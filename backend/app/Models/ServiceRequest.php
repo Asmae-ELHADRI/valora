@@ -15,6 +15,7 @@ class ServiceRequest extends Model
         'created_by_id',
         'message',
         'status',
+        'is_read',
     ];
 
     public function serviceOffer()
@@ -25,5 +26,10 @@ class ServiceRequest extends Model
     public function provider()
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+
+    public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by_id');
     }
 }

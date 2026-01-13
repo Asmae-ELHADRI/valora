@@ -10,6 +10,62 @@ use Illuminate\Http\Request;
 class ServiceRequestController extends Controller
 {
     /**
+     * List applications/requests for the client.
+     * Includes applications to their offers AND direct invitations they sent.
+     */
+    public function clientIndex(Request $request)
+    {
+        $user = $request->user();
+        
+        $requests = ServiceRequest::with(['serviceOffer.category', 'provider', 'creator'])
+            ->where(function ($query) use ($user) {
+                $query->whereHas('serviceOffer', function ($q) use ($user) {
+                    $q->where('user_id', $user->id);
+                })
+                ->orWhere('created_by_id', $user->id);
+            })
+            ->latest()
+            ->get();
+
+        // Mark as read for the client (where they are either offer owner or invited? No, simply if they see them)
+        // Actually, only mark as read if they didn't create it? No, client sees applications to their offers.
+        ServiceRequest::whereHas('serviceOffer', function ($q) use ($user) {
+                $q->where('user_id', $user->id);
+            })
+            ->where('created_by_id', '!=', $user->id)
+            ->where('is_read', false)
+            ->update(['is_read' => true]);
+
+        return response()->json($requests);
+    }
+
+    /**
+     * Get unread notifications counts.
+     */
+    public function unreadCounts(Request $request)
+    {
+        $user = $request->user();
+        
+        $candidaturesCount = ServiceRequest::whereHas('serviceOffer', function ($q) use ($user) {
+                $q->where('user_id', $user->id);
+            })
+            ->where('created_by_id', '!=', $user->id)
+            ->where('is_read', false)
+            ->count();
+
+        // Providers also get notifications for direct invites
+        $invitationsCount = ServiceRequest::where('user_id', $user->id)
+            ->where('created_by_id', '!=', $user->id)
+            ->where('is_read', false)
+            ->count();
+
+        return response()->json([
+            'candidatures_count' => $candidaturesCount,
+            'invitations_count' => $invitationsCount
+        ]);
+    }
+
+    /**
      * Provider applies to an offer.
      */
     public function apply(Request $request)
@@ -20,6 +76,12 @@ class ServiceRequestController extends Controller
         ]);
 
         $user = $request->user();
+        $offer = ServiceOffer::findOrFail($request->service_offer_id);
+
+        // Block check
+        if ($offer->user->isBlockedBy($user->id) || $user->isBlockedBy($offer->user_id)) {
+            return response()->json(['message' => 'Action impossible avec cet utilisateur'], 403);
+        }
 
         // Check if already applied
         $existing = ServiceRequest::where('service_offer_id', $request->service_offer_id)
@@ -45,47 +107,102 @@ class ServiceRequestController extends Controller
     }
 
     /**
+     * Client invites a provider for a specific offer.
+     */
+    public function invite(Request $request)
+    {
+        $request->validate([
+            'service_offer_id' => 'required|exists:service_offers,id',
+            'provider_id' => 'required|exists:users,id',
+            'message' => 'nullable|string',
+        ]);
+
+        $user = $request->user();
+        $provider = \App\Models\User::findOrFail($request->provider_id);
+
+        if ($provider->isBlockedBy($user->id) || $user->isBlockedBy($provider->id)) {
+            return response()->json(['message' => 'Action impossible avec cet utilisateur'], 403);
+        }
+
+        // Ensure the offer belongs to the client
+        $offer = ServiceOffer::where('id', $request->service_offer_id)
+            ->where('user_id', $user->id)
+            ->firstOrFail();
+
+        $serviceRequest = ServiceRequest::create([
+            'service_offer_id' => $request->service_offer_id,
+            'user_id' => $request->provider_id,
+            'created_by_id' => $user->id,
+            'message' => $request->message,
+            'status' => 'pending',
+        ]);
+
+        return response()->json([
+            'message' => 'Invitation envoyée avec succès',
+            'data' => $serviceRequest
+        ]);
+    }
+
+    /**
      * List current user's applications (as provider).
      */
     public function providerIndex(Request $request)
     {
         $user = $request->user();
-        $requests = ServiceRequest::with(['serviceOffer.user', 'serviceOffer.category'])
+        $requests = ServiceRequest::with(['serviceOffer.user', 'serviceOffer.category', 'creator'])
             ->where('user_id', $user->id)
             ->latest()
             ->get();
+
+        // Mark invitations as read
+        ServiceRequest::where('user_id', $user->id)
+            ->where('created_by_id', '!=', $user->id)
+            ->where('is_read', false)
+            ->update(['is_read' => true]);
 
         return response()->json($requests);
     }
 
     /**
-     * Update status (Accept/Reject for provider if client invited them, or Finish).
-     * In this basic version, we'll allow status updates.
+     * Update status (Accept/Reject/Complete/Cancel).
      */
     public function updateStatus(Request $request, $id)
     {
         $request->validate([
-            'status' => 'required|in:accepted,rejected,completed'
+            'status' => 'required|in:accepted,rejected,completed,cancelled'
         ]);
 
         $user = $request->user();
-        $serviceRequest = ServiceRequest::findOrFail($id);
+        $serviceRequest = ServiceRequest::with('serviceOffer')->findOrFail($id);
 
-        // Authorization: logic depends on who can change status
-        // For now, let's keep it simple: the provider can accept/reject if they were invited,
-        // or the client can accept/reject if the provider applied.
-        // And either can complete if it's accepted.
-        
+        // Basic Authorization check
+        // Client can: Accept/Reject if provider applied. Cancel if they invited.
+        // Provider can: Accept/Reject if client invited. Cancel if they applied.
+        // Both can: Complete if accepted.
+
         $serviceRequest->update(['status' => $request->status]);
 
-        // If completed, maybe update the offer status too
-        if ($request->status === 'completed') {
-            $serviceRequest->serviceOffer->update(['status' => 'completed']);
+        // Side effects
+        if ($request->status === 'accepted') {
+            // When an application is accepted, the offer status changes to in_progress
+            $serviceRequest->serviceOffer->update(['status' => 'in_progress']);
+            
+            // Optionally: reject all other pending applications for this offer? 
+            // Let's keep it simple for now and allow multiple if needed, or user can manually reject.
+        }
+
+        if ($request->status === 'completed' || $request->status === 'cancelled') {
+            // If mission is finished or cancelled, but no other mission is active, 
+            // we could revert offer to open? Or just keep it as is.
+            // Usually, if a mission starts, the offer is "filled".
+            if ($request->status === 'completed') {
+                $serviceRequest->serviceOffer->update(['status' => 'completed']);
+            }
         }
 
         return response()->json([
             'message' => 'Statut mis à jour',
-            'data' => $serviceRequest
+            'data' => $serviceRequest->load(['serviceOffer', 'provider', 'creator'])
         ]);
     }
 }

@@ -84,6 +84,12 @@ const routes = [
         meta: { requiresAuth: true, role: 'client' }
     },
     {
+        path: '/security',
+        name: 'Security',
+        component: () => import('../views/Security.vue'),
+        meta: { requiresAuth: true }
+    },
+    {
         path: '/providers',
         name: 'ProviderSearch',
         component: () => import('../views/ProviderSearch.vue'),
@@ -105,6 +111,8 @@ router.beforeEach(async (to, from, next) => {
 
     if (to.meta.requiresAuth && !auth.isAuthenticated) {
         next('/login')
+    } else if (to.meta.guestOnly && auth.isAuthenticated) {
+        next('/dashboard')
     } else if (to.meta.role && auth.user?.role !== to.meta.role) {
         next('/dashboard')
     } else {

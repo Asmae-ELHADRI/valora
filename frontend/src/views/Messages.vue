@@ -5,7 +5,8 @@ import api from '../services/api';
 import { 
   Send, User, Search as SearchIcon, 
   MoreVertical, Phone, Video, Info,
-  Check, CheckCheck, Loader2, ArrowLeft, MessageSquare
+  Check, CheckCheck, Loader2, ArrowLeft, MessageSquare,
+  ShieldAlert, Ban, MoreHorizontal, AlertTriangle
 } from 'lucide-vue-next';
 
 const auth = useAuthStore();
@@ -16,6 +17,13 @@ const newMessage = ref('');
 const loadingConversations = ref(true);
 const loadingMessages = ref(false);
 const messageContainer = ref(null);
+
+const showReportModal = ref(false);
+const showBlockModal = ref(false);
+const reportForm = ref({ reason: '', description: '' });
+const reporting = ref(false);
+const blocking = ref(false);
+const showActions = ref(false);
 
 let pollingInterval = null;
 
@@ -51,6 +59,7 @@ const selectConversation = async (conv) => {
 
 const sendMessage = async () => {
   if (!newMessage.value.trim() || !activeConversation.value) return;
+  if (activeConversation.value.user.is_blocked_by || activeConversation.value.user.has_blocked) return;
 
   const content = newMessage.value;
   newMessage.value = '';
@@ -65,6 +74,46 @@ const sendMessage = async () => {
     fetchConversations(true);
   } catch (err) {
     console.error('Erreur envoi message:', err);
+    if (err.response?.status === 403) {
+      alert('Action impossible : vous avez bloqué cet utilisateur ou vice versa.');
+    }
+  }
+};
+
+const submitReport = async () => {
+  if (!reportForm.value.reason) return;
+  reporting.value = true;
+  try {
+    await api.post('/api/report', {
+      reported_id: activeConversation.value.user.id,
+      reason: `${reportForm.value.reason}: ${reportForm.value.description}`
+    });
+    alert('Signalement envoyé.');
+    showReportModal.value = false;
+    reportForm.value = { reason: '', description: '' };
+  } catch (err) {
+    alert('Erreur lors du signalement');
+  } finally {
+    reporting.value = false;
+  }
+};
+
+const toggleBlock = async () => {
+  blocking.value = true;
+  try {
+    if (activeConversation.value.user.has_blocked) {
+      await api.delete(`/api/block/${activeConversation.value.user.id}`);
+      activeConversation.value.user.has_blocked = false;
+    } else {
+      await api.post('/api/block', { blocked_id: activeConversation.value.user.id });
+      activeConversation.value.user.has_blocked = true;
+    }
+    showBlockModal.value = false;
+    fetchConversations(true);
+  } catch (err) {
+    alert('Erreur lors de l\'action');
+  } finally {
+    blocking.value = false;
   }
 };
 
@@ -179,16 +228,19 @@ const getInitials = (name) => {
                 <p class="text-[10px] text-green-500 font-bold uppercase tracking-wider">En ligne</p>
               </div>
             </div>
-            <div class="flex items-center space-x-2">
-              <button class="p-2.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition">
-                <Phone class="w-5 h-5" />
+            <div class="flex items-center space-x-2 relative">
+              <button @click="showActions = !showActions" class="p-2.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition">
+                <MoreHorizontal class="w-5 h-5" />
               </button>
-              <button class="p-2.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition">
-                <Video class="w-5 h-5" />
-              </button>
-              <button class="p-2.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition">
-                <Info class="w-5 h-5" />
-              </button>
+              
+              <div v-if="showActions" class="absolute top-full right-0 mt-2 w-48 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-20">
+                <button @click="showReportModal = true; showActions = false" class="w-full px-4 py-2 text-left text-sm text-orange-600 hover:bg-orange-50 font-bold flex items-center">
+                  <ShieldAlert class="w-4 h-4 mr-2" /> Signaler
+                </button>
+                <button @click="showBlockModal = true; showActions = false" class="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 font-bold flex items-center">
+                  <Ban class="w-4 h-4 mr-2" /> {{ activeConversation.user.has_blocked ? 'Débloquer' : 'Bloquer' }}
+                </button>
+              </div>
             </div>
           </div>
 
@@ -223,7 +275,7 @@ const getInitials = (name) => {
           </div>
 
           <!-- Input Area -->
-          <div class="p-4 md:p-6 bg-white border-t border-gray-100">
+          <div v-if="!activeConversation.user.is_blocked_by && !activeConversation.user.has_blocked" class="p-4 md:p-6 bg-white border-t border-gray-100">
             <form @submit.prevent="sendMessage" class="flex items-center space-x-4">
               <div class="flex-grow relative">
                 <input 
@@ -242,6 +294,12 @@ const getInitials = (name) => {
               </button>
             </form>
           </div>
+          <div v-else class="p-6 bg-gray-100/50 border-t border-gray-100 text-center">
+            <p class="text-sm font-bold text-gray-400 flex items-center justify-center">
+              <Ban class="w-4 h-4 mr-2" />
+              {{ activeConversation.user.has_blocked ? 'Vous avez bloqué cet utilisateur.' : 'Cet utilisateur vous a bloqué.' }}
+            </p>
+          </div>
         </template>
 
         <div v-else class="flex-grow flex flex-col items-center justify-center p-12 text-center">
@@ -253,6 +311,54 @@ const getInitials = (name) => {
         </div>
       </div>
 
+    </div>
+
+    <!-- Report Modal (Same as search) -->
+    <div v-if="showReportModal" class="fixed inset-0 z-[120] flex items-center justify-center p-4">
+      <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" @click="showReportModal = false"></div>
+      <div class="relative bg-white w-full max-w-lg rounded-[40px] shadow-2xl p-10 animate-in fade-in zoom-in duration-300">
+        <div class="text-center mb-8">
+          <div class="w-16 h-16 bg-orange-50 rounded-2xl flex items-center justify-center mx-auto mb-4 text-orange-600">
+            <ShieldAlert class="w-8 h-8" />
+          </div>
+          <h3 class="text-2xl font-black text-gray-900">Signaler un problème</h3>
+          <p class="text-sm text-gray-500 mt-2">Votre signalement sera examiné par nos modérateurs.</p>
+        </div>
+        <div class="space-y-6">
+          <select v-model="reportForm.reason" class="w-full px-5 py-4 rounded-2xl border border-gray-100 bg-gray-50 outline-none font-bold text-gray-700">
+            <option value="" disabled>Raison du signalement</option>
+            <option value="scam">Arnaque</option>
+            <option value="harassment">Harcèlement</option>
+            <option value="unprofessional">Non professionnel</option>
+            <option value="other">Autre</option>
+          </select>
+          <textarea v-model="reportForm.description" rows="3" placeholder="Détails (facultatif)" class="w-full px-5 py-4 rounded-2xl border border-gray-100 bg-gray-50 outline-none"></textarea>
+          <div class="flex gap-4">
+            <button @click="showReportModal = false" class="flex-grow py-4 rounded-2xl font-bold text-gray-500">Annuler</button>
+            <button @click="submitReport" :disabled="reporting || !reportForm.reason" class="flex-grow py-4 rounded-2xl font-bold bg-orange-600 text-white">Signaler</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Block Modal -->
+    <div v-if="showBlockModal" class="fixed inset-0 z-[120] flex items-center justify-center p-4">
+      <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" @click="showBlockModal = false"></div>
+      <div class="relative bg-white w-full max-w-sm rounded-[40px] shadow-2xl p-10 animate-in fade-in zoom-in duration-300 text-center">
+        <div class="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4 text-red-600">
+          <Ban class="w-8 h-8" />
+        </div>
+        <h3 class="text-2xl font-black text-gray-900">{{ activeConversation.user.has_blocked ? 'Débloquer' : 'Bloquer' }} {{ activeConversation.user.name }} ?</h3>
+        <p class="text-sm text-gray-500 mt-4 mb-8">
+          {{ activeConversation.user.has_blocked ? 'Vous pourrez à nouveau échanger.' : 'Vous ne recevrez plus de messages de sa part.' }}
+        </p>
+        <div class="space-y-3">
+          <button @click="toggleBlock" :disabled="blocking" :class="activeConversation.user.has_blocked ? 'bg-blue-600' : 'bg-red-600'" class="w-full py-4 rounded-2xl font-bold text-white hover:opacity-90 transition">
+             {{ activeConversation.user.has_blocked ? 'Débloquer' : 'Bloquer' }}
+          </button>
+          <button @click="showBlockModal = false" class="w-full py-4 rounded-2xl font-bold text-gray-500">Annuler</button>
+        </div>
+      </div>
     </div>
   </div>
 </template>

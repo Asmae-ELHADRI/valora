@@ -5,7 +5,8 @@ import api from '../services/api';
 import { 
   Search, Filter, MapPin, Star, Briefcase, 
   ChevronRight, X, Loader2, Info, User,
-  MessageSquare, GraduationCap, Award
+  MessageSquare, GraduationCap, Award, Send, CheckCircle, AlertCircle,
+  ShieldAlert, Ban
 } from 'lucide-vue-next';
 import { useRouter } from 'vue-router';
 
@@ -16,6 +17,21 @@ const categories = ref([]);
 const loading = ref(false);
 const selectedProvider = ref(null);
 const showFilters = ref(false);
+const showInviteModal = ref(false);
+const clientOffers = ref([]);
+const selectedOfferId = ref('');
+const invitationMessage = ref('');
+const inviting = ref(false);
+
+const showReportModal = ref(false);
+const reportForm = ref({
+  reason: '',
+  description: ''
+});
+const reporting = ref(false);
+
+const showBlockModal = ref(false);
+const blocking = ref(false);
 
 const filters = ref({
   keyword: '',
@@ -88,6 +104,76 @@ const resetFilters = () => {
 
 const startConversation = (providerId) => {
   router.push(`/messages?userId=${providerId}`);
+};
+
+const fetchClientOffers = async () => {
+  try {
+    const response = await api.get('/api/offers/my-offers');
+    clientOffers.value = response.data.filter(o => o.status === 'open');
+  } catch (err) {
+    console.error('Erreur chargement offres:', err);
+  }
+};
+
+const openInviteModal = () => {
+  fetchClientOffers();
+  showInviteModal.value = true;
+};
+
+const submitInvitation = async () => {
+  if (!selectedOfferId.value) return;
+  
+  inviting.value = true;
+  try {
+    await api.post('/api/invite', {
+      service_offer_id: selectedOfferId.value,
+      provider_id: selectedProvider.value.id,
+      message: invitationMessage.value
+    });
+    alert('Invitation envoyée !');
+    showInviteModal.value = false;
+    selectedOfferId.value = '';
+    invitationMessage.value = '';
+  } catch (err) {
+    alert(err.response?.data?.message || 'Erreur lors de l\'envoi');
+  } finally {
+    inviting.value = false;
+  }
+};
+
+const submitReport = async () => {
+  if (!reportForm.value.reason) return;
+  reporting.value = true;
+  try {
+    await api.post('/api/report', {
+      reported_id: selectedProvider.value.id,
+      reason: `${reportForm.value.reason}: ${reportForm.value.description}`
+    });
+    alert('Signalement envoyé. Merci de nous aider à garder VALORA sûr.');
+    showReportModal.value = false;
+    reportForm.value = { reason: '', description: '' };
+  } catch (err) {
+    alert(err.response?.data?.message || 'Erreur lors du signalement');
+  } finally {
+    reporting.value = false;
+  }
+};
+
+const blockUser = async () => {
+  blocking.value = true;
+  try {
+    await api.post('/api/block', {
+      blocked_id: selectedProvider.value.id
+    });
+    alert('Utilisateur bloqué.');
+    showBlockModal.value = false;
+    selectedProvider.value = null; // Close profile
+    fetchProviders(); // Refresh list to hide blocked user
+  } catch (err) {
+    alert(err.response?.data?.message || 'Erreur lors du blocage');
+  } finally {
+    blocking.value = false;
+  }
 };
 </script>
 
@@ -314,17 +400,147 @@ const startConversation = (providerId) => {
           </div>
         </div>
 
-        <div class="p-10 bg-gray-50 border-t border-gray-100 flex gap-4">
+        <div class="p-10 bg-gray-50 border-t border-gray-100 flex flex-wrap gap-4">
+          <button 
+            v-if="auth.isClient"
+            @click="openInviteModal"
+            class="flex-grow bg-blue-600 text-white py-5 px-8 rounded-3xl font-bold hover:bg-blue-700 shadow-xl shadow-blue-100 transition active:scale-[0.98] flex items-center justify-center space-x-3"
+          >
+            <Briefcase class="w-6 h-6" />
+            <span>Proposer une mission</span>
+          </button>
+          
           <button 
             @click="startConversation(selectedProvider.id)"
-            class="flex-grow bg-blue-600 text-white py-5 rounded-3xl font-bold hover:bg-blue-700 shadow-xl shadow-blue-100 transition active:scale-[0.98] flex items-center justify-center space-x-3"
+            class="flex-grow bg-white text-blue-600 border-2 border-blue-50 py-5 px-8 rounded-3xl font-bold hover:bg-blue-50 transition active:scale-[0.98] flex items-center justify-center space-x-3"
           >
             <MessageSquare class="w-6 h-6" />
-            <span>Contacter ce prestataire</span>
+            <span>Contacter</span>
           </button>
+          
+          <div class="flex gap-2">
+            <button 
+              @click="showReportModal = true"
+              class="p-5 bg-white text-orange-500 border border-orange-100 rounded-3xl hover:bg-orange-50 transition"
+              title="Signaler"
+            >
+              <ShieldAlert class="w-6 h-6" />
+            </button>
+            <button 
+              @click="showBlockModal = true"
+              class="p-5 bg-white text-red-500 border border-red-100 rounded-3xl hover:bg-red-50 transition"
+              title="Bloquer"
+            >
+              <Ban class="w-6 h-6" />
+            </button>
+          </div>
+          
           <button @click="closeProvider" class="px-10 py-5 bg-white text-gray-700 border border-gray-200 rounded-3xl font-bold hover:bg-gray-100 transition">
             Fermer
           </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Invitation Modal -->
+    <div v-if="showInviteModal" class="fixed inset-0 z-[110] flex items-center justify-center p-4">
+      <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" @click="showInviteModal = false"></div>
+      <div class="relative bg-white w-full max-w-lg rounded-[40px] shadow-2xl p-10 animate-in fade-in zoom-in duration-300">
+        <button @click="showInviteModal = false" class="absolute top-6 right-6 p-2 rounded-2xl bg-gray-100 text-gray-500 hover:bg-red-50 hover:text-red-600 transition">
+          <X class="w-6 h-6" />
+        </button>
+
+        <div class="text-center mb-8">
+          <div class="w-20 h-20 bg-blue-50 rounded-3xl flex items-center justify-center mx-auto mb-6 text-blue-600">
+            <Send class="w-10 h-10" />
+          </div>
+          <h3 class="text-2xl font-black text-gray-900">Proposer une mission</h3>
+          <p class="text-gray-500 mt-2">Invitez {{ selectedProvider?.name }} à travailler sur l'un de vos projets.</p>
+        </div>
+
+        <div class="space-y-6">
+          <div v-if="clientOffers.length > 0">
+            <label class="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Sélectionnez une offre</label>
+            <select v-model="selectedOfferId" class="w-full px-5 py-4 rounded-2xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition appearance-none font-bold text-gray-700">
+              <option value="" disabled>Choisir parmi vos offres ouvertes</option>
+              <option v-for="offer in clientOffers" :key="offer.id" :value="offer.id">{{ offer.title }}</option>
+            </select>
+          </div>
+          <div v-else class="p-6 bg-yellow-50 rounded-2xl border border-yellow-100 flex items-start space-x-3">
+            <AlertCircle class="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+            <p class="text-sm text-yellow-700 font-medium">Vous n'avez aucune offre ouverte. Veuillez <router-link to="/post-offer" class="underline font-bold">en créer une</router-link> avant d'inviter un prestataire.</p>
+          </div>
+
+          <div v-if="clientOffers.length > 0">
+            <label class="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Message (Optionnel)</label>
+            <textarea 
+              v-model="invitationMessage"
+              rows="4" 
+              placeholder="Bonjour, j'aimerais vous proposer ce projet car votre profil correspond parfaitement..."
+              class="w-full px-5 py-4 rounded-2xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition font-medium text-gray-700"
+            ></textarea>
+          </div>
+
+          <button 
+            v-if="clientOffers.length > 0"
+            @click="submitInvitation"
+            :disabled="!selectedOfferId || inviting"
+            class="w-full bg-blue-600 text-white py-5 rounded-3xl font-bold hover:bg-blue-700 shadow-xl shadow-blue-100 transition active:scale-[0.98] flex items-center justify-center space-x-3 disabled:opacity-50 disabled:grayscale"
+          >
+            <Loader2 v-if="inviting" class="w-6 h-6 animate-spin" />
+            <Send v-else class="w-6 h-6" />
+            <span>Envoyer l'invitation</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Report Modal -->
+    <div v-if="showReportModal" class="fixed inset-0 z-[120] flex items-center justify-center p-4">
+      <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" @click="showReportModal = false"></div>
+      <div class="relative bg-white w-full max-w-lg rounded-[40px] shadow-2xl p-10 animate-in fade-in zoom-in duration-300">
+        <div class="text-center mb-8">
+          <div class="w-16 h-16 bg-orange-50 rounded-2xl flex items-center justify-center mx-auto mb-4 text-orange-600">
+            <ShieldAlert class="w-8 h-8" />
+          </div>
+          <h3 class="text-2xl font-black text-gray-900">Signaler un problème</h3>
+          <p class="text-sm text-gray-500 mt-2">Votre signalement est anonyme et sera traité par notre équipe de modération.</p>
+        </div>
+        <div class="space-y-6">
+          <div>
+            <label class="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Raison du signalement</label>
+            <select v-model="reportForm.reason" class="w-full px-5 py-4 rounded-2xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none font-bold text-gray-700">
+              <option value="" disabled>Pourquoi signalez-vous ce profil ?</option>
+              <option value="scam">Arnaque ou fraude</option>
+              <option value="harassment">Harcèlement ou propos offensants</option>
+              <option value="unprofessional">Comportement non professionnel</option>
+              <option value="other">Autre</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Description complémentaire</label>
+            <textarea v-model="reportForm.description" rows="3" class="w-full px-5 py-4 rounded-2xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none font-medium text-gray-700"></textarea>
+          </div>
+          <div class="flex gap-4">
+            <button @click="showReportModal = false" class="flex-grow py-4 rounded-2xl font-bold border border-gray-200 text-gray-500 hover:bg-gray-50 transition">Annuler</button>
+            <button @click="submitReport" :disabled="reporting || !reportForm.reason" class="flex-grow py-4 rounded-2xl font-bold bg-orange-600 text-white hover:bg-orange-700 disabled:opacity-50 transition">Envoyer</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Block Modal -->
+    <div v-if="showBlockModal" class="fixed inset-0 z-[120] flex items-center justify-center p-4">
+      <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" @click="showBlockModal = false"></div>
+      <div class="relative bg-white w-full max-w-sm rounded-[40px] shadow-2xl p-10 animate-in fade-in zoom-in duration-300 text-center">
+        <div class="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4 text-red-600">
+          <Ban class="w-8 h-8" />
+        </div>
+        <h3 class="text-2xl font-black text-gray-900">Bloquer {{ selectedProvider?.name }} ?</h3>
+        <p class="text-sm text-gray-500 mt-4 mb-8">Vous ne pourrez plus échanger de messages ni collaborer avec cette personne. Cette action est réversible.</p>
+        <div class="space-y-3">
+          <button @click="blockUser" :disabled="blocking" class="w-full py-4 rounded-2xl font-bold bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 transition">Bloquer l'utilisateur</button>
+          <button @click="showBlockModal = false" class="w-full py-4 rounded-2xl font-bold text-gray-500 hover:bg-gray-50 transition">Annuler</button>
         </div>
       </div>
     </div>

@@ -27,36 +27,8 @@ class User extends Authenticatable
         'address',
         'password',
         'role',
-    ];
-
-    public function prestataire()
-    {
-        return $this->hasOne(Prestataire::class);
-    }
-
-    public function client()
-    {
-        return $this->hasOne(Client::class);
-    }
-
-    public function serviceOffers()
-    {
-        return $this->hasMany(ServiceOffer::class);
-    }
-
-    public function serviceRequests()
-    {
-        return $this->hasMany(ServiceRequest::class);
-    }
-
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var list<string>
-     */
-    protected $hidden = [
-        'password',
-        'remember_token',
+        'role_id',
+        'is_active',
     ];
 
     /**
@@ -69,6 +41,72 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_active' => 'boolean',
+            'role_id' => 'integer',
         ];
     }
+
+    public function prestataire()
+    {
+        return $this->hasOne(Prestataire::class);
+    }
+
+    public function client()
+    {
+        return $this->hasOne(Client::class);
+    }
+
+    public function roleModel()
+    {
+        return $this->belongsTo(Role::class, 'role_id');
+    }
+
+    public function hasPermission($permissionSlug)
+    {
+        if (!$this->roleModel) {
+            return false;
+        }
+
+        return $this->roleModel->permissions()->where('slug', $permissionSlug)->exists();
+    }
+
+    public function serviceOffers()
+    {
+        return $this->hasMany(ServiceOffer::class);
+    }
+
+    public function serviceRequests()
+    {
+        return $this->hasMany(ServiceRequest::class);
+    }
+
+    public function blockedUsers()
+    {
+        return $this->belongsToMany(User::class, 'user_blocks', 'blocker_id', 'blocked_id');
+    }
+
+    public function blockers()
+    {
+        return $this->belongsToMany(User::class, 'user_blocks', 'blocked_id', 'blocker_id');
+    }
+
+    public function isBlockedBy($userId)
+    {
+        return $this->blockers()->where('blocker_id', $userId)->exists();
+    }
+
+    public function hasBlocked($userId)
+    {
+        return $this->blockedUsers()->where('blocked_id', $userId)->exists();
+    }
+
+    /**
+     * The attributes that should be hidden for serialization.
+     *
+     * @var list<string>
+     */
+    protected $hidden = [
+        'password',
+        'remember_token',
+    ];
 }

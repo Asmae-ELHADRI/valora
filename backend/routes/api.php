@@ -23,6 +23,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // Application routes
     Route::post('/apply', [\App\Http\Controllers\Api\ServiceRequestController::class, 'apply']);
     Route::get('/my-applications', [\App\Http\Controllers\Api\ServiceRequestController::class, 'providerIndex']);
+    Route::get('/my-requests', [\App\Http\Controllers\Api\ServiceRequestController::class, 'clientIndex']);
+    Route::get('/requests/unread-count', [\App\Http\Controllers\Api\ServiceRequestController::class, 'unreadCounts']);
+    Route::post('/invite', [\App\Http\Controllers\Api\ServiceRequestController::class, 'invite']);
     Route::post('/service-requests/{id}/status', [\App\Http\Controllers\Api\ServiceRequestController::class, 'updateStatus']);
 
     // Messaging routes
@@ -32,8 +35,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/messages', [\App\Http\Controllers\Api\MessageController::class, 'store']);
 
     // Review routes
-    Route::get('/my-reviews', [\App\Http\Controllers\Api\ReviewController::class, 'providerReviews']);
+    Route::get('/reviews/provider', [\App\Http\Controllers\Api\ReviewController::class, 'providerReviews']);
+    Route::get('/reviews/client', [\App\Http\Controllers\Api\ReviewController::class, 'clientReviews']);
     Route::post('/reviews', [\App\Http\Controllers\Api\ReviewController::class, 'store']);
+    Route::put('/reviews/{id}', [\App\Http\Controllers\Api\ReviewController::class, 'update']);
+    Route::delete('/reviews/{id}', [\App\Http\Controllers\Api\ReviewController::class, 'destroy']);
 
     // Security & Account
     Route::post('/password/update', [\App\Http\Controllers\Api\AuthController::class, 'updatePassword']);
@@ -53,6 +59,34 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('client')->group(function () {
         Route::post('/profile', [\App\Http\Controllers\Api\ClientController::class, 'updateProfile']);
         Route::post('/photo', [\App\Http\Controllers\Api\ClientController::class, 'uploadPhoto']);
+    });
+
+    // Security routes
+    Route::post('/report', [\App\Http\Controllers\Api\SecurityController::class, 'report']);
+    Route::post('/block', [\App\Http\Controllers\Api\SecurityController::class, 'block']);
+    Route::delete('/block/{id}', [\App\Http\Controllers\Api\SecurityController::class, 'unblock']);
+    Route::get('/blocked-users', [\App\Http\Controllers\Api\SecurityController::class, 'blockedList']);
+
+    // Admin Specific Routes
+    Route::middleware([\App\Http\Middleware\CheckAdminRole::class])->prefix('admin')->group(function () {
+        Route::get('/stats', [\App\Http\Controllers\Api\AdminController::class, 'stats']);
+        Route::get('/users', [\App\Http\Controllers\Api\AdminController::class, 'index']);
+        Route::post('/users', [\App\Http\Controllers\Api\AdminController::class, 'store']);
+        Route::put('/users/{id}', [\App\Http\Controllers\Api\AdminController::class, 'update']);
+        Route::post('/users/{id}/toggle-status', [\App\Http\Controllers\Api\AdminController::class, 'toggleStatus']);
+        Route::delete('/users/{id}', [\App\Http\Controllers\Api\AdminController::class, 'destroy']);
+        
+        Route::get('/complaints', [\App\Http\Controllers\Api\AdminController::class, 'complaints']);
+        Route::post('/complaints/{id}/status', [\App\Http\Controllers\Api\AdminController::class, 'updateComplaintStatus']);
+
+        Route::get('/roles', [\App\Http\Controllers\Api\AdminController::class, 'roles']);
+        Route::put('/roles/{id}/permissions', [\App\Http\Controllers\Api\AdminController::class, 'updateRolePermissions']);
+
+        // Service Categories Management
+        Route::get('/categories', [\App\Http\Controllers\Admin\ServiceCategoryController::class, 'index']);
+        Route::post('/categories', [\App\Http\Controllers\Admin\ServiceCategoryController::class, 'store']);
+        Route::put('/categories/{id}', [\App\Http\Controllers\Admin\ServiceCategoryController::class, 'update']);
+        Route::delete('/categories/{id}', [\App\Http\Controllers\Admin\ServiceCategoryController::class, 'destroy']);
     });
 });
 

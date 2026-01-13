@@ -3,20 +3,25 @@ import { ref, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from './store/auth';
 import api from './services/api';
-import { LogOut, User as UserIcon, MessageSquare, Search } from 'lucide-vue-next';
+import { LogOut, User as UserIcon, MessageSquare, Search, Settings } from 'lucide-vue-next';
 
 const auth = useAuthStore();
 const router = useRouter();
 const unreadCount = ref(0);
+const reqCount = ref(0);
 let countInterval = null;
 
 const fetchUnreadCount = async () => {
   if (!auth.isAuthenticated) return;
   try {
-    const response = await api.get('/api/messages/unread-count');
-    unreadCount.value = response.data.count;
+    const [msgRes, reqRes] = await Promise.all([
+      api.get('/api/messages/unread-count'),
+      api.get('/api/requests/unread-count')
+    ]);
+    unreadCount.value = msgRes.data.count;
+    reqCount.value = auth.isClient ? reqRes.data.candidatures_count : reqRes.data.invitations_count;
   } catch (err) {
-    console.error('Erreur unread count:', err);
+    console.error('Erreur counts:', err);
   }
 };
 
@@ -75,8 +80,14 @@ onUnmounted(() => {
                   {{ unreadCount }}
                 </span>
               </router-link>
-              <router-link to="/profile" class="text-gray-500 hover:text-gray-700 p-2">
+              <router-link to="/profile" class="text-gray-500 hover:text-gray-700 p-2 relative">
                 <UserIcon class="w-5 h-5" />
+                <span v-if="reqCount > 0" class="absolute top-0 right-0 w-4 h-4 bg-orange-500 text-white text-[10px] flex items-center justify-center rounded-full font-bold border-2 border-white">
+                  {{ reqCount }}
+                </span>
+              </router-link>
+              <router-link to="/security" class="text-gray-500 hover:text-gray-700 p-2">
+                <Settings class="w-5 h-5" />
               </router-link>
               <button @click="logout" class="text-gray-500 hover:text-red-600 p-2">
                 <LogOut class="w-5 h-5" />
@@ -102,9 +113,7 @@ onUnmounted(() => {
 </template>
 
 <style>
-@reference "tailwindcss";
-
 .router-link-active {
-  @apply !text-blue-600;
+  color: #2563eb !important;
 }
 </style>

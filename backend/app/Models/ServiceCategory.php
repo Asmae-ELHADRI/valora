@@ -9,7 +9,12 @@ class ServiceCategory extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name', 'slug', 'icon'];
+    protected $fillable = ['name', 'slug', 'icon', 'description'];
+
+    public function scopeAlphabetical($query)
+    {
+        return $query->orderBy('name', 'asc');
+    }
 
     public function serviceOffers()
     {

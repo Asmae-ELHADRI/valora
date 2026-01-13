@@ -43,7 +43,14 @@ class MessageController extends Controller
                 ->count();
 
             return [
-                'user' => $user,
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'role' => $user->role,
+                    'is_blocked_by' => $user->isBlockedBy($userId),
+                    'has_blocked' => $user->hasBlocked($userId),
+                ],
                 'last_message' => $lastMessage,
                 'unread_count' => $unreadCount
             ];
@@ -81,10 +88,10 @@ class MessageController extends Controller
      */
     public function store(Request $request)
     {
-        $request->validate([
-            'receiver_id' => 'required|exists:users,id',
-            'content' => 'required|string',
-        ]);
+        $receiver = User::findOrFail($request->receiver_id);
+        if ($receiver->isBlockedBy($request->user()->id) || $request->user()->isBlockedBy($receiver->id)) {
+            return response()->json(['message' => 'Communication impossible avec cet utilisateur.'], 403);
+        }
 
         $message = Message::create([
             'sender_id' => $request->user()->id,
