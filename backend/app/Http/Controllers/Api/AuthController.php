@@ -55,6 +55,13 @@ class AuthController extends Controller
         ]);
 
         if (!Auth::attempt($request->only('email', 'password'))) {
+            \App\Models\ActivityLog::create([
+                'action' => 'login_failed',
+                'description' => "Tentative de connexion échouée pour l'email: " . $request->email,
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+            ]);
+
             throw ValidationException::withMessages([
                 'email' => ['Les identifiants sont incorrects.'],
             ]);
@@ -63,6 +70,14 @@ class AuthController extends Controller
         $user = User::where('email', $request->email)->firstOrFail();
 
         if (!$user->is_active) {
+            \App\Models\ActivityLog::create([
+                'user_id' => $user->id,
+                'action' => 'login_failed',
+                'description' => 'Tentative de connexion sur un compte désactivé.',
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+            ]);
+
             throw ValidationException::withMessages([
                 'email' => ['Votre compte a été désactivé par un administrateur.'],
             ]);
@@ -80,6 +95,14 @@ class AuthController extends Controller
     public function logout(Request $request)
     {
         $request->user()->tokens()->delete();
+        
+        \App\Models\ActivityLog::create([
+            'user_id' => $request->user()->id,
+            'action' => 'logout',
+            'description' => 'Déconnexion réussie',
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+        ]);
 
         return response()->json([
             'message' => 'Déconnexion réussie',
@@ -108,6 +131,14 @@ class AuthController extends Controller
 
         $user->update([
             'password' => Hash::make($request->password),
+        ]);
+
+        \App\Models\ActivityLog::create([
+            'user_id' => $user->id,
+            'action' => 'update_password',
+            'description' => 'Mot de passe modifié',
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
         ]);
 
         return response()->json([

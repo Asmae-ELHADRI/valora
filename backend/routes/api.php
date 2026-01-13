@@ -87,6 +87,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/categories', [\App\Http\Controllers\Admin\ServiceCategoryController::class, 'store']);
         Route::put('/categories/{id}', [\App\Http\Controllers\Admin\ServiceCategoryController::class, 'update']);
         Route::delete('/categories/{id}', [\App\Http\Controllers\Admin\ServiceCategoryController::class, 'destroy']);
+
+        // Moderation
+        Route::post('/users/{id}/warn', [\App\Http\Controllers\Api\AdminController::class, 'warnUser']);
+        Route::delete('/complaints/{id}/content', [\App\Http\Controllers\Api\AdminController::class, 'deleteReportedContent']);
+
+        // Security Logs & Alerts
+        Route::get('/logs', [\App\Http\Controllers\Api\AdminController::class, 'logs']);
+        Route::get('/alerts', [\App\Http\Controllers\Api\AdminController::class, 'securityAlerts']);
     });
 });
 

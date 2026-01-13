@@ -14,6 +14,8 @@ class Complaint extends Model
         'reported_id',
         'reason',
         'status',
+        'subject_id',
+        'subject_type',
     ];
 
     public function reporter()
@@ -24,5 +26,10 @@ class Complaint extends Model
     public function reported()
     {
         return $this->belongsTo(User::class, 'reported_id');
+    }
+
+    public function subject()
+    {
+        return $this->morphTo();
     }
 }
