@@ -29,7 +29,11 @@ class AuthController extends Controller
         ]);
 
         if ($request->role === 'provider') {
-            Prestataire::create([
+            \App\Models\Prestataire::create([
+                'user_id' => $user->id,
+            ]);
+        } else {
+            \App\Models\Client::create([
                 'user_id' => $user->id,
             ]);
         }
@@ -77,6 +81,46 @@ class AuthController extends Controller
 
     public function user(Request $request)
     {
-        return response()->json($request->user()->load('prestataire'));
+        return response()->json($request->user()->load(['prestataire', 'client']));
+    }
+
+    public function updatePassword(Request $request)
+    {
+        $request->validate([
+            'current_password' => 'required',
+            'password' => 'required|string|min:8|confirmed',
+        ]);
+
+        $user = $request->user();
+
+        if (!Hash::check($request->current_password, $user->password)) {
+            throw ValidationException::withMessages([
+                'current_password' => ['Le mot de passe actuel est incorrect.'],
+            ]);
+        }
+
+        $user->update([
+            'password' => Hash::make($request->password),
+        ]);
+
+        return response()->json([
+            'message' => 'Mot de passe mis à jour avec succès',
+        ]);
+    }
+
+    public function deleteAccount(Request $request)
+    {
+        $user = $request->user();
+        
+        // Revoke tokens
+        $user->tokens()->delete();
+        
+        // Delete user (cascade will handle prestataire/client if set in DB, 
+        // but we'll do it explicitly if needed. In migrations we used onDelete('cascade'))
+        $user->delete();
+
+        return response()->json([
+            'message' => 'Compte supprimé avec succès',
+        ]);
     }
 }

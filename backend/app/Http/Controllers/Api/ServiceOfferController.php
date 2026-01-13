@@ -14,7 +14,7 @@ class ServiceOfferController extends Controller
      */
     public function index(Request $request)
     {
-        $query = ServiceOffer::where('status', 'active')
+        $query = ServiceOffer::where('status', 'open')
             ->with(['user:id,name', 'category:id,name,icon,slug']);
 
         // Filter by keyword (title or description)
@@ -63,6 +63,85 @@ class ServiceOfferController extends Controller
             ->findOrFail($id);
 
         return response()->json($offer);
+    }
+
+    public function myOffers(Request $request)
+    {
+        $offers = ServiceOffer::where('user_id', $request->user()->id)
+            ->with('category:id,name,icon,slug')
+            ->latest()
+            ->get();
+
+        return response()->json($offers);
+    }
+
+    public function store(Request $request)
+    {
+        $request->validate([
+            'category_id' => 'required|exists:service_categories,id',
+            'title' => 'required|string|max:255',
+            'description' => 'required|string',
+            'requirements' => 'nullable|string',
+            'estimated_duration' => 'nullable|string',
+            'material_required' => 'nullable|string',
+            'budget' => 'nullable|numeric|min:0',
+            'location' => 'nullable|string|max:255',
+            'desired_date' => 'nullable|date',
+        ]);
+
+        $offer = ServiceOffer::create([
+            'user_id' => $request->user()->id,
+            'category_id' => $request->category_id,
+            'title' => $request->title,
+            'description' => $request->description,
+            'requirements' => $request->requirements,
+            'estimated_duration' => $request->estimated_duration,
+            'material_required' => $request->material_required,
+            'budget' => $request->budget,
+            'location' => $request->location,
+            'desired_date' => $request->desired_date,
+            'status' => 'open',
+        ]);
+
+        return response()->json([
+            'message' => 'Offre publiée avec succès',
+            'offer' => $offer,
+        ], 201);
+    }
+
+    public function update(Request $request, $id)
+    {
+        $offer = ServiceOffer::where('user_id', $request->user()->id)->findOrFail($id);
+
+        $request->validate([
+            'category_id' => 'sometimes|required|exists:service_categories,id',
+            'title' => 'sometimes|required|string|max:255',
+            'description' => 'sometimes|required|string',
+            'requirements' => 'nullable|string',
+            'estimated_duration' => 'nullable|string',
+            'material_required' => 'nullable|string',
+            'budget' => 'nullable|numeric|min:0',
+            'location' => 'nullable|string|max:255',
+            'desired_date' => 'nullable|date',
+            'status' => 'sometimes|required|string|in:open,in_progress,completed,cancelled',
+        ]);
+
+        $offer->update($request->all());
+
+        return response()->json([
+            'message' => 'Offre mise à jour avec succès',
+            'offer' => $offer,
+        ]);
+    }
+
+    public function destroy(Request $request, $id)
+    {
+        $offer = ServiceOffer::where('user_id', $request->user()->id)->findOrFail($id);
+        $offer->delete();
+
+        return response()->json([
+            'message' => 'Offre supprimée avec succès',
+        ]);
     }
 
     /**

@@ -58,6 +58,36 @@ const routes = [
         name: 'Messages',
         component: () => import('../views/Messages.vue'),
         meta: { requiresAuth: true }
+    },
+    {
+        path: '/forgot-password',
+        name: 'ForgotPassword',
+        component: () => import('../views/ForgotPassword.vue'),
+        meta: { guestOnly: true }
+    },
+    {
+        path: '/password-reset',
+        name: 'ResetPassword',
+        component: () => import('../views/ResetPassword.vue'),
+        meta: { guestOnly: true }
+    },
+    {
+        path: '/post-offer',
+        name: 'PostOffer',
+        component: () => import('../views/PostOffer.vue'),
+        meta: { requiresAuth: true, role: 'client' }
+    },
+    {
+        path: '/edit-offer/:id',
+        name: 'EditOffer',
+        component: () => import('../views/PostOffer.vue'),
+        meta: { requiresAuth: true, role: 'client' }
+    },
+    {
+        path: '/providers',
+        name: 'ProviderSearch',
+        component: () => import('../views/ProviderSearch.vue'),
+        meta: { requiresAuth: true, role: 'client' }
     }
 ]
 

@@ -64,6 +64,9 @@ const handleLogin = async () => {
             placeholder="••••••••"
           >
         </div>
+        <div class="flex justify-end mt-2">
+          <router-link to="/forgot-password" class="text-xs text-blue-600 hover:underline">Mot de passe oublié ?</router-link>
+        </div>
       </div>
 
       <button 

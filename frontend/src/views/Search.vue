@@ -4,7 +4,7 @@ import { useAuthStore } from '../store/auth';
 import api from '../services/api';
 import { 
   Search, Filter, MapPin, Briefcase, Calendar, 
-  ChevronRight, Euro, Clock, X, Loader2, Info
+  ChevronRight, Euro, Clock, X, Loader2, Info, Check
 } from 'lucide-vue-next';
 
 const auth = useAuthStore();
@@ -22,6 +22,29 @@ const filters = ref({
   max_budget: '',
   desired_date: ''
 });
+
+const applyMessage = ref('');
+const applying = ref(false);
+const applySuccess = ref(false);
+
+const submitApplication = async () => {
+  if (!selectedOffer.value) return;
+  applying.value = true;
+  try {
+    await api.post('/api/apply', {
+      service_offer_id: selectedOffer.value.id,
+      message: applyMessage.value
+    });
+    applySuccess.value = true;
+    setTimeout(() => {
+      closeOffer();
+    }, 2000);
+  } catch (err) {
+    alert(err.response?.data?.message || 'Erreur lors de la candidature');
+  } finally {
+    applying.value = false;
+  }
+};
 
 const fetchOffers = async () => {
   loading.value = true;
@@ -65,10 +88,14 @@ watch(filters, () => {
 
 const openOffer = (offer) => {
   selectedOffer.value = offer;
+  applyMessage.value = '';
+  applySuccess.value = false;
 };
 
 const closeOffer = () => {
   selectedOffer.value = null;
+  applyMessage.value = '';
+  applySuccess.value = false;
 };
 
 const resetFilters = () => {
@@ -235,6 +262,24 @@ const formatDate = (date) => {
               </h4>
               <p class="text-gray-600 leading-relaxed">{{ selectedOffer.description }}</p>
             </div>
+
+            <!-- Apply Form -->
+            <div v-if="!applySuccess" class="pt-6 border-t border-gray-100">
+              <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Message d'accompagnement (facultatif)</label>
+              <textarea 
+                v-model="applyMessage"
+                rows="3" 
+                placeholder="Expliquez pourquoi vous êtes le meilleur candidat pour cette mission..."
+                class="w-full px-4 py-3 rounded-2xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition text-sm"
+              ></textarea>
+            </div>
+
+            <div v-else class="pt-6 border-t border-gray-100 text-center py-4">
+              <div class="bg-green-50 text-green-700 p-4 rounded-2xl flex items-center justify-center space-x-2">
+                <Check class="w-5 h-5" />
+                <span class="font-bold">Candidature envoyée avec succès !</span>
+              </div>
+            </div>
             
             <div class="flex items-center space-x-6 pt-6 border-t border-gray-100">
               <div class="flex items-center text-sm text-gray-500">
@@ -249,8 +294,14 @@ const formatDate = (date) => {
           </div>
 
           <div class="mt-10 flex space-x-4">
-            <button class="flex-grow bg-blue-600 text-white py-5 rounded-2xl font-bold hover:bg-blue-700 shadow-xl shadow-blue-100 transition">
-              Postuler à cette offre
+            <button 
+              v-if="!applySuccess"
+              @click="submitApplication"
+              :disabled="applying"
+              class="flex-grow bg-blue-600 text-white py-5 rounded-2xl font-bold hover:bg-blue-700 shadow-xl shadow-blue-100 transition disabled:opacity-50 flex items-center justify-center space-x-2"
+            >
+              <Loader2 v-if="applying" class="w-5 h-5 animate-spin" />
+              <span>{{ applying ? 'Envoi...' : 'Postuler à cette offre' }}</span>
             </button>
             <button @click="closeOffer" class="px-8 py-5 bg-gray-100 text-gray-700 rounded-2xl font-bold hover:bg-gray-200 transition">
               Fermer

@@ -10,6 +10,59 @@ use Illuminate\Support\Facades\Storage;
 
 class ProviderController extends Controller
 {
+    public function index(Request $request)
+    {
+        $query = User::role('provider')
+            ->whereHas('prestataire', function ($q) {
+                $q->where('is_visible', true);
+            })
+            ->with(['prestataire.category']);
+
+        // Filter by keyword (name, description, skills)
+        if ($request->has('keyword')) {
+            $keyword = $request->keyword;
+            $query->where(function ($q) use ($keyword) {
+                $q->where('name', 'like', "%{$keyword}%")
+                    ->orWhereHas('prestataire', function ($pq) use ($keyword) {
+                        $pq->where('skills', 'like', "%{$keyword}%")
+                            ->orWhere('description', 'like', "%{$keyword}%");
+                    });
+            });
+        }
+
+        // Filter by category
+        if ($request->has('category_id')) {
+            $query->whereHas('prestataire', function ($q) use ($request) {
+                $q->where('category_id', $request->category_id);
+            });
+        }
+
+        // Filter by location
+        if ($request->has('location')) {
+            $query->where('address', 'like', "%{$request->location}%");
+        }
+
+        // Filter by rating
+        if ($request->has('min_rating')) {
+            $query->whereHas('prestataire', function ($q) use ($request) {
+                $q->where('rating', '>=', $request->min_rating);
+            });
+        }
+
+        $providers = $query->paginate(12);
+
+        return response()->json($providers);
+    }
+
+    public function show($id)
+    {
+        $provider = User::role('provider')
+            ->with(['prestataire.category', 'receivedReviews.reviewer'])
+            ->findOrFail($id);
+
+        return response()->json($provider);
+    }
+
     public function updateProfile(Request $request)
     {
         $user = $request->user();
@@ -22,6 +75,7 @@ class ProviderController extends Controller
             'description' => 'nullable|string',
             'experience' => 'nullable|string',
             'diplomas' => 'nullable|string',
+            'category_id' => 'nullable|exists:service_categories,id',
         ]);
 
         $user->update([
@@ -41,11 +95,12 @@ class ProviderController extends Controller
             'description' => $request->description,
             'experience' => $request->experience,
             'diplomas' => $request->diplomas,
+            'category_id' => $request->category_id,
         ]);
 
         return response()->json([
             'message' => 'Profil mis à jour avec succès',
-            'user' => $user->load('prestataire'),
+            'user' => $user->load('prestataire.category'),
         ]);
     }
 

@@ -34,6 +34,11 @@ class User extends Authenticatable
         return $this->hasOne(Prestataire::class);
     }
 
+    public function client()
+    {
+        return $this->hasOne(Client::class);
+    }
+
     public function serviceOffers()
     {
         return $this->hasMany(ServiceOffer::class);
