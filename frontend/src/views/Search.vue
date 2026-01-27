@@ -157,24 +157,27 @@ const formatDate = (date) => {
     </div>
 
     <!-- Expanded Filters -->
-    <div v-if="showFilters" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 p-6 bg-gray-50 rounded-3xl border border-gray-100">
-      <div>
+    <div v-if="showFilters" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8 p-6 bg-gray-50 rounded-3xl border border-gray-100 animate-in slide-in-from-top-4 duration-300">
+      <div class="lg:col-span-2">
         <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Catégorie</label>
-        <select v-model="filters.category_id" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm">
-          <option value="">Toutes les catégories</option>
-          <option v-for="cat in categories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
-        </select>
+        <div class="relative">
+             <select v-model="filters.category_id" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm appearance-none">
+              <option value="">Toutes les catégories</option>
+              <option v-for="cat in categories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
+            </select>
+            <ChevronRight class="absolute right-4 top-3.5 w-4 h-4 text-gray-400 rotate-90 pointer-events-none" />
+        </div>
       </div>
       <div>
         <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Localisation</label>
-        <input v-model="filters.location" type="text" placeholder="Ville ou Code Postal" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+        <input v-model="filters.location" type="text" placeholder="Ville..." class="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm">
       </div>
       <div>
-        <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Budget Max (€)</label>
-        <input v-model="filters.max_budget" type="number" placeholder="Ex: 500" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+        <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Budget Min (€)</label>
+        <input v-model="filters.min_budget" type="number" placeholder="Ex: 50" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm">
       </div>
       <div>
-        <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Date souhaitée</label>
+        <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Date (au plus tôt)</label>
         <input v-model="filters.desired_date" type="date" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm">
       </div>
     </div>
@@ -232,7 +235,7 @@ const formatDate = (date) => {
     <!-- Offer Detail Modal -->
     <div v-if="selectedOffer" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" @click="closeOffer"></div>
-      <div class="relative bg-white w-full max-w-2xl rounded-[40px] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
+      <div class="relative bg-white w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-[40px] shadow-2xl animate-in fade-in zoom-in duration-300">
         <button @click="closeOffer" class="absolute top-6 right-6 p-2 rounded-2xl bg-gray-100 text-gray-500 hover:bg-red-50 hover:text-red-600 transition z-10">
           <X class="w-6 h-6" />
         </button>
@@ -243,7 +246,7 @@ const formatDate = (date) => {
           </div>
           <h2 class="text-3xl font-extrabold text-gray-900 mb-6">{{ selectedOffer.title }}</h2>
           
-          <div class="grid grid-cols-2 gap-6 mb-8">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
             <div class="bg-gray-50 p-4 rounded-2xl">
               <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Budget Proposé</p>
               <p class="text-xl font-bold text-gray-900">{{ selectedOffer.budget }} €</p>
@@ -251,6 +254,14 @@ const formatDate = (date) => {
             <div class="bg-gray-50 p-4 rounded-2xl">
               <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Date souhaitée</p>
               <p class="text-xl font-bold text-gray-900">{{ formatDate(selectedOffer.desired_date) }}</p>
+            </div>
+            <div v-if="selectedOffer.nature_of_need" class="bg-blue-50/50 p-4 rounded-2xl border border-blue-100">
+              <p class="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-1">Nature du besoin</p>
+              <p class="text-lg font-bold text-gray-900">{{ selectedOffer.nature_of_need }}</p>
+            </div>
+            <div v-if="selectedOffer.estimated_duration" class="bg-blue-50/50 p-4 rounded-2xl border border-blue-100">
+              <p class="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-1">Durée estimée</p>
+              <p class="text-lg font-bold text-gray-900">{{ selectedOffer.estimated_duration }}</p>
             </div>
           </div>
 
@@ -261,6 +272,22 @@ const formatDate = (date) => {
                 Description de la mission
               </h4>
               <p class="text-gray-600 leading-relaxed">{{ selectedOffer.description }}</p>
+            </div>
+
+            <div v-if="selectedOffer.material_required" class="bg-purple-50/50 p-6 rounded-2xl border border-purple-100">
+              <h4 class="font-bold text-purple-900 mb-2 flex items-center">
+                <Briefcase class="w-4 h-4 mr-2" />
+                Matériel requis
+              </h4>
+              <p class="text-sm text-purple-800">{{ selectedOffer.material_required }}</p>
+            </div>
+
+            <div v-if="selectedOffer.requirements" class="bg-gray-50 p-6 rounded-2xl border border-gray-200">
+              <h4 class="font-bold text-gray-900 mb-2 flex items-center">
+                <Check class="w-4 h-4 mr-2 text-green-600" />
+                Critères & Pré-requis
+              </h4>
+              <p class="text-sm text-gray-600 italic">{{ selectedOffer.requirements }}</p>
             </div>
 
             <!-- Apply Form -->

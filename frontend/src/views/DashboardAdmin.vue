@@ -1,5 +1,6 @@
 <script setup>
-import { ref, onMounted, watch } from 'vue';
+import { ref, onMounted, watch, computed } from 'vue';
+import CategoryManagement from './CategoryManagement.vue';
 import { useAuthStore } from '../store/auth';
 import api from '../services/api';
 import { 
@@ -7,8 +8,30 @@ import {
   UserPlus, MoreHorizontal, Edit, Trash2, 
   CheckCircle, XCircle, Shield, ShieldAlert,
   Loader2, ArrowRight, User, Mail, ShieldCheck,
-  AlertTriangle, Filter, LayoutGrid, List as ListIcon
+  AlertTriangle, Filter, LayoutGrid, List as ListIcon,
+  TrendingUp, Award, Save
 } from 'lucide-vue-next';
+import { Line } from 'vue-chartjs';
+import { 
+  Chart as ChartJS, 
+  Title, 
+  Tooltip, 
+  Legend, 
+  LineElement, 
+  CategoryScale, 
+  LinearScale, 
+  PointElement 
+} from 'chart.js';
+
+ChartJS.register(
+  Title, 
+  Tooltip, 
+  Legend, 
+  LineElement, 
+  CategoryScale, 
+  LinearScale, 
+  PointElement
+);
 
 const auth = useAuthStore();
 const adminStats = ref({
@@ -29,7 +52,35 @@ const loading = ref(true);
 const reportsLoading = ref(false);
 const rolesLoading = ref(false);
 const statsLoading = ref(true);
-const activeTab = ref('users'); // users, reports, roles
+const activeTab = ref('users'); // users, reports, roles, categories, governance, content, badges
+const governanceSettings = ref([]);
+const settingsLoading = ref(false);
+const fullOffers = ref([]);
+const fullMissions = ref([]);
+const contentLoading = ref(false);
+const badges = ref([]);
+const badgeLoading = ref(false);
+
+const fetchBadges = async () => {
+    badgeLoading.value = true;
+    try {
+        const res = await api.get('/api/admin/badges');
+        badges.value = res.data;
+    } catch (err) {
+        console.error('Erreur badges:', err);
+    } finally {
+        badgeLoading.value = false;
+    }
+};
+
+const saveBadge = async (badge) => {
+    try {
+        await api.put(`/api/admin/badges/${badge.id}`, badge);
+        alert('Badge mis à jour');
+    } catch (err) {
+        alert('Erreur lors de la mise à jour');
+    }
+};
 
 const filters = ref({
   search: '',
@@ -46,6 +97,24 @@ const userForm = ref({
   role_id: null
 });
 const formLoading = ref(false);
+
+const chartOptions = computed(() => ({
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      backgroundColor: '#111827',
+      padding: 12,
+      cornerRadius: 12,
+      titleFont: { weight: 'bold' }
+    }
+  },
+  scales: {
+    y: { beginAtZero: true, grid: { color: '#f3f4f6' } },
+    x: { grid: { display: false } }
+  }
+}));
 
 const fetchStats = async () => {
   statsLoading.value = true;
@@ -210,6 +279,12 @@ watch(() => filters.value.search, () => {
   searchTimeout = setTimeout(() => fetchUsers(1), 500);
 });
 
+watch(activeTab, (newTab) => {
+    if (newTab === 'governance') fetchSettings();
+    if (newTab === 'content') fetchAllContent();
+    if (newTab === 'badges') fetchBadges();
+});
+
 onMounted(() => {
   fetchStats();
   fetchUsers();
@@ -240,6 +315,28 @@ const getRoleClass = (role) => {
           <UserPlus class="w-5 h-5" />
           <span>Créer un utilisateur</span>
         </button>
+      </div>
+    </div>
+
+    <!-- Dynamic Activity Chart -->
+    <div v-if="adminStats.chart_data" class="bg-white p-8 rounded-[40px] border border-gray-100 shadow-sm mb-12 relative overflow-hidden group">
+      <div class="flex items-center justify-between mb-10">
+        <div>
+          <h2 class="text-xl font-black text-gray-900 leading-none">Croissance de l'activité</h2>
+          <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mt-2">Évolution des utilisateurs et services</p>
+        </div>
+        <div class="flex items-center space-x-2">
+            <span class="w-3 h-3 rounded-full bg-blue-500"></span>
+            <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest mr-4">Utilisateurs</span>
+            <span class="w-3 h-3 rounded-full bg-purple-500"></span>
+            <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Offres</span>
+        </div>
+      </div>
+      <div class="h-64 sm:h-80">
+        <Line 
+          :data="adminStats.chart_data" 
+          :options="chartOptions"
+        />
       </div>
     </div>
 
@@ -316,9 +413,54 @@ const getRoleClass = (role) => {
         class="pb-4 px-2 text-sm font-black uppercase tracking-widest transition relative"
         :class="activeTab === 'roles' ? 'text-gray-900' : 'text-gray-400 hover:text-gray-600'"
       >
-        Rôles & Permissions
+        Rôles
         <div v-if="activeTab === 'roles'" class="absolute bottom-0 left-0 right-0 h-1 bg-gray-900 rounded-t-full"></div>
       </button>
+      <button 
+        @click="activeTab = 'categories'"
+        class="pb-4 px-2 text-sm font-black uppercase tracking-widest transition relative"
+        :class="activeTab === 'categories' ? 'text-gray-900' : 'text-gray-400 hover:text-gray-600'"
+      >
+        Catégories
+        <div v-if="activeTab === 'categories'" class="absolute bottom-0 left-0 right-0 h-1 bg-gray-900 rounded-t-full"></div>
+      </button>
+      <button 
+        @click="activeTab = 'reports'"
+        class="pb-4 px-2 text-sm font-black uppercase tracking-widest transition relative"
+        :class="activeTab === 'reports' ? 'text-gray-900' : 'text-gray-400 hover:text-gray-600'"
+      >
+        Signalements
+        <div v-if="activeTab === 'reports'" class="absolute bottom-0 left-0 right-0 h-1 bg-gray-900 rounded-t-full"></div>
+      </button>
+      <button 
+        @click="activeTab = 'governance'"
+        class="pb-4 px-2 text-sm font-black uppercase tracking-widest transition relative"
+        :class="activeTab === 'governance' ? 'text-gray-900' : 'text-gray-400 hover:text-gray-600'"
+      >
+        Gouvernance
+        <div v-if="activeTab === 'governance'" class="absolute bottom-0 left-0 right-0 h-1 bg-gray-900 rounded-t-full"></div>
+      </button>
+      <button 
+        @click="activeTab = 'content'"
+        class="pb-4 px-2 text-sm font-black uppercase tracking-widest transition relative"
+        :class="activeTab === 'content' ? 'text-gray-900' : 'text-gray-400 hover:text-gray-600'"
+      >
+        Contenu
+        <div v-if="activeTab === 'content'" class="absolute bottom-0 left-0 right-0 h-1 bg-gray-900 rounded-t-full"></div>
+      </button>
+      <button 
+        @click="activeTab = 'badges'"
+        class="pb-4 px-2 text-sm font-black uppercase tracking-widest transition relative"
+        :class="activeTab === 'badges' ? 'text-gray-900' : 'text-gray-400 hover:text-gray-600'"
+      >
+        Badges
+        <div v-if="activeTab === 'badges'" class="absolute bottom-0 left-0 right-0 h-1 bg-gray-900 rounded-t-full"></div>
+      </button>
+    </div>
+
+    <!-- Content: Categories -->
+    <div v-if="activeTab === 'categories'">
+        <CategoryManagement />
     </div>
 
     <!-- Users Management View -->
@@ -442,68 +584,105 @@ const getRoleClass = (role) => {
       </div>
     </div>
 
-    <!-- Reports View -->
-    <div v-if="activeTab === 'reports'" class="space-y-6">
-      <div class="bg-white rounded-[40px] border border-gray-100 shadow-sm overflow-hidden">
-        <div class="overflow-x-auto">
-          <table class="w-full text-left border-collapse">
-            <thead>
-              <tr class="bg-gray-50/50">
-                <th class="px-8 py-5 text-xs font-black text-gray-400 uppercase tracking-widest">Signaleur</th>
-                <th class="px-8 py-5 text-xs font-black text-gray-400 uppercase tracking-widest">Signalé</th>
-                <th class="px-8 py-5 text-xs font-black text-gray-400 uppercase tracking-widest">Raison</th>
-                <th class="px-8 py-5 text-xs font-black text-gray-400 uppercase tracking-widest">Statut</th>
-                <th class="px-8 py-5 text-right text-xs font-black text-gray-400 uppercase tracking-widest">Actions</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-50">
-              <tr v-if="reportsLoading" v-for="i in 3" :key="i" class="animate-pulse">
-                <td colspan="5" class="px-8 py-8"><div class="h-4 bg-gray-100 rounded w-full"></div></td>
-              </tr>
-              <tr v-else v-for="report in complaints" :key="report.id" class="hover:bg-gray-50/30 transition-colors">
-                <td class="px-8 py-6">
-                  <p class="text-sm font-bold text-gray-900">{{ report.reporter?.name }}</p>
-                  <p class="text-[10px] text-gray-400 font-bold uppercase">{{ report.reporter?.role }}</p>
-                </td>
-                <td class="px-8 py-6">
-                  <p class="text-sm font-bold text-gray-900">{{ report.reported?.name }}</p>
-                  <p class="text-[10px] text-gray-400 font-bold uppercase">{{ report.reported?.role }}</p>
-                </td>
-                <td class="px-8 py-6">
-                  <div class="max-w-xs">
-                    <p class="text-sm font-medium text-gray-700">{{ report.reason }}</p>
-                    <p class="text-xs text-gray-400 mt-1">{{ new Date(report.created_at).toLocaleString() }}</p>
-                  </div>
-                </td>
-                <td class="px-8 py-6">
-                  <span 
-                    class="px-2 py-1 text-[10px] font-black uppercase rounded-lg border shadow-sm"
-                    :class="{
-                      'bg-orange-50 text-orange-600 border-orange-100': report.status === 'pending',
-                      'bg-green-50 text-green-600 border-green-100': report.status === 'resolved',
-                      'bg-gray-50 text-gray-500 border-gray-100': report.status === 'ignored',
-                    }"
-                  >
-                    {{ report.status }}
-                  </span>
-                </td>
-                <td class="px-8 py-6 text-right">
-                  <div v-if="report.status === 'pending'" class="flex items-center justify-end space-x-2">
-                    <button @click="updateComplaintStatus(report, 'resolved')" class="text-xs font-bold text-green-600 hover:bg-green-50 px-3 py-2 rounded-xl border border-green-100 transition">Résoudre</button>
-                    <button @click="updateComplaintStatus(report, 'ignored')" class="text-xs font-bold text-gray-400 hover:bg-gray-50 px-3 py-2 rounded-xl border border-gray-100 transition">Ignorer</button>
-                  </div>
-                </td>
-              </tr>
-              <tr v-if="!reportsLoading && complaints.length === 0">
-                <td colspan="5" class="py-20 text-center">
-                  <p class="text-gray-400 font-bold">Aucun signalement trouvé</p>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+    <!-- Content: Governance -->
+    <div v-if="activeTab === 'governance'" class="space-y-6">
+        <div class="bg-white rounded-[40px] border border-gray-100 shadow-sm p-10">
+            <div class="flex items-center justify-between mb-10">
+                <div>
+                    <h3 class="text-2xl font-black text-gray-900">Gouvernance de la Plateforme</h3>
+                    <p class="text-gray-500 text-sm font-medium">Ajustez les règles métiers et les seuils système.</p>
+                </div>
+                <button @click="saveSettings" :disabled="settingsLoading" class="bg-gray-900 text-white px-8 py-4 rounded-2xl font-bold hover:bg-black transition flex items-center space-x-2">
+                    <Loader2 v-if="settingsLoading" class="w-5 h-5 animate-spin" />
+                    <Save v-else class="w-5 h-5" />
+                    <span>Enregistrer la configuration</span>
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div v-for="setting in governanceSettings" :key="setting.id" class="p-6 bg-gray-50 rounded-3xl border border-gray-100">
+                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">{{ setting.description || setting.key }}</label>
+                    <input 
+                        v-if="setting.type === 'integer'" 
+                        v-model.number="setting.value" 
+                        type="number" 
+                        class="w-full px-5 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none transition font-bold"
+                    >
+                    <input 
+                        v-else 
+                        v-model="setting.value" 
+                        type="text" 
+                        class="w-full px-5 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none transition font-bold"
+                    >
+                    <p class="mt-2 text-[10px] text-gray-400 font-medium italic">Key: {{ setting.key }}</p>
+                </div>
+            </div>
         </div>
-      </div>
-      </div>
+    </div>
+
+    <!-- Content: Content Moderation -->
+    <div v-if="activeTab === 'content'" class="space-y-10">
+        <!-- Offers Section -->
+        <div class="bg-white rounded-[40px] border border-gray-100 shadow-sm overflow-hidden">
+            <div class="p-8 border-b border-gray-50 bg-gray-50/50 flex justify-between items-center">
+                <h3 class="text-xl font-black text-gray-900">Offres de Service</h3>
+                <span class="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-[10px] font-black uppercase">{{ fullOffers.length }} Offres</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left">
+                    <thead>
+                        <tr class="text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50">
+                            <th class="px-8 py-5">Titre / Client</th>
+                            <th class="px-8 py-5">Catégorie</th>
+                            <th class="px-8 py-5">Budget</th>
+                            <th class="px-8 py-5 text-right">Date</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-50">
+                        <tr v-for="offer in fullOffers" :key="offer.id" class="hover:bg-gray-50/30 transition">
+                            <td class="px-8 py-5">
+                                <p class="font-bold text-gray-900">{{ offer.title }}</p>
+                                <p class="text-xs text-blue-600">{{ offer.user?.name }}</p>
+                            </td>
+                            <td class="px-8 py-5"><span class="text-xs font-bold bg-gray-100 px-3 py-1 rounded-lg">{{ offer.category?.name }}</span></td>
+                            <td class="px-8 py-5 font-black text-gray-900">{{ offer.budget }} €</td>
+                            <td class="px-8 py-5 text-right text-xs text-gray-400">{{ new Date(offer.created_at).toLocaleDateString() }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Missions Section -->
+        <div class="bg-white rounded-[40px] border border-gray-100 shadow-sm overflow-hidden">
+            <div class="p-8 border-b border-gray-50 bg-gray-50/50 flex justify-between items-center">
+                <h3 class="text-xl font-black text-gray-900">Demandes & Missions</h3>
+                <span class="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-[10px] font-black uppercase">{{ fullMissions.length }} Missions</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left">
+                    <thead>
+                        <tr class="text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50">
+                            <th class="px-8 py-5">Mission / Relation</th>
+                            <th class="px-8 py-5">Statut</th>
+                            <th class="px-8 py-5 text-right">Date</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-50">
+                        <tr v-for="miss in fullMissions" :key="miss.id" class="hover:bg-gray-50/30 transition">
+                            <td class="px-8 py-5">
+                                <p class="font-bold text-gray-900">{{ miss.service_offer?.title }}</p>
+                                <p class="text-[10px] text-gray-400">Prestataire: <span class="font-bold text-gray-600">{{ miss.provider?.name }}</span> | Client: <span class="font-bold text-gray-600">{{ miss.creator?.name }}</span></p>
+                            </td>
+                            <td class="px-8 py-5">
+                                <span class="px-2 py-1 bg-gray-100 rounded text-[8px] font-black uppercase">{{ miss.status }}</span>
+                            </td>
+                            <td class="px-8 py-5 text-right text-xs text-gray-400">{{ new Date(miss.created_at).toLocaleDateString() }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
     <div v-if="activeTab === 'roles'" class="space-y-8">
       <div v-if="rolesLoading" class="flex items-center justify-center py-20">
@@ -549,7 +728,68 @@ const getRoleClass = (role) => {
       </div>
     </div>
 
-    <!-- User Modal (Create/Edit) -->
+    <!-- Content: Badges Management -->
+    <div v-if="activeTab === 'badges'" class="space-y-6">
+        <div class="bg-white rounded-[40px] border border-gray-100 shadow-sm p-10">
+            <div class="mb-10 text-center">
+                <h3 class="text-2xl font-black text-gray-900">Moteur de Réputation</h3>
+                <p class="text-gray-500 text-sm font-medium mt-2">Définissez les seuils d'attribution automatique des badges.</p>
+            </div>
+
+            <div v-if="badgeLoading" class="flex justify-center py-10">
+                <Loader2 class="w-10 h-10 animate-spin text-blue-600" />
+            </div>
+            
+            <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div v-for="badge in badges" :key="badge.id" class="p-8 bg-gray-50 rounded-[2.5rem] border border-gray-100 flex flex-col group">
+                    <div class="flex items-center space-x-4 mb-6">
+                        <div class="w-16 h-16 bg-white rounded-3xl flex items-center justify-center text-blue-600 shadow-sm group-hover:scale-110 transition-transform">
+                            <Award v-if="badge.name === 'Confirmé'" class="w-8 h-8" />
+                            <ShieldCheck v-else class="w-8 h-8" />
+                        </div>
+                        <div>
+                            <h4 class="text-lg font-black text-gray-900">{{ badge.name }}</h4>
+                            <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{{ badge.slug }}</p>
+                        </div>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Seuil de points (Pro Score)</label>
+                            <input 
+                                v-model.number="badge.threshold" 
+                                type="number" 
+                                class="w-full px-5 py-3 rounded-2xl border-none bg-white shadow-sm focus:ring-2 focus:ring-blue-500 outline-none font-black text-gray-900"
+                            >
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Description</label>
+                            <textarea 
+                                v-model="badge.description" 
+                                rows="2"
+                                class="w-full px-5 py-3 rounded-2xl border-none bg-white shadow-sm focus:ring-2 focus:ring-blue-500 outline-none font-medium text-gray-700 text-sm"
+                            ></textarea>
+                        </div>
+                    </div>
+
+                    <button 
+                        @click="saveBadge(badge)"
+                        class="mt-8 bg-gray-900 text-white py-4 rounded-2xl font-bold hover:bg-black transition active:scale-95 shadow-lg shadow-gray-100"
+                    >
+                        Mettre à jour la règle
+                    </button>
+                </div>
+            </div>
+
+            <div class="mt-12 bg-blue-50/50 p-6 rounded-3xl border border-blue-100 flex items-start space-x-4">
+                <AlertTriangle class="w-6 h-6 text-blue-600 flex-shrink-0 mt-1" />
+                <p class="text-xs text-blue-700 leading-relaxed font-medium">
+                    <span class="font-black uppercase tracking-widest block mb-1">Impact sur le système</span>
+                    La modification d'un seuil est immédiate. Les prestataires dont le score ne correspond plus aux règles verront leurs badges synchronisés automatiquement lors de leur prochaine activité (fin de mission, nouvel avis).
+                </p>
+            </div>
+        </div>
+    </div>
     <div v-if="showUserModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" @click="showUserModal = false"></div>
       <div class="relative bg-white w-full max-w-lg rounded-[40px] shadow-2xl p-10 animate-in fade-in zoom-in duration-300">

@@ -72,7 +72,7 @@ class MessageController extends Controller
             $q->where('sender_id', $userId)->where('receiver_id', $otherUserId);
         })->orWhere(function($q) use ($userId, $otherUserId) {
             $q->where('sender_id', $otherUserId)->where('receiver_id', $userId);
-        })->orderBy('created_at', 'asc')->get();
+        })->orderBy('created_at', 'desc')->paginate(50); // Get latest first for pagination, frontend needs to reverse
 
         // Mark as read
         Message::where('sender_id', $otherUserId)

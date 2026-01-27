@@ -46,7 +46,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/account/delete', [\App\Http\Controllers\Api\AuthController::class, 'deleteAccount']);
 
     // Provider routes
-    Route::prefix('provider')->group(function () {
+    Route::middleware(['role:provider'])->prefix('provider')->group(function () {
         Route::get('/', [\App\Http\Controllers\Api\ProviderController::class, 'index']);
         Route::get('/{id}', [\App\Http\Controllers\Api\ProviderController::class, 'show']);
         Route::post('/profile', [\App\Http\Controllers\Api\ProviderController::class, 'updateProfile']);
@@ -56,7 +56,7 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     // Client routes
-    Route::prefix('client')->group(function () {
+    Route::middleware(['role:client'])->prefix('client')->group(function () {
         Route::post('/profile', [\App\Http\Controllers\Api\ClientController::class, 'updateProfile']);
         Route::post('/photo', [\App\Http\Controllers\Api\ClientController::class, 'uploadPhoto']);
     });
@@ -68,7 +68,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/blocked-users', [\App\Http\Controllers\Api\SecurityController::class, 'blockedList']);
 
     // Admin Specific Routes
-    Route::middleware([\App\Http\Middleware\CheckAdminRole::class])->prefix('admin')->group(function () {
+    Route::middleware(['admin'])->prefix('admin')->group(function () {
         Route::get('/stats', [\App\Http\Controllers\Api\AdminController::class, 'stats']);
         Route::get('/users', [\App\Http\Controllers\Api\AdminController::class, 'index']);
         Route::post('/users', [\App\Http\Controllers\Api\AdminController::class, 'store']);
@@ -91,6 +91,14 @@ Route::middleware('auth:sanctum')->group(function () {
         // Moderation
         Route::post('/users/{id}/warn', [\App\Http\Controllers\Api\AdminController::class, 'warnUser']);
         Route::delete('/complaints/{id}/content', [\App\Http\Controllers\Api\AdminController::class, 'deleteReportedContent']);
+
+        // Platform Governance
+        Route::get('/settings', [\App\Http\Controllers\Api\AdminController::class, 'getSettings']);
+        Route::put('/settings', [\App\Http\Controllers\Api\AdminController::class, 'updateSettings']);
+
+        // Detailed Content Management
+        Route::get('/offers-list', [\App\Http\Controllers\Api\AdminController::class, 'offersList']);
+        Route::get('/missions-list', [\App\Http\Controllers\Api\AdminController::class, 'missionsList']);
 
         // Security Logs & Alerts
         Route::get('/logs', [\App\Http\Controllers\Api\AdminController::class, 'logs']);

@@ -12,6 +12,7 @@ class ServiceOffer extends Model
     protected $fillable = [
         'user_id',
         'category_id',
+        'nature_of_need',
         'title',
         'description',
         'requirements',

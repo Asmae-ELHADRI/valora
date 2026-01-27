@@ -80,7 +80,7 @@ onUnmounted(() => {
                   {{ unreadCount }}
                 </span>
               </router-link>
-              <router-link to="/profile" class="text-gray-500 hover:text-gray-700 p-2 relative">
+              <router-link :to="auth.isProvider ? '/dashboard-provider' : (auth.isClient ? '/dashboard-client' : (auth.isAdmin ? '/dashboard-admin' : '/dashboard'))" class="text-gray-500 hover:text-gray-700 p-2 relative">
                 <UserIcon class="w-5 h-5" />
                 <span v-if="reqCount > 0" class="absolute top-0 right-0 w-4 h-4 bg-orange-500 text-white text-[10px] flex items-center justify-center rounded-full font-bold border-2 border-white">
                   {{ reqCount }}

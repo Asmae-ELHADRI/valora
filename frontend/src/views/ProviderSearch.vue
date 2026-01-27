@@ -37,7 +37,10 @@ const filters = ref({
   keyword: '',
   category_id: '',
   location: '',
-  min_rating: ''
+  min_rating: '',
+  badge_level: '',
+  availability_date: '',
+  sort_by: 'newest'
 });
 
 const fetchProviders = async () => {
@@ -98,7 +101,10 @@ const resetFilters = () => {
     keyword: '',
     category_id: '',
     location: '',
-    min_rating: ''
+    min_rating: '',
+    badge_level: '',
+    availability_date: '',
+    sort_by: 'newest'
   };
 };
 
@@ -175,6 +181,13 @@ const blockUser = async () => {
     blocking.value = false;
   }
 };
+const getBadgeClass = (level) => {
+    switch (level) {
+        case 'Expert': return 'bg-purple-600 text-white shadow-lg shadow-purple-200';
+        case 'Confirmé': return 'bg-blue-600 text-white shadow-lg shadow-blue-200';
+        default: return 'bg-gray-500 text-white shadow-lg shadow-gray-200';
+    }
+};
 </script>
 
 <template>
@@ -216,24 +229,48 @@ const blockUser = async () => {
     </div>
 
     <!-- Expanded Filters -->
-    <div v-if="showFilters" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8 p-6 bg-gray-50 rounded-3xl border border-gray-100">
-      <div>
-        <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Catégorie</label>
-        <select v-model="filters.category_id" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm">
-          <option value="">Toutes les catégories</option>
-          <option v-for="cat in categories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
-        </select>
+    <div v-if="showFilters" class="mb-8 p-8 bg-gray-50 rounded-[2.5rem] border border-gray-100 shadow-inner">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div>
+          <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Catégorie</label>
+          <select v-model="filters.category_id" class="w-full px-5 py-3.5 rounded-2xl border-none bg-white shadow-sm focus:ring-2 focus:ring-blue-500 outline-none text-sm font-bold text-gray-700 appearance-none">
+            <option value="">Toutes les catégories</option>
+            <option v-for="cat in categories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Expérience (Badge)</label>
+          <select v-model="filters.badge_level" class="w-full px-5 py-3.5 rounded-2xl border-none bg-white shadow-sm focus:ring-2 focus:ring-blue-500 outline-none text-sm font-bold text-gray-700 appearance-none">
+            <option value="">Tous les niveaux</option>
+            <option value="Expert">Expert (300+ pts)</option>
+            <option value="Confirmé">Confirmé (100+ pts)</option>
+            <option value="Débutant">Débutant</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Disponible le</label>
+          <input v-model="filters.availability_date" type="date" class="w-full px-5 py-3.5 rounded-2xl border-none bg-white shadow-sm focus:ring-2 focus:ring-blue-500 outline-none text-sm font-bold text-gray-700">
+        </div>
+        <div>
+          <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Localisation</label>
+          <input v-model="filters.location" type="text" placeholder="Ville..." class="w-full px-5 py-3.5 rounded-2xl border-none bg-white shadow-sm focus:ring-2 focus:ring-blue-500 outline-none text-sm font-bold text-gray-700">
+        </div>
       </div>
-      <div>
-        <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Localisation</label>
-        <input v-model="filters.location" type="text" placeholder="Ville ou Code Postal" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm">
-      </div>
-      <div>
-        <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Note Minimale</label>
-        <select v-model="filters.min_rating" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm">
-          <option value="">Toutes les notes</option>
-          <option v-for="r in [4, 3, 2, 1]" :key="r" :value="r">{{ r }}+ étoiles</option>
-        </select>
+
+      <!-- Sorting Bar -->
+      <div class="flex flex-wrap items-center gap-4 pt-6 border-t border-gray-200/50">
+        <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Trier par :</span>
+        <div class="flex p-1 bg-white rounded-xl shadow-sm">
+          <button 
+            v-for="opt in [{k:'newest', l:'Nouveaux'}, {k:'rating', l:'Meilleures Notes'}, {k:'pro_score', l:'Pro Score'}]" 
+            :key="opt.k"
+            @click="filters.sort_by = opt.k"
+            :class="filters.sort_by === opt.k ? 'bg-blue-600 text-white shadow-md shadow-blue-100' : 'text-gray-500 hover:text-gray-900'"
+            class="px-4 py-1.5 rounded-lg text-xs font-black transition-all"
+          >
+            {{ opt.l }}
+          </button>
+        </div>
       </div>
     </div>
 
@@ -271,10 +308,27 @@ const blockUser = async () => {
           </div>
         </div>
         
-        <h3 class="text-lg font-bold text-gray-900 mb-1 group-hover:text-blue-600 transition">{{ provider.name }}</h3>
-        <p class="text-xs font-bold text-blue-600 uppercase tracking-widest mb-4 bg-blue-50 px-3 py-1 rounded-lg">
-          {{ provider.prestataire?.category?.name || 'Prestataire' }}
-        </p>
+        <h3 class="text-lg font-black text-gray-900 leading-tight group-hover:text-blue-600 transition">{{ provider.name }}</h3>
+        <span 
+            v-if="provider.prestataire?.badge_level" 
+            :class="getBadgeClass(provider.prestataire.badge_level)"
+            class="mt-1 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest leading-none"
+        >
+            {{ provider.prestataire.badge_level }}
+        </span>
+
+        <div class="flex flex-wrap justify-center gap-1 mt-4 mb-4">
+          <span 
+            v-for="cat in provider.prestataire?.categories" 
+            :key="cat.id"
+            class="text-[10px] font-bold text-blue-600 uppercase tracking-widest bg-blue-50 px-2 py-0.5 rounded-lg"
+          >
+            {{ cat.name }}
+          </span>
+          <span v-if="!provider.prestataire?.categories?.length" class="text-[10px] font-bold text-gray-400 uppercase tracking-widest bg-gray-50 px-2 py-0.5 rounded-lg">
+            Prestataire
+          </span>
+        </div>
         
         <p class="text-sm text-gray-500 line-clamp-2 mb-6 h-10">{{ provider.prestataire?.description || 'Pas de description disponible.' }}</p>
         
@@ -306,9 +360,15 @@ const blockUser = async () => {
               <div>
                 <h2 class="text-4xl font-black text-gray-900 leading-tight">{{ selectedProvider.name }}</h2>
                 <div class="flex flex-wrap justify-center md:justify-start gap-2 mt-2">
-                  <span class="px-4 py-1.5 bg-blue-600 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest shadow-lg shadow-blue-200">
-                    {{ selectedProvider.prestataire?.category?.name || 'Prestataire' }}
-                  </span>
+                  <div class="flex flex-wrap justify-center md:justify-start gap-2">
+                    <span 
+                      v-for="cat in selectedProvider.prestataire?.categories" 
+                      :key="cat.id"
+                      class="px-4 py-1.5 bg-blue-600 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest shadow-lg shadow-blue-200"
+                    >
+                      {{ cat.name }}
+                    </span>
+                  </div>
                   <div v-if="selectedProvider.prestataire?.rating > 0" class="flex items-center bg-yellow-50 text-yellow-700 px-3 py-1.5 rounded-xl text-xs font-bold ring-1 ring-yellow-200">
                     <Star class="w-4 h-4 fill-current mr-1.5 text-yellow-400" />
                     {{ parseFloat(selectedProvider.prestataire.rating).toFixed(1) }} / 5
@@ -363,6 +423,24 @@ const blockUser = async () => {
                     <p class="text-xs font-bold text-purple-600 uppercase mb-1">Diplômes</p>
                     <p class="text-sm text-gray-700 whitespace-pre-wrap">{{ selectedProvider.prestataire?.diplomas || 'Non renseigné' }}</p>
                   </div>
+                </div>
+              </div>
+
+              <div>
+                <h4 class="text-xs font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center">
+                  <Clock class="w-4 h-4 mr-2 text-blue-600" />
+                  Disponibilités
+                </h4>
+                <div class="grid grid-cols-2 gap-2">
+                   <div v-for="(day, key) in { monday: 'Lun', tuesday: 'Mar', wednesday: 'Mer', thursday: 'Jeu', friday: 'Ven', saturday: 'Sam', sunday: 'Dim' }" :key="key" 
+                        class="p-2 rounded-xl text-[10px] font-bold border flex flex-col items-center"
+                        :class="selectedProvider.prestataire?.availabilities?.[key]?.active ? 'bg-green-50 border-green-100 text-green-700' : 'bg-gray-50 border-gray-100 text-gray-400 opacity-50'">
+                        <span>{{ day }}</span>
+                        <span v-if="selectedProvider.prestataire?.availabilities?.[key]?.active" class="mt-1 text-[9px]">
+                            {{ selectedProvider.prestataire?.availabilities[key].start }} - {{ selectedProvider.prestataire?.availabilities[key].end }}
+                        </span>
+                        <span v-else class="mt-1">Off</span>
+                   </div>
                 </div>
               </div>
             </div>

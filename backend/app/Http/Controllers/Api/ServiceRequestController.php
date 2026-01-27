@@ -5,10 +5,17 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ServiceRequest;
 use App\Models\ServiceOffer;
+use App\Services\BadgeService;
 use Illuminate\Http\Request;
 
 class ServiceRequestController extends Controller
 {
+    protected $badgeService;
+
+    public function __construct(BadgeService $badgeService)
+    {
+        $this->badgeService = $badgeService;
+    }
     /**
      * List applications/requests for the client.
      * Includes applications to their offers AND direct invitations they sent.
@@ -25,7 +32,7 @@ class ServiceRequestController extends Controller
                 ->orWhere('created_by_id', $user->id);
             })
             ->latest()
-            ->get();
+            ->paginate(15);
 
         // Mark as read for the client (where they are either offer owner or invited? No, simply if they see them)
         // Actually, only mark as read if they didn't create it? No, client sees applications to their offers.
@@ -92,6 +99,21 @@ class ServiceRequestController extends Controller
             return response()->json(['message' => 'Vous avez déjà postulé à cette offre'], 400);
         }
 
+        // Automated Availability Check (US-P04/US-P06)
+        if ($offer->desired_date) {
+            $date = \Carbon\Carbon::parse($offer->desired_date);
+            $dayOfWeek = strtolower($date->format('l')); // e.g., 'monday'
+            
+            $availabilities = $user->prestataire?->availabilities ?? [];
+            $dayAvailability = $availabilities[$dayOfWeek] ?? null;
+
+            if (!$dayAvailability || ($dayAvailability['active'] ?? false) === false) {
+                return response()->json([
+                    'message' => "Vous n'êtes pas marqué comme disponible le " . $date->translatedFormat('l d F') . ". Veuillez mettre à jour votre calendrier dans votre profil."
+                ], 422);
+            }
+        }
+
         $serviceRequest = ServiceRequest::create([
             'service_offer_id' => $request->service_offer_id,
             'user_id' => $user->id,
@@ -152,7 +174,7 @@ class ServiceRequestController extends Controller
         $requests = ServiceRequest::with(['serviceOffer.user', 'serviceOffer.category', 'creator'])
             ->where('user_id', $user->id)
             ->latest()
-            ->get();
+            ->paginate(15);
 
         // Mark invitations as read
         ServiceRequest::where('user_id', $user->id)
@@ -172,13 +194,8 @@ class ServiceRequestController extends Controller
             'status' => 'required|in:accepted,rejected,completed,cancelled'
         ]);
 
-        $user = $request->user();
         $serviceRequest = ServiceRequest::with('serviceOffer')->findOrFail($id);
-
-        // Basic Authorization check
-        // Client can: Accept/Reject if provider applied. Cancel if they invited.
-        // Provider can: Accept/Reject if client invited. Cancel if they applied.
-        // Both can: Complete if accepted.
+        $this->authorize('updateStatus', [$serviceRequest, $request->status]);
 
         $serviceRequest->update(['status' => $request->status]);
 
@@ -197,6 +214,12 @@ class ServiceRequestController extends Controller
             // Usually, if a mission starts, the offer is "filled".
             if ($request->status === 'completed') {
                 $serviceRequest->serviceOffer->update(['status' => 'completed']);
+                
+                // Trigger Badge Sync
+                $prestataire = \App\Models\Prestataire::where('user_id', $serviceRequest->user_id)->first();
+                if ($prestataire) {
+                    $this->badgeService->syncBadges($prestataire);
+                }
             }
         }
 

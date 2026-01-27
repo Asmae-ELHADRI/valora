@@ -15,8 +15,10 @@ class Client extends Model
         'type',
     ];
 
-    public function user()
+    protected $appends = ['photo_url'];
+
+    public function getPhotoUrlAttribute()
     {
-        return $this->belongsTo(User::class);
+        return $this->photo ? url('storage/' . $this->photo) : null;
     }
 }

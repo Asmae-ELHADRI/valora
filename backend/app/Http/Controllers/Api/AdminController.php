@@ -467,4 +467,80 @@ class AdminController extends Controller
             'message' => 'Contenu supprimé avec succès'
         ]);
     }
+    /**
+     * Get platform settings.
+     */
+    public function getSettings()
+    {
+        return response()->json(\App\Models\SystemSetting::orderBy('group')->get());
+    }
+
+    /**
+     * update platform settings.
+     */
+    public function updateSettings(Request $request)
+    {
+        $request->validate([
+            'settings' => 'required|array',
+            'settings.*.key' => 'required|string|exists:system_settings,key',
+            'settings.*.value' => 'required',
+        ]);
+
+        foreach ($request->settings as $item) {
+            \App\Models\SystemSetting::set($item['key'], $item['value']);
+        }
+
+        return response()->json([
+            'message' => 'Paramètres mis à jour avec succès'
+        ]);
+    }
+
+    /**
+     * List all service offers for moderation.
+     */
+    public function offersList(Request $request)
+    {
+        return \App\Models\ServiceOffer::with(['user', 'category'])
+            ->latest()
+            ->paginate(20);
+    }
+
+    /**
+     * List all missions/requests for monitoring.
+     */
+    public function missionsList(Request $request)
+    {
+        return \App\Models\ServiceRequest::with(['provider', 'creator', 'serviceOffer'])
+            ->latest()
+            ->paginate(20);
+    }
+
+    /**
+     * List all badges for management.
+     */
+    public function badgesList()
+    {
+        return \App\Models\Badge::orderBy('threshold')->get();
+    }
+
+    /**
+     * Update a badge rule.
+     */
+    public function updateBadge(Request $request, $id)
+    {
+        $badge = \App\Models\Badge::findOrFail($id);
+        
+        $request->validate([
+            'name' => 'sometimes|required|string',
+            'threshold' => 'sometimes|required|integer',
+            'description' => 'nullable|string'
+        ]);
+
+        $badge->update($request->only(['name', 'threshold', 'description']));
+
+        return response()->json([
+            'message' => 'Règle du badge mise à jour',
+            'badge' => $badge
+        ]);
+    }
 }

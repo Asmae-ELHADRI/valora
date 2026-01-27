@@ -4,10 +4,17 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Review;
+use App\Services\BadgeService;
 use Illuminate\Http\Request;
 
 class ReviewController extends Controller
 {
+    protected $badgeService;
+
+    public function __construct(BadgeService $badgeService)
+    {
+        $this->badgeService = $badgeService;
+    }
     /**
      * Get reviews for the current authenticated user (assuming provider).
      */
@@ -135,8 +142,10 @@ class ReviewController extends Controller
     {
         $avg = Review::where('user_id', $providerId)->avg('rating') ?: 0;
         
-        \App\Models\Prestataire::where('user_id', $providerId)->update([
-            'rating' => round($avg, 1)
-        ]);
+        $prestataire = \App\Models\Prestataire::where('user_id', $providerId)->first();
+        if ($prestataire) {
+            $prestataire->update(['rating' => round($avg, 1)]);
+            $this->badgeService->syncBadges($prestataire);
+        }
     }
 }

@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted } from 'vue';
+import ClientProfile from './ClientProfile.vue';
 import { useAuthStore } from '../store/auth';
 import { 
   Plus, Briefcase, Clock, CheckCircle, Edit, Trash2, 
@@ -39,9 +40,9 @@ const fetchDashboardData = async () => {
       api.get('/api/reviews/client')
     ]);
     
-    offers.value = offersRes.data;
-    requests.value = requestsRes.data;
-    clientReviews.value = reviewsRes.data;
+    offers.value = offersRes.data.data;
+    requests.value = requestsRes.data.data;
+    clientReviews.value = reviewsRes.data; // reviews might not be paginated yet, check if needed
     
     // Calculate stats
     stats.value = offers.value.reduce((acc, offer) => {
@@ -193,6 +194,34 @@ const getReqStatusClass = (status) => {
   return classes[status] || 'bg-gray-50 text-gray-700 border-gray-100';
 };
 
+const showProviderProfileModal = ref(false);
+const selectedProviderData = ref(null);
+const loadingProfile = ref(false);
+
+const openProviderProfile = async (providerId) => {
+  loadingProfile.value = true;
+  showProviderProfileModal.value = true;
+  try {
+    const response = await api.get(`/api/provider/${providerId}`);
+    selectedProviderData.value = response.data;
+  }
+ catch (err) {
+    console.error('Erreur chargement profil:', err);
+    alert('Impossible de charger le profil du prestataire');
+    showProviderProfileModal.value = false;
+  } finally {
+    loadingProfile.value = false;
+  }
+};
+
+const getBadgeClass = (level) => {
+    switch (level) {
+        case 'Expert': return 'bg-purple-600 text-white shadow-purple-100';
+        case 'Confirmé': return 'bg-blue-600 text-white shadow-blue-100';
+        default: return 'bg-gray-500 text-white shadow-gray-100';
+    }
+};
+
 onMounted(fetchDashboardData);
 </script>
 
@@ -241,6 +270,9 @@ onMounted(fetchDashboardData);
         <button @click="activeTab = 'reviews'" :class="activeTab === 'reviews' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white text-gray-500 border border-gray-100 hover:bg-gray-50'" class="px-6 py-3 rounded-2xl font-bold transition flex items-center space-x-2">
           <Star class="w-5 h-5 mx-1" /><span>Mes avis</span>
         </button>
+        <button @click="activeTab = 'profile'" :class="activeTab === 'profile' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white text-gray-500 border border-gray-100 hover:bg-gray-50'" class="px-6 py-3 rounded-2xl font-bold transition flex items-center space-x-2">
+          <User class="w-5 h-5 mx-1" /><span>Mon Profil</span>
+        </button>
       </div>
 
       <!-- Content: Offers -->
@@ -275,7 +307,11 @@ onMounted(fetchDashboardData);
       <div v-if="activeTab === 'requests'" class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
         <div v-if="requests.length > 0" class="divide-y divide-gray-50">
           <div v-for="req in requests" :key="req.id" class="p-8 hover:bg-gray-50/50 transition flex flex-col md:flex-row items-center gap-6">
-            <div class="w-16 h-16 rounded-2xl bg-gray-100 overflow-hidden border border-gray-50 shadow-inner shrink-0">
+            <div 
+                class="w-16 h-16 rounded-2xl bg-gray-100 overflow-hidden border border-gray-50 shadow-inner shrink-0 cursor-pointer hover:ring-4 hover:ring-blue-100 transition"
+                @click="openProviderProfile(req.provider_id)"
+                title="Voir le profil complet"
+            >
               <img v-if="req.provider?.prestataire?.photo" :src="`http://localhost:8000/storage/${req.provider.prestataire.photo}`" class="w-full h-full object-cover">
               <div v-else class="w-full h-full flex items-center justify-center text-gray-300"><User class="w-8 h-8" /></div>
             </div>
@@ -289,6 +325,13 @@ onMounted(fetchDashboardData);
               <p class="text-sm text-gray-500 italic line-clamp-1">"{{ req.message || 'Pas de message' }}"</p>
             </div>
             <div class="flex gap-2">
+              <button 
+                @click="openProviderProfile(req.provider_id)"
+                class="p-3 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition border border-gray-100 shadow-sm" 
+                title="Consulter le profil"
+              >
+                <User class="w-5 h-5" />
+              </button>
               <router-link :to="`/messages?userId=${req.provider?.id}`" class="p-3 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition border border-gray-100 shadow-sm" title="Discuter">
                 <MessageSquare class="w-5 h-5" />
               </router-link>
@@ -396,6 +439,112 @@ onMounted(fetchDashboardData);
           <p v-if="!isEditingReview" class="text-[10px] text-center text-gray-400 font-medium">Vous pourrez modifier ou supprimer votre avis pendant 24 heures.</p>
         </div>
       </div>
+    </div>
+    <!-- Provider Profile Modal -->
+    <div v-if="showProviderProfileModal" class="fixed inset-0 z-[130] flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" @click="showProviderProfileModal = false"></div>
+        <div class="relative bg-white w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-[40px] shadow-2xl animate-in fade-in zoom-in duration-300">
+            <button @click="showProviderProfileModal = false" class="absolute top-6 right-6 p-2 rounded-2xl bg-gray-100 text-gray-500 hover:bg-red-50 hover:text-red-600 transition z-10">
+                <XCircle class="w-6 h-6" />
+            </button>
+
+            <div v-if="loadingProfile" class="p-20 flex justify-center">
+                <Loader2 class="w-10 h-10 text-blue-600 animate-spin" />
+            </div>
+
+            <div v-else-if="selectedProviderData" class="p-8">
+                <div class="flex items-center space-x-6 mb-8">
+                    <div class="w-24 h-24 rounded-3xl bg-gray-100 overflow-hidden border-4 border-white shadow-xl">
+                        <img v-if="selectedProviderData.prestataire?.photo" :src="`http://localhost:8000/storage/${selectedProviderData.prestataire.photo}`" class="w-full h-full object-cover">
+                        <div v-else class="w-full h-full flex items-center justify-center text-gray-300"><User class="w-12 h-12" /></div>
+                    </div>
+                    <div>
+                        <h2 class="text-2xl font-black text-gray-900">{{ selectedProviderData.name }}</h2>
+                        <div class="flex flex-wrap items-center gap-2 mt-3">
+                             <!-- Hierarchical Badges -->
+                             <template v-if="selectedProviderData.prestataire?.badges?.length > 0">
+                                <div v-for="badge in selectedProviderData.prestataire.badges" :key="badge.id"
+                                     :class="getBadgeClass(badge.name)" 
+                                     class="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest shadow-md flex items-center group/badge"
+                                >
+                                    <Award v-if="badge.name === 'Confirmé'" class="w-3 h-3 mr-1" />
+                                    <ShieldCheck v-else-if="badge.name === 'Expert'" class="w-3 h-3 mr-1" />
+                                    {{ badge.name }}
+                                </div>
+                             </template>
+                             <div v-else class="px-3 py-1 bg-gray-100 text-gray-400 rounded-full text-[9px] font-black uppercase tracking-widest">
+                                Débutant
+                             </div>
+
+                             <div v-if="selectedProviderData.prestataire?.rating > 0" class="flex items-center bg-yellow-50 text-yellow-700 px-3 py-1 rounded-full text-[10px] font-black ring-1 ring-yellow-100">
+                                <Star class="w-3 h-3 fill-current mr-1 text-yellow-400" />
+                                {{ parseFloat(selectedProviderData.prestataire.rating).toFixed(1) }}
+                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                    <div class="space-y-6">
+                        <div>
+                            <h4 class="text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Compétences</h4>
+                            <div class="flex flex-wrap gap-2">
+                                <span v-for="skill in (selectedProviderData.prestataire?.skills || '').split(',')" :key="skill" class="px-3 py-1 bg-gray-100 text-gray-600 rounded-lg text-xs font-bold">
+                                    {{ skill.trim() }}
+                                </span>
+                            </div>
+                        </div>
+                        <div>
+                            <h4 class="text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Bio</h4>
+                            <p class="text-sm text-gray-600 leading-relaxed">{{ selectedProviderData.prestataire?.description || 'Aucune description' }}</p>
+                        </div>
+                    </div>
+                    <div class="space-y-6">
+                        <div>
+                            <h4 class="text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Expérience</h4>
+                            <div class="bg-blue-50/50 p-4 rounded-2xl text-sm text-gray-700 font-medium border border-blue-100">
+                                {{ selectedProviderData.prestataire?.experience || 'Non renseigné' }}
+                            </div>
+                        </div>
+                        <div>
+                            <h4 class="text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Statistiques</h4>
+                            <div class="bg-gray-50 p-4 rounded-2xl relative overflow-hidden group">
+                                <div class="flex justify-between items-center mb-4">
+                                    <div class="flex flex-col">
+                                        <span class="text-[10px] font-black text-gray-400 uppercase leading-none mb-1">Pro Score</span>
+                                        <span :class="getBadgeClass(selectedProviderData.prestataire?.badge_level)" class="text-xl font-black px-2 py-0.5 rounded-lg inline-block w-fit">{{ selectedProviderData.prestataire?.pro_score }}</span>
+                                    </div>
+                                    <div class="text-right">
+                                        <div class="flex items-center text-xs font-bold text-gray-700">
+                                            <Briefcase class="w-3 h-3 mr-1 text-blue-500" />
+                                            {{ (selectedProviderData.prestataire?.completed_missions_count || 0) * 10 }} pts
+                                        </div>
+                                        <div class="flex items-center text-xs font-bold text-gray-700">
+                                            <Star class="w-3 h-3 mr-1 text-purple-500" />
+                                            {{ Math.round((selectedProviderData.prestataire?.rating || 0) * 20) }} pts
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="flex justify-between items-center mb-2">
+                                    <span class="text-xs text-gray-500 font-medium">Missions réussies</span>
+                                    <span class="font-bold text-gray-900">{{ selectedProviderData.prestataire?.completed_missions_count }}</span>
+                                </div>
+                                <div class="flex justify-between items-center text-xs">
+                                    <span class="text-gray-500 font-medium">Avis déposés</span>
+                                    <span class="font-bold text-gray-900">{{ selectedProviderData.received_reviews?.length || 0 }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex justify-end pt-6 border-t border-gray-100">
+                    <button @click="showProviderProfileModal = false" class="px-8 py-3 bg-gray-100 text-gray-600 rounded-2xl font-bold hover:bg-gray-200 transition">
+                        Fermer la vue détaillée
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
   </div>
 </template>

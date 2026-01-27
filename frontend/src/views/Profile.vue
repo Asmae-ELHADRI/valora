@@ -58,7 +58,7 @@ const form = ref({
   description: '',
   experience: '',
   diplomas: '',
-  category_id: '',
+  category_ids: [],
   type: 'individual', // individual, company
   availabilities: {
     monday: false,
@@ -79,7 +79,7 @@ const reviewsData = ref({ reviews: [], average_rating: 0, total_reviews: 0 });
 const fetchReviews = async () => {
   if (auth.user?.role !== 'provider') return;
   try {
-    const response = await api.get('/api/my-reviews');
+    const response = await api.get('/api/reviews/provider');
     reviewsData.value = response.data;
   } catch (err) {
     console.error('Erreur chargement avis:', err);
@@ -91,11 +91,19 @@ onMounted(async () => {
   try {
     const [catRes] = await Promise.all([
       api.get('/api/offers/categories'),
-      auth.user ? Promise.resolve() : auth.fetchUser(),
+      auth.user ? auth.fetchUser() : auth.fetchUser(),
       fetchReviews()
     ]);
     categories.value = catRes.data;
     const user = auth.user;
+    
+    // Extract category IDs from prestataire.categories
+    const userCategoryIds = user.prestataire?.categories?.map(c => c.id) || [];
+    // Fallback to old category_id if categories array is empty
+    if (userCategoryIds.length === 0 && user.prestataire?.category_id) {
+        userCategoryIds.push(user.prestataire.category_id);
+    }
+
     form.value = {
       first_name: user.first_name || '',
       last_name: user.last_name || '',
@@ -105,7 +113,7 @@ onMounted(async () => {
       description: user.prestataire?.description || '',
       experience: user.prestataire?.experience || '',
       diplomas: user.prestataire?.diplomas || '',
-      category_id: user.prestataire?.category_id || '',
+      category_ids: userCategoryIds,
       type: user.client?.type || 'individual',
       availabilities: user.prestataire?.availabilities || form.value.availabilities
     };
@@ -114,7 +122,7 @@ onMounted(async () => {
     // Photo handling
     const photoPath = user.role === 'provider' ? user.prestataire?.photo : user.client?.photo;
     if (photoPath) {
-      photoPreview.value = `http://localhost:8000/storage/${photoPath}`;
+      photoPreview.value = photoPath.startsWith('http') ? photoPath : `http://localhost:8000/storage/${photoPath}`;
     }
   } catch (err) {
     message.value = { type: 'error', text: 'Impossible de charger le profil' };
@@ -150,7 +158,10 @@ const saveProfile = async () => {
       });
     }
 
-    // Save provider specific data
+    // Save provider specific data (availability is already in profile update in some versions, 
+    // but the backend updateProfile handles it if added. Currently ProviderController updateProfile 
+    // doesn't handle availability directly, it has a separate endpoint. 
+    // Let's keep it consistent for now.)
     if (isProvider) {
       await api.post('/api/provider/availability', { availabilities: form.value.availabilities });
     }
@@ -330,12 +341,24 @@ const days = [
               <h3 class="font-bold uppercase tracking-wider text-sm">Profil Professionnel</h3>
             </div>
             <div class="space-y-6">
-              <div>
-                <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Catégorie de service</label>
-                <select v-model="form.category_id" class="w-full px-4 py-3 rounded-xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition appearance-none">
-                  <option value="" disabled>Choisir une catégorie</option>
-                  <option v-for="cat in categories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
-                </select>
+            <div>
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-4">Catégories de service (plusieurs choix possibles)</label>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <label 
+                    v-for="cat in categories" 
+                    :key="cat.id"
+                    :class="form.category_ids.includes(cat.id) ? 'border-blue-600 bg-blue-50' : 'border-gray-100 hover:border-gray-200'"
+                    class="flex items-center space-x-3 p-3 rounded-xl border-2 cursor-pointer transition"
+                  >
+                    <input 
+                      type="checkbox" 
+                      :value="cat.id" 
+                      v-model="form.category_ids"
+                      class="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    >
+                    <span class="text-sm font-medium text-gray-700">{{ cat.name }}</span>
+                  </label>
+                </div>
               </div>
               <div>
                 <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Compétences (séparées par des virgules)</label>

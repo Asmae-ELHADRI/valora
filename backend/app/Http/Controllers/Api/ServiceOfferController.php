@@ -44,9 +44,9 @@ class ServiceOfferController extends Controller
             $query->where('budget', '<=', $request->max_budget);
         }
 
-        // Filter by date
+        // Filter by date (on or after)
         if ($request->has('desired_date')) {
-            $query->whereDate('desired_date', $request->desired_date);
+            $query->whereDate('desired_date', '>=', $request->desired_date);
         }
 
         $offers = $query->latest()->paginate(10);
@@ -70,7 +70,7 @@ class ServiceOfferController extends Controller
         $offers = ServiceOffer::where('user_id', $request->user()->id)
             ->with('category:id,name,icon,slug')
             ->latest()
-            ->get();
+            ->paginate(10);
 
         return response()->json($offers);
     }
@@ -79,6 +79,7 @@ class ServiceOfferController extends Controller
     {
         $request->validate([
             'category_id' => 'required|exists:service_categories,id',
+            'nature_of_need' => 'nullable|string|max:255',
             'title' => 'required|string|max:255',
             'description' => 'required|string',
             'requirements' => 'nullable|string',
@@ -92,6 +93,7 @@ class ServiceOfferController extends Controller
         $offer = ServiceOffer::create([
             'user_id' => $request->user()->id,
             'category_id' => $request->category_id,
+            'nature_of_need' => $request->nature_of_need,
             'title' => $request->title,
             'description' => $request->description,
             'requirements' => $request->requirements,
@@ -111,10 +113,12 @@ class ServiceOfferController extends Controller
 
     public function update(Request $request, $id)
     {
-        $offer = ServiceOffer::where('user_id', $request->user()->id)->findOrFail($id);
+        $offer = ServiceOffer::findOrFail($id);
+        $this->authorize('update', $offer);
 
         $request->validate([
             'category_id' => 'sometimes|required|exists:service_categories,id',
+            'nature_of_need' => 'nullable|string|max:255',
             'title' => 'sometimes|required|string|max:255',
             'description' => 'sometimes|required|string',
             'requirements' => 'nullable|string',
@@ -136,7 +140,8 @@ class ServiceOfferController extends Controller
 
     public function destroy(Request $request, $id)
     {
-        $offer = ServiceOffer::where('user_id', $request->user()->id)->findOrFail($id);
+        $offer = ServiceOffer::findOrFail($id);
+        $this->authorize('delete', $offer);
         $offer->delete();
 
         return response()->json([
