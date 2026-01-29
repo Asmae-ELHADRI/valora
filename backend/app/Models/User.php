@@ -29,6 +29,7 @@ class User extends Authenticatable
         'role',
         'role_id',
         'is_active',
+        'last_seen_at',
     ];
 
     /**
@@ -43,6 +44,7 @@ class User extends Authenticatable
             'password' => 'hashed',
             'is_active' => 'boolean',
             'role_id' => 'integer',
+            'last_seen_at' => 'datetime',
         ];
     }
 

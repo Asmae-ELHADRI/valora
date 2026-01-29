@@ -3,7 +3,8 @@ import { ref, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from './store/auth';
 import api from './services/api';
-import { LogOut, User as UserIcon, MessageSquare, Search, Settings } from 'lucide-vue-next';
+import echo from './services/echo';
+import { LogOut, User as UserIcon, MessageSquare, Search, Settings, CheckCircle, X, Info } from 'lucide-vue-next';
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -11,32 +12,69 @@ const unreadCount = ref(0);
 const reqCount = ref(0);
 let countInterval = null;
 
+// Global Toast State
+const toast = ref({
+  show: false,
+  message: '',
+  type: 'info'
+});
+
+const showGlobalToast = (message, type = 'info') => {
+  toast.value = { show: true, message, type };
+  setTimeout(() => toast.value.show = false, 5000);
+};
+
 const fetchUnreadCount = async () => {
   if (!auth.isAuthenticated) return;
+  
   try {
-    const [msgRes, reqRes] = await Promise.all([
-      api.get('/api/messages/unread-count'),
-      api.get('/api/requests/unread-count')
-    ]);
-    unreadCount.value = msgRes.data.count;
-    reqCount.value = auth.isClient ? reqRes.data.candidatures_count : reqRes.data.invitations_count;
-  } catch (err) {
-    console.error('Erreur counts:', err);
+    // Sequential fetch to avoid session locking on PHP server
+    try {
+      const msgRes = await api.get('/api/messages/unread-count');
+      unreadCount.value = msgRes.data.count;
+    } catch (err) {
+      console.error('Error fetching unread messages:', err.message, err.response?.status, err.response?.data);
+    }
+
+    try {
+      const reqRes = await api.get('/api/requests/unread-count');
+      reqCount.value = auth.isClient ? reqRes.data.candidatures_count : reqRes.data.invitations_count;
+    } catch (err) {
+      console.error('Error fetching request counts:', err.message, err.response?.status, err.response?.data);
+    }
+  } finally {
+    // Schedule next poll
+    if (countInterval) clearTimeout(countInterval);
+    countInterval = setTimeout(fetchUnreadCount, 10000);
   }
 };
 
 const logout = async () => {
+  if (countInterval) clearTimeout(countInterval);
   await auth.logout();
   router.push('/login');
 };
 
 onMounted(() => {
   fetchUnreadCount();
-  countInterval = setInterval(fetchUnreadCount, 10000);
+
+  if (auth.user) {
+    echo.private(`chat.${auth.user.id}`)
+      .listen('MessageSent', (e) => {
+        // If not on messages page, show notification and increment count
+        if (router.currentRoute.value.path !== '/messages') {
+          unreadCount.value++;
+          showGlobalToast(`${e.message.sender?.name || 'Nouveau message'} : ${e.message.content || 'Fichier reçu'}`, 'info');
+        } else {
+            // Unread count is handled by Messages.vue when on that page, 
+            // but we might want to sync it here too if needed.
+        }
+      });
+  }
 });
 
 onUnmounted(() => {
-  clearInterval(countInterval);
+  if (countInterval) clearTimeout(countInterval);
 });
 </script>
 
@@ -109,11 +147,58 @@ onUnmounted(() => {
         <p>© 2026 VALORA. « C’est dans l’effort que l’humain se révèle »</p>
       </div>
     </footer>
+
+    <!-- Global Toast Notification -->
+    <Transition name="toast">
+      <div v-if="toast.show" 
+           :class="{
+              'shadow-green-100 border-green-100': toast.type === 'success',
+              'shadow-red-100 border-red-100': toast.type === 'error',
+              'shadow-blue-100 border-blue-100': toast.type === 'info'
+           }"
+           class="fixed bottom-6 right-6 z-[200] flex items-center bg-white px-6 py-4 rounded-2xl shadow-2xl border min-w-[300px] max-w-[90vw]"
+      >
+          <div :class="{
+              'bg-green-100': toast.type === 'success',
+              'bg-red-100': toast.type === 'error',
+              'bg-blue-100': toast.type === 'info'
+          }"
+               class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center mr-4">
+              <CheckCircle v-if="toast.type === 'success'" class="w-5 h-5 text-green-600" />
+              <X v-else-if="toast.type === 'error'" class="w-5 h-5 text-red-600" />
+              <MessageSquare v-else class="w-5 h-5 text-blue-600" />
+          </div>
+          <div class="min-w-0">
+              <h4 class="font-black text-gray-900 text-sm">
+                  {{ toast.type === 'success' ? 'Succès !' : (toast.type === 'error' ? 'Erreur' : 'Nouveau message') }}
+              </h4>
+              <p class="text-xs text-gray-500 font-medium truncate">{{ toast.message }}</p>
+          </div>
+          <button @click="toast.show = false" class="ml-auto pl-4 text-gray-300 hover:text-gray-500">
+            <X class="w-4 h-4" />
+          </button>
+      </div>
+    </Transition>
   </div>
 </template>
 
 <style>
 .router-link-active {
   color: #2563eb !important;
+}
+
+/* Global Toast Animations */
+.toast-enter-active,
+.toast-leave-active {
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.toast-enter-from {
+  opacity: 0;
+  transform: translateX(100px);
+}
+.toast-leave-to {
+  opacity: 0;
+  transform: translateY(20px);
 }
 </style>

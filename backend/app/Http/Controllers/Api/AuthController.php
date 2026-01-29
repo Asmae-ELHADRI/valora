@@ -161,4 +161,17 @@ class AuthController extends Controller
             'message' => 'Compte supprimé avec succès',
         ]);
     }
+
+    public function getBasicInfo($id)
+    {
+        $user = User::with(['prestataire', 'client'])->findOrFail($id);
+        
+        return response()->json([
+            'id' => $user->id,
+            'name' => $user->name,
+            'role' => $user->role,
+            'prestataire' => $user->prestataire, // Include specific data if needed
+            'client' => $user->client,
+        ]);
+    }
 }

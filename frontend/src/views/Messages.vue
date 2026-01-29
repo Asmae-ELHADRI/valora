@@ -1,9 +1,10 @@
 <script setup>
-import { ref, onMounted, nextTick, computed } from 'vue';
+import { ref, onMounted, nextTick, computed, onUnmounted } from 'vue';
 import { useAuthStore } from '../store/auth';
 import api from '../services/api';
+import echo from '../services/echo';
 import { useRoute } from 'vue-router';
-import { Send, User, MessageCircle, MoreVertical, Search, CheckCheck, ChevronLeft } from 'lucide-vue-next';
+import { Send, User, MessageCircle, MoreVertical, Search, CheckCheck, ChevronLeft, CheckCircle, Paperclip, X, FileText, Loader2, Play } from 'lucide-vue-next';
 
 const auth = useAuthStore();
 const route = useRoute();
@@ -12,8 +13,62 @@ const activeConversation = ref(null);
 const messages = ref([]);
 const newMessage = ref('');
 const loading = ref(true);
+const isSending = ref(false);
 const messagesContainer = ref(null);
 const showSidebar = ref(true);
+const fileInput = ref(null);
+const selectedFile = ref(null);
+const previewUrl = ref(null);
+const secureUrls = ref({});
+const onlineUsers = ref([]);
+const currentTime = ref(Date.now());
+
+const isOnline = (userId) => {
+    return onlineUsers.value.some(u => u.id === userId);
+};
+
+const fetchSecureUrl = async (message) => {
+    if (!message.attachment_path || message.id.toString().startsWith('temp')) return;
+    try {
+        const response = await api.get(`/api/messages/attachments/${message.id}`, { responseType: 'blob' });
+        const url = URL.createObjectURL(response.data);
+        secureUrls.value[message.id] = url;
+    } catch (err) {
+        console.error(`Error fetching secure attachment for message ${message.id}:`, err);
+    }
+};
+
+// Toast Notification State
+const showToast = ref(false);
+const toastMessage = ref('');
+const toastType = ref('success'); // 'success' or 'error'
+
+const showSuccessToast = (message) => {
+    toastType.value = 'success';
+    toastMessage.value = message;
+    showToast.value = true;
+    setTimeout(() => {
+        showToast.value = false;
+    }, 3000);
+};
+
+const showErrorToast = (message) => {
+    toastType.value = 'error';
+    toastMessage.value = message;
+    showToast.value = true;
+    setTimeout(() => {
+        showToast.value = false;
+    }, 4000);
+};
+
+const showInfoToast = (message) => {
+    toastType.value = 'info';
+    toastMessage.value = message;
+    showToast.value = true;
+    setTimeout(() => {
+        showToast.value = false;
+    }, 5000);
+};
 
 const fetchConversations = async () => {
     try {
@@ -22,12 +77,28 @@ const fetchConversations = async () => {
             ...c,
             last_message_date: c.last_message ? new Date(c.last_message.created_at) : new Date(0)
         }));
-        
-        if (route.query.user) {
-            const userId = parseInt(route.query.user);
+
+        if (route.query.user || route.query.userId) {
+            const userId = parseInt(route.query.user || route.query.userId);
             const existingConv = conversations.value.find(c => c.user.id === userId);
             if (existingConv) {
                 selectConversation(existingConv);
+            } else {
+                // Fetch basic info and start new conversation
+                try {
+                    const userRes = await api.get(`/api/users/${userId}/basic`);
+                    const newUser = userRes.data;
+                    const newConv = {
+                        user: newUser,
+                        last_message: null,
+                        unread_count: 0
+                    };
+                    activeConversation.value = newConv;
+                    if (window.innerWidth < 768) showSidebar.value = false;
+                    messages.value = []; // Empty chat
+                } catch (e) {
+                    console.error('Error fetching user for new chat', e);
+                }
             }
         }
     } catch (err) {
@@ -41,6 +112,9 @@ const fetchMessages = async (userId) => {
     try {
         const response = await api.get(`/api/messages/${userId}`);
         messages.value = response.data.data.reverse();
+        messages.value.forEach(msg => {
+            if (msg.attachment_path) fetchSecureUrl(msg);
+        });
         scrollToBottom();
     } catch (err) {
         console.error('Error fetching messages:', err);
@@ -62,8 +136,30 @@ const selectConversation = async (conv) => {
     await fetchMessages(conv.user.id);
 };
 
+const handleFileSelect = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+        if (file.size > 20 * 1024 * 1024) {
+            alert('Le fichier est trop volumineux (Max 20Mo)');
+            return;
+        }
+        selectedFile.value = file;
+        if (file.type.startsWith('image/')) {
+            previewUrl.value = URL.createObjectURL(file);
+        } else {
+            previewUrl.value = null; // Can add generic file icon preview later
+        }
+    }
+};
+
+const clearFile = () => {
+    selectedFile.value = null;
+    previewUrl.value = null;
+    if (fileInput.value) fileInput.value.value = '';
+};
+
 const sendMessage = async () => {
-    if (!newMessage.value.trim() || !activeConversation.value) return;
+    if ((!newMessage.value.trim() && !selectedFile.value) || !activeConversation.value) return;
 
     const tempMsg = {
         id: 'temp-' + Date.now(),
@@ -71,17 +167,34 @@ const sendMessage = async () => {
         sender_id: auth.user.id,
         receiver_id: activeConversation.value.user.id,
         created_at: new Date().toISOString(),
-        pending: true
+        pending: true,
+        attachment_path: previewUrl.value, // Local preview
+        attachment_type: selectedFile.value ? 'image' : null
     };
     
     messages.value.push(tempMsg);
-    newMessage.value = '';
     scrollToBottom();
 
+    const formData = new FormData();
+    formData.append('receiver_id', activeConversation.value.user.id);
+    formData.append('content', newMessage.value);
+    if (selectedFile.value) {
+        formData.append('image', selectedFile.value);
+    }
+
+    // Reset input immediately
+    const sentContent = newMessage.value;
+    const sentFile = selectedFile.value;
+    
+    newMessage.value = '';
+    clearFile();
+    isSending.value = true;
+
     try {
-        const response = await api.post('/api/messages', {
-            receiver_id: activeConversation.value.user.id,
-            content: tempMsg.content
+        const response = await api.post('/api/messages', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
         });
         
         const index = messages.value.findIndex(m => m.id === tempMsg.id);
@@ -93,8 +206,18 @@ const sendMessage = async () => {
         activeConversation.value.last_message_date = new Date(response.data.created_at);
         conversations.value.sort((a, b) => b.last_message_date - a.last_message_date);
         
+        showSuccessToast('Message envoyé !');
     } catch (err) {
         console.error('Error sending message:', err);
+        const index = messages.value.findIndex(m => m.id === tempMsg.id);
+        if (index !== -1) {
+            messages.value[index].error = true;
+            messages.value[index].pending = false;
+        }
+        newMessage.value = sentContent;
+        showErrorToast('Erreur lors de l\'envoi du message.');
+    } finally {
+        isSending.value = false;
     }
 };
 
@@ -108,6 +231,24 @@ const scrollToBottom = () => {
 
 const formatTime = (date) => {
     return new Date(date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
+
+const formatLastSeen = (date) => {
+    if (!date) return 'Jamais vu';
+    const now = currentTime.value;
+    const seenDate = new Date(date);
+    const seen = seenDate.getTime();
+    const diffInMinutes = Math.floor((now - seen) / 60000);
+    
+    if (diffInMinutes < 1) return 'Dernière activité à l\'instant';
+    if (diffInMinutes < 60) return `Dernière activité il y a ${diffInMinutes} minutes`;
+    
+    const day = seenDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
+    const today = new Date(now).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
+    const time = seenDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    
+    if (day === today) return `Vu à ${time}`;
+    return `Vu le ${day} à ${time}`;
 };
 
 const groupedMessages = computed(() => {
@@ -143,12 +284,73 @@ const formatDateHeader = (dateStr) => {
 
 onMounted(() => {
     fetchConversations();
-    setInterval(() => {
-        if (activeConversation.value) {
-            fetchMessages(activeConversation.value.user.id);
-        }
-        fetchConversations();
-    }, 10000);
+    
+    // Refresh "Last seen" relative times every minute
+    const timer = setInterval(() => {
+        currentTime.value = Date.now();
+    }, 60000);
+
+    onUnmounted(() => {
+        clearInterval(timer);
+    });
+    
+    if (auth.user) {
+        echo.join('online')
+            .here((users) => {
+                onlineUsers.value = users;
+            })
+            .joining((user) => {
+                if (!onlineUsers.value.some(u => u.id === user.id)) {
+                    onlineUsers.value.push(user);
+                }
+            })
+            .leaving((user) => {
+                onlineUsers.value = onlineUsers.value.filter(u => u.id !== user.id);
+            });
+
+        // Subscribe to private chat channel
+        echo.private(`chat.${auth.user.id}`)
+            .listen('MessageSent', (e) => {
+                const newMsg = e.message;
+                
+                if (newMsg.sender_id !== auth.user.id) {
+                    showInfoToast(`${newMsg.sender?.name || 'Contact'} : ${newMsg.content || 'Nouveau fichier reçu'}`);
+                }
+
+                // If it's for the active conversation
+                if (activeConversation.value && (
+                    newMsg.sender_id === activeConversation.value.user.id || 
+                    (newMsg.sender_id === auth.user.id && newMsg.receiver_id === activeConversation.value.user.id)
+                )) {
+                    // Avoid duplicates (already added by sender's AJAX response)
+                    const exists = messages.value.some(m => m.id === newMsg.id || (m.id.toString().startsWith('temp') && m.content === newMsg.content));
+                    if (!exists) {
+                        messages.value.push(newMsg);
+                        if (newMsg.attachment_path) fetchSecureUrl(newMsg);
+                        scrollToBottom();
+                        
+                        // Mark as read immediately if it's the active conversation
+                        if (newMsg.sender_id === activeConversation.value.user.id) {
+                            api.post(`/api/messages/${newMsg.sender_id}/read`).catch(e => console.error('Error marking as read', e));
+                        }
+                    }
+                }
+
+                // Update conversations list summary
+                const otherUserId = newMsg.sender_id === auth.user.id ? newMsg.receiver_id : newMsg.sender_id;
+                const conv = conversations.value.find(c => c.user.id === otherUserId);
+                if (conv) {
+                    conv.last_message = newMsg;
+                    conv.last_message_date = new Date(newMsg.created_at);
+                    if (newMsg.sender_id !== auth.user.id && (!activeConversation.value || activeConversation.value.user.id !== newMsg.sender_id)) {
+                         conv.unread_count = (conv.unread_count || 0) + 1;
+                    }
+                    conversations.value.sort((a, b) => b.last_message_date - a.last_message_date);
+                } else {
+                    fetchConversations();
+                }
+            });
+    }
 });
 </script>
 
@@ -183,7 +385,14 @@ onMounted(() => {
                         class="p-5 cursor-pointer transition relative group"
                     >
                         <div class="flex justify-between items-start mb-1">
-                            <h3 class="font-bold text-gray-900 group-hover:text-blue-600 transition">{{ conv.user.name }}</h3>
+                            <div class="flex items-center space-x-2">
+                                <h3 class="font-bold text-gray-900 group-hover:text-blue-600 transition">{{ conv.user.name }}</h3>
+                                <div class="flex items-center" v-if="isOnline(conv.user.id)">
+                                    <span class="w-2 h-2 bg-green-500 rounded-full border border-white shadow-sm animate-pulse"></span>
+                                    <span class="text-[8px] font-black text-green-500 uppercase ml-1 tracking-tighter">En ligne</span>
+                                </div>
+                                <span v-else class="w-2 h-2 bg-gray-300 rounded-full border border-white"></span>
+                            </div>
                             <span class="text-[10px] font-bold text-gray-300" v-if="conv.last_message">{{ formatTime(conv.last_message.created_at) }}</span>
                         </div>
                         <div class="flex justify-between items-center">
@@ -202,8 +411,8 @@ onMounted(() => {
 
         <!-- Chat Window -->
         <div 
-            v-show="!showSidebar || window?.innerWidth >= 768"
             class="flex-grow bg-white border border-gray-100 rounded-[2.5rem] shadow-sm flex flex-col overflow-hidden relative"
+            :class="{ 'hidden md:flex': showSidebar, 'flex': !showSidebar }"
         >
             <template v-if="activeConversation">
                 <!-- Chat Header -->
@@ -226,8 +435,11 @@ onMounted(() => {
                                       {{ activeConversation.user.prestataire.badge_level }}
                                   </span>
                               </div>
-                              <p class="text-[10px] font-bold text-green-500 mt-1 uppercase tracking-widest flex items-center">
-                                 <span class="w-1.5 h-1.5 bg-green-500 rounded-full mr-1 animate-pulse"></span> Connecté
+                              <p v-if="isOnline(activeConversation.user.id)" class="text-[10px] font-bold text-green-500 mt-1 uppercase tracking-widest flex items-center">
+                                 <span class="w-1.5 h-1.5 bg-green-500 rounded-full mr-1 animate-pulse"></span> En ligne
+                              </p>
+                              <p v-else class="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-widest flex items-center">
+                                 <span class="w-1.5 h-1.5 bg-gray-300 rounded-full mr-1"></span> {{ formatLastSeen(activeConversation.user.last_seen_at) }}
                               </p>
                           </div>
                      </div>
@@ -260,13 +472,66 @@ onMounted(() => {
                                     : 'bg-white text-gray-800 border border-gray-100 rounded-[20px] rounded-tl-none shadow-sm'"
                                 class="max-w-[80%] px-5 py-4 relative group transition-all hover:scale-[1.01]"
                             >
-                                <p class="text-sm font-medium leading-relaxed">{{ msg.content }}</p>
+                                <div v-if="msg.attachment_path" class="mb-3 rounded-xl overflow-hidden min-w-[200px]">
+                                    <!-- Image Rendering -->
+                                    <template v-if="msg.attachment_type === 'image' || (msg.id.toString().startsWith('temp') && msg.attachment_path && !msg.attachment_path.includes('video'))">
+                                        <img :src="msg.id.toString().startsWith('temp') ? msg.attachment_path : secureUrls[msg.id]" 
+                                             class="w-full h-auto object-cover max-h-60 cursor-pointer hover:opacity-90 transition" 
+                                             alt="Attachment">
+                                        <div v-if="!msg.id.toString().startsWith('temp') && !secureUrls[msg.id]" class="p-4 bg-gray-50 flex items-center justify-center">
+                                            <Loader2 class="w-5 h-5 animate-spin text-blue-600" />
+                                        </div>
+                                    </template>
+                                    
+                                    <!-- Video Rendering -->
+                                    <template v-else-if="msg.attachment_type === 'video'">
+                                        <video v-if="secureUrls[msg.id]" controls class="w-full h-auto max-h-60">
+                                            <source :src="secureUrls[msg.id]" type="video/mp4">
+                                            Votre navigateur ne supporte pas la lecture de vidéos.
+                                        </video>
+                                        <div v-else class="p-4 bg-gray-50 flex items-center justify-center">
+                                            <Loader2 class="w-5 h-5 animate-spin text-blue-600" />
+                                        </div>
+                                    </template>
+
+                                    <!-- Generic File Rendering -->
+                                    <template v-else-if="!msg.id.toString().startsWith('temp')">
+                                        <div class="p-4 bg-gray-50/50 rounded-xl flex items-center space-x-3 border border-gray-100">
+                                            <div class="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-sm">
+                                                <FileText class="w-5 h-5 text-blue-600" />
+                                            </div>
+                                            <div class="flex-grow min-w-0">
+                                                <p class="text-xs font-bold text-gray-700 truncate">{{ msg.attachment_path.split('/').pop() }}</p>
+                                                <p class="text-[10px] text-gray-400 uppercase font-black">{{ msg.attachment_type || 'Fichier' }}</p>
+                                            </div>
+                                            <a v-if="secureUrls[msg.id]" :href="secureUrls[msg.id]" 
+                                               :download="msg.attachment_path.split('/').pop()"
+                                               class="p-2 bg-white rounded-lg text-blue-600 hover:bg-blue-50 transition border border-gray-100">
+                                                <Play class="w-4 h-4" />
+                                            </a>
+                                            <div v-else class="p-2">
+                                                <Loader2 class="w-4 h-4 animate-spin text-blue-600" />
+                                            </div>
+                                        </div>
+                                    </template>
+                                    
+                                    <!-- Temp Generic File Preview -->
+                                    <template v-else>
+                                         <div class="p-4 bg-gray-50/50 rounded-xl flex items-center space-x-3">
+                                            <FileText class="w-5 h-5 text-gray-400" />
+                                            <span class="text-xs font-bold text-gray-500">Chargement du fichier...</span>
+                                         </div>
+                                    </template>
+                                </div>
+                                <p v-if="msg.content" class="text-sm font-medium leading-relaxed">{{ msg.content }}</p>
                                 <div 
                                     :class="msg.sender_id === auth.user.id ? 'text-blue-100' : 'text-gray-400'"
                                     class="text-[9px] font-bold mt-2 flex items-center justify-end space-x-1 uppercase tracking-tighter"
                                 >
+                                    <span v-if="msg.error" class="text-red-300 mr-2 font-black">Échec de l'envoi</span>
                                     <span>{{ formatTime(msg.created_at) }}</span>
-                                    <CheckCheck v-if="msg.sender_id === auth.user.id && !msg.pending" class="w-3 h-3" />
+                                    <CheckCheck v-if="msg.sender_id === auth.user.id && !msg.pending && !msg.error" class="w-3 h-3" />
+                                    <Loader2 v-if="msg.pending" class="w-3 h-3 animate-spin" />
                                 </div>
                             </div>
                         </div>
@@ -275,7 +540,33 @@ onMounted(() => {
 
                 <!-- Input Area -->
                 <div class="p-6 bg-white border-t border-gray-100">
+                    <div v-if="selectedFile" class="mb-4 relative inline-block">
+                        <div class="relative rounded-2xl overflow-hidden h-24 w-24 border-2 border-blue-100 shadow-xl shadow-blue-50">
+                            <img v-if="previewUrl" :src="previewUrl" class="w-full h-full object-cover">
+                            <div v-else class="w-full h-full bg-blue-50 flex flex-col items-center justify-center p-2 text-center">
+                                <FileText class="w-8 h-8 text-blue-400 mb-1" />
+                                <span class="text-[8px] font-black text-blue-600 uppercase truncate w-full">{{ selectedFile.name }}</span>
+                            </div>
+                            <button @click="clearFile" class="absolute top-1 right-1 bg-white/90 text-red-500 rounded-full p-1 hover:bg-red-500 hover:text-white transition shadow-sm">
+                                <X class="w-3 h-3" />
+                            </button>
+                        </div>
+                    </div>
                     <form @submit.prevent="sendMessage" class="flex items-center space-x-3">
+                        <button 
+                            type="button"
+                            @click="fileInput.click()"
+                            class="p-4 bg-gray-50 text-gray-400 rounded-2xl hover:bg-gray-100 hover:text-gray-600 transition"
+                        >
+                            <Paperclip class="w-6 h-6" />
+                        </button>
+                        <input 
+                            ref="fileInput"
+                            type="file" 
+                            accept="image/*,video/*,application/pdf,.doc,.docx" 
+                            class="hidden"
+                            @change="handleFileSelect"
+                        >
                         <input 
                             v-model="newMessage"
                             type="text" 
@@ -284,10 +575,11 @@ onMounted(() => {
                         >
                         <button 
                             type="submit" 
-                            :disabled="!newMessage.trim()"
-                            class="p-4 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition disabled:opacity-50 disabled:grayscale shadow-xl shadow-blue-100 active:scale-95"
+                            :disabled="(!newMessage.trim() && !selectedFile) || isSending"
+                            class="p-4 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition disabled:opacity-50 disabled:grayscale shadow-xl shadow-blue-100 active:scale-95 flex items-center justify-center min-w-[56px]"
                         >
-                            <Send class="w-6 h-6" />
+                            <Loader2 v-if="isSending" class="w-6 h-6 animate-spin" />
+                            <Send v-else class="w-6 h-6" />
                         </button>
                     </form>
                 </div>
@@ -302,6 +594,34 @@ onMounted(() => {
             </div>
         </div>
     </div>
+
+    <Transition name="toast">
+        <div v-if="showToast" 
+             :class="{
+                'shadow-green-100 border-green-100': toastType === 'success',
+                'shadow-red-100 border-red-100': toastType === 'error',
+                'shadow-blue-100 border-blue-100': toastType === 'info'
+             }"
+             class="fixed top-6 left-1/2 transform -translate-x-1/2 z-[200] flex items-center bg-white px-6 py-4 rounded-2xl shadow-2xl border min-w-[300px] max-w-[90vw]"
+        >
+            <div :class="{
+                'bg-green-100': toastType === 'success',
+                'bg-red-100': toastType === 'error',
+                'bg-blue-100': toastType === 'info'
+            }"
+                 class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center mr-4">
+                <CheckCircle v-if="toastType === 'success'" class="w-6 h-6 text-green-600" />
+                <X v-else-if="toastType === 'error'" class="w-6 h-6 text-red-600" />
+                <MessageSquare v-else class="w-6 h-6 text-blue-600" />
+            </div>
+            <div class="min-w-0">
+                <h4 class="font-black text-gray-900 text-sm">
+                    {{ toastType === 'success' ? 'Succès !' : (toastType === 'error' ? 'Erreur' : 'Nouveau message') }}
+                </h4>
+                <p class="text-xs text-gray-500 font-medium truncate">{{ toastMessage }}</p>
+            </div>
+        </div>
+    </Transition>
 </template>
 
 <style scoped>
@@ -318,5 +638,17 @@ onMounted(() => {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #cbd5e1;
+}
+
+/* Toast Animations */
+.toast-enter-active,
+.toast-leave-active {
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.toast-enter-from,
+.toast-leave-to {
+  opacity: 0;
+  transform: translate(-50%, -20px);
 }
 </style>

@@ -43,11 +43,16 @@ export const useAuthStore = defineStore('auth', {
             }
         },
         async logout() {
-            await api.post('/api/logout')
-            this.user = null
-            this.token = null
-            localStorage.removeItem('token')
-            delete api.defaults.headers.common['Authorization']
+            try {
+                await api.post('/api/logout')
+            } catch (err) {
+                console.error('Logout API call failed:', err);
+            } finally {
+                this.user = null
+                this.token = null
+                localStorage.removeItem('token')
+                delete api.defaults.headers.common['Authorization']
+            }
         },
         async fetchUser() {
             if (!this.token) return
@@ -56,7 +61,7 @@ export const useAuthStore = defineStore('auth', {
                 const response = await api.get('/api/user')
                 this.user = response.data
             } catch (error) {
-                this.logout()
+                await this.logout()
             }
         }
     }

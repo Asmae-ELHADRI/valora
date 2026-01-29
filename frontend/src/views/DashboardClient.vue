@@ -332,8 +332,13 @@ onMounted(fetchDashboardData);
               >
                 <User class="w-5 h-5" />
               </button>
-              <router-link :to="`/messages?userId=${req.provider?.id}`" class="p-3 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition border border-gray-100 shadow-sm" title="Discuter">
-                <MessageSquare class="w-5 h-5" />
+              <router-link 
+                :to="`/messages?userId=${req.provider?.id}`" 
+                class="bg-white text-blue-600 border-2 border-blue-50 px-5 py-3 rounded-xl font-bold text-sm hover:bg-blue-50 transition flex items-center shadow-sm" 
+                title="Discuter"
+              >
+                <MessageSquare class="w-4 h-4 mr-2" />
+                <span>Discuter</span>
               </router-link>
               
               <template v-if="req.status === 'pending' && req.created_by_id !== auth.user.id">

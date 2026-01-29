@@ -8,7 +8,10 @@ Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 
 Route::middleware('auth:sanctum')->group(function () {
+    Broadcast::routes();
+
     Route::get('/user', [AuthController::class, 'user']);
+    Route::get('/users/{id}/basic', [AuthController::class, 'getBasicInfo']);
     Route::post('/logout', [AuthController::class, 'logout']);
 
     // Offer routes
@@ -31,7 +34,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // Messaging routes
     Route::get('/messages', [\App\Http\Controllers\Api\MessageController::class, 'index']);
     Route::get('/messages/unread-count', [\App\Http\Controllers\Api\MessageController::class, 'unreadCount']);
+    Route::get('/messages/attachments/{messageId}', [\App\Http\Controllers\Api\MessageController::class, 'downloadAttachment']);
     Route::get('/messages/{userId}', [\App\Http\Controllers\Api\MessageController::class, 'show']);
+    Route::post('/messages/{userId}/read', [\App\Http\Controllers\Api\MessageController::class, 'markAsRead']);
     Route::post('/messages', [\App\Http\Controllers\Api\MessageController::class, 'store']);
 
     // Review routes
@@ -45,10 +50,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/password/update', [\App\Http\Controllers\Api\AuthController::class, 'updatePassword']);
     Route::delete('/account/delete', [\App\Http\Controllers\Api\AuthController::class, 'deleteAccount']);
 
-    // Provider routes
-    Route::middleware(['role:provider'])->prefix('provider')->group(function () {
+    // Provider browsing (accessible by all auth users)
+    Route::prefix('provider')->group(function () {
         Route::get('/', [\App\Http\Controllers\Api\ProviderController::class, 'index']);
         Route::get('/{id}', [\App\Http\Controllers\Api\ProviderController::class, 'show']);
+    });
+
+    // Provider profile management (restricted to providers)
+    Route::middleware(['role:provider'])->prefix('provider')->group(function () {
         Route::post('/profile', [\App\Http\Controllers\Api\ProviderController::class, 'updateProfile']);
         Route::post('/photo', [\App\Http\Controllers\Api\ProviderController::class, 'uploadPhoto']);
         Route::post('/availability', [\App\Http\Controllers\Api\ProviderController::class, 'updateAvailability']);

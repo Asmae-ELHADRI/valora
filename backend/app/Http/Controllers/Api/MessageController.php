@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Message;
 use App\Models\User;
+use App\Events\MessageSent;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class MessageController extends Controller
 {
@@ -48,6 +50,7 @@ class MessageController extends Controller
                     'name' => $user->name,
                     'email' => $user->email,
                     'role' => $user->role,
+                    'last_seen_at' => $user->last_seen_at,
                     'is_blocked_by' => $user->isBlockedBy($userId),
                     'has_blocked' => $user->hasBlocked($userId),
                 ],
@@ -88,18 +91,96 @@ class MessageController extends Controller
      */
     public function store(Request $request)
     {
+        $request->validate([
+            'receiver_id' => 'required|exists:users,id',
+            'content' => 'nullable|string',
+            'attachment' => 'nullable|file|max:20480', // 20MB max
+            'image' => 'nullable|image|max:10240', // Backward compatibility / specific image field
+        ]);
+
+        if ($request->receiver_id == $request->user()->id) {
+            return response()->json(['message' => 'Vous ne pouvez pas vous envoyer de message à vous-même.'], 422);
+        }
+
+        if (!$request->content && !$request->hasFile('image') && !$request->hasFile('attachment')) {
+            return response()->json(['message' => 'Le message ne peut pas être vide.'], 422);
+        }
+
         $receiver = User::findOrFail($request->receiver_id);
         if ($receiver->isBlockedBy($request->user()->id) || $request->user()->isBlockedBy($receiver->id)) {
             return response()->json(['message' => 'Communication impossible avec cet utilisateur.'], 403);
         }
 
+        $attachmentPath = null;
+        $attachmentType = null;
+
+        if ($request->hasFile('image')) {
+            $path = $request->file('image')->store('chat_attachments', 'local');
+            $attachmentPath = $path;
+            $attachmentType = 'image';
+        } elseif ($request->hasFile('attachment')) {
+            $file = $request->file('attachment');
+            $path = $file->store('chat_attachments', 'local');
+            $attachmentPath = $path;
+            
+            $mime = $file->getMimeType();
+            if (str_starts_with($mime, 'image/')) {
+                $attachmentType = 'image';
+            } elseif (str_starts_with($mime, 'video/')) {
+                $attachmentType = 'video';
+            } elseif (str_starts_with($mime, 'audio/')) {
+                $attachmentType = 'audio';
+            } else {
+                $attachmentType = 'file';
+            }
+        }
+
         $message = Message::create([
             'sender_id' => $request->user()->id,
             'receiver_id' => $request->receiver_id,
-            'content' => $request->content,
+            'content' => $request->content ?? '',
+            'attachment_path' => $attachmentPath,
+            'attachment_type' => $attachmentType,
         ]);
 
+        $message->load('sender');
+
+        broadcast(new MessageSent($message))->toOthers();
+
         return response()->json($message);
+    }
+
+    /**
+     * Download/View an attachment securely.
+     */
+    public function downloadAttachment(Request $request, $messageId)
+    {
+        $message = Message::findOrFail($messageId);
+        $userId = $request->user()->id;
+
+        // Authorization: only sender or receiver
+        if ($message->sender_id !== $userId && $message->receiver_id !== $userId) {
+            return response()->json(['message' => 'Accès non autorisé.'], 403);
+        }
+
+        if (!$message->attachment_path || !Storage::disk('local')->exists($message->attachment_path)) {
+            return response()->json(['message' => 'Fichier introuvable.'], 404);
+        }
+
+        return Storage::disk('local')->download($message->attachment_path);
+    }
+
+    /**
+     * Mark all messages from a specific user as read.
+     */
+    public function markAsRead(Request $request, $senderId)
+    {
+        Message::where('sender_id', $senderId)
+            ->where('receiver_id', $request->user()->id)
+            ->whereNull('read_at')
+            ->update(['read_at' => now()]);
+
+        return response()->json(['success' => true]);
     }
 
     /**

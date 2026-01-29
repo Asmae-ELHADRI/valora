@@ -332,9 +332,18 @@ const getBadgeClass = (level) => {
         
         <p class="text-sm text-gray-500 line-clamp-2 mb-6 h-10">{{ provider.prestataire?.description || 'Pas de description disponible.' }}</p>
         
-        <div class="flex items-center text-xs text-gray-400 mt-auto">
-          <MapPin class="w-4 h-4 mr-1.5" />
-          {{ provider.address || 'Localisation non précisée' }}
+        <div class="flex items-center justify-between w-full mt-auto pt-6 border-t border-gray-50">
+          <div class="flex items-center text-xs text-gray-400">
+            <MapPin class="w-4 h-4 mr-1.5" />
+            {{ provider.address || 'Localisation non précisée' }}
+          </div>
+          <button 
+            @click.stop="startConversation(provider.id)"
+            class="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition shadow-sm"
+            title="Contacter"
+          >
+            <MessageSquare class="w-5 h-5" />
+          </button>
         </div>
       </div>
     </div>

@@ -12,11 +12,11 @@ class ProviderController extends Controller
 {
     public function index(Request $request)
     {
-        $query = User::role('provider')
+        $query = User::where('role', 'provider')
             ->whereHas('prestataire', function ($q) {
                 $q->where('is_visible', true);
             })
-            ->with(['prestataire.categories', 'prestataire.badges' => function($q) {
+            ->with(['prestataire.categories', 'prestataire.badges' => function ($q) {
                 $q->orderBy('threshold', 'desc');
             }]);
 
@@ -104,12 +104,19 @@ class ProviderController extends Controller
 
     public function show($id)
     {
-        $provider = User::role('provider')
+        $provider = User::where('role', 'provider')
             ->with(['prestataire.categories', 'receivedReviews.reviewer'])
-            ->findOrFail($id);
+            ->firstWhere('id', $id);
+
+        if (!$provider) {
+            return response()->json([
+                'message' => 'Prestataire introuvable'
+            ], 404);
+        }
 
         return response()->json($provider);
     }
+
 
     public function updateProfile(Request $request)
     {
