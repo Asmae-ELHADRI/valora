@@ -4,7 +4,7 @@ import { useAuthStore } from '../store/auth';
 import api from '../services/api';
 import echo from '../services/echo';
 import { useRoute } from 'vue-router';
-import { Send, User, MessageCircle, MoreVertical, Search, CheckCheck, ChevronLeft, CheckCircle, Paperclip, X, FileText, Loader2, Play } from 'lucide-vue-next';
+import { Send, User, MessageCircle, MoreVertical, Search, CheckCheck, ChevronLeft, CheckCircle, Paperclip, X, FileText, Loader2, Play, Mic, Ban, Trash2, StopCircle, Pause } from 'lucide-vue-next';
 
 const auth = useAuthStore();
 const route = useRoute();
@@ -20,6 +20,19 @@ const fileInput = ref(null);
 const selectedFile = ref(null);
 const previewUrl = ref(null);
 const secureUrls = ref({});
+
+// Audio Recording State
+const isRecording = ref(false);
+const mediaRecorder = ref(null);
+const audioChunks = ref([]);
+const recordingDuration = ref(0);
+const recordingTimer = ref(null);
+const audioBlob = ref(null);
+const audioPreviewUrl = ref(null);
+
+// Audio Player State
+const playingAudioId = ref(null);
+const audioElements = ref({}); // Map of audio elements refs
 const onlineUsers = ref([]);
 const currentTime = ref(Date.now());
 
@@ -144,6 +157,10 @@ const handleFileSelect = (event) => {
             return;
         }
         selectedFile.value = file;
+        
+        // Clear audio if file is selected
+        if (audioBlob.value) cancelRecording();
+
         if (file.type.startsWith('image/')) {
             previewUrl.value = URL.createObjectURL(file);
         } else {
@@ -158,8 +175,141 @@ const clearFile = () => {
     if (fileInput.value) fileInput.value.value = '';
 };
 
+// Audio Functions
+const startRecording = async () => {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder.value = new MediaRecorder(stream);
+        audioChunks.value = [];
+        
+        mediaRecorder.value.ondataavailable = (event) => {
+            audioChunks.value.push(event.data);
+        };
+        
+        mediaRecorder.value.onstop = () => {
+            audioBlob.value = new Blob(audioChunks.value, { type: 'audio/webm' });
+            audioPreviewUrl.value = URL.createObjectURL(audioBlob.value);
+            
+            // Stop all tracks to release microphone
+            stream.getTracks().forEach(track => track.stop());
+        };
+        
+        mediaRecorder.value.start();
+        isRecording.value = true;
+        recordingDuration.value = 0;
+        
+        recordingTimer.value = setInterval(() => {
+            recordingDuration.value++;
+        }, 1000);
+        
+    } catch (err) {
+        console.error('Error accessing microphone:', err);
+        alert('Impossible d\'accéder au microphone. Veuillez vérifier vos permissions.');
+    }
+};
+
+const stopRecording = () => {
+    if (mediaRecorder.value && isRecording.value) {
+        mediaRecorder.value.stop();
+        isRecording.value = false;
+        clearInterval(recordingTimer.value);
+    }
+};
+
+const cancelRecording = () => {
+    if (mediaRecorder.value && isRecording.value) {
+        mediaRecorder.value.stop(); // Will trigger onstop but we clear data after
+        // We need to wait a tick for onstop to fire if we want to be clean, 
+        // but generally just resetting values is enough if we don't use the blob.
+    }
+    
+    isRecording.value = false;
+    audioBlob.value = null;
+    audioPreviewUrl.value = null;
+    audioChunks.value = [];
+    recordingDuration.value = 0;
+    isRecording.value = false;
+    audioBlob.value = null;
+    audioPreviewUrl.value = null;
+    audioChunks.value = [];
+    recordingDuration.value = 0;
+    if (recordingTimer.value) clearInterval(recordingTimer.value);
+};
+
+const toggleAudio = (msgId) => {
+    const audio = audioElements.value[msgId];
+    if (!audio) return;
+
+    if (playingAudioId.value && playingAudioId.value !== msgId) {
+        // Stop currently playing
+        const data = messages.value.find(m => m.id === playingAudioId.value);
+        if (data) data.isPlaying = false;
+        if (audioElements.value[playingAudioId.value]) {
+            audioElements.value[playingAudioId.value].pause();
+            audioElements.value[playingAudioId.value].currentTime = 0;
+        }
+    }
+
+    const msg = messages.value.find(m => m.id === msgId);
+    if (!msg) return;
+
+    if (audio.paused) {
+        audio.play();
+        msg.isPlaying = true;
+        playingAudioId.value = msgId;
+    } else {
+        audio.pause();
+        msg.isPlaying = false;
+        playingAudioId.value = null;
+    }
+};
+
+const onAudioEnded = (msgId) => {
+    const msg = messages.value.find(m => m.id === msgId);
+    if (msg) msg.isPlaying = false;
+    playingAudioId.value = null;
+};
+
+const onTimeUpdate = (msgId) => {
+    const audio = audioElements.value[msgId];
+    const msg = messages.value.find(m => m.id === msgId);
+    if (audio && msg) {
+        msg.progress = (audio.currentTime / audio.duration) * 100 || 0;
+        msg.currentTime = audio.currentTime;
+        msg.duration = audio.duration;
+    }
+};
+
+const onLoadedMetadata = (msgId) => {
+    const audio = audioElements.value[msgId];
+    const msg = messages.value.find(m => m.id === msgId);
+    if (audio && msg) {
+        msg.duration = audio.duration;
+    }
+};
+
+const seekAudio = (msgId, event) => {
+    const audio = audioElements.value[msgId];
+    if (!audio) return;
+    const percent = event.target.value;
+    audio.currentTime = (percent / 100) * audio.duration;
+};
+
+const formatAudioTime = (seconds) => {
+    if (!seconds) return '0:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+};
+
+const formatDuration = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+};
+
 const sendMessage = async () => {
-    if ((!newMessage.value.trim() && !selectedFile.value) || !activeConversation.value) return;
+    if ((!newMessage.value.trim() && !selectedFile.value && !audioBlob.value) || !activeConversation.value) return;
 
     const tempMsg = {
         id: 'temp-' + Date.now(),
@@ -168,8 +318,8 @@ const sendMessage = async () => {
         receiver_id: activeConversation.value.user.id,
         created_at: new Date().toISOString(),
         pending: true,
-        attachment_path: previewUrl.value, // Local preview
-        attachment_type: selectedFile.value ? 'image' : null
+        attachment_path: previewUrl.value || audioPreviewUrl.value, // Local preview
+        attachment_type: selectedFile.value ? 'image' : (audioBlob.value ? 'audio' : null)
     };
     
     messages.value.push(tempMsg);
@@ -180,6 +330,8 @@ const sendMessage = async () => {
     formData.append('content', newMessage.value);
     if (selectedFile.value) {
         formData.append('image', selectedFile.value);
+    } else if (audioBlob.value) {
+        formData.append('attachment', audioBlob.value, 'voice-message.webm');
     }
 
     // Reset input immediately
@@ -187,7 +339,15 @@ const sendMessage = async () => {
     const sentFile = selectedFile.value;
     
     newMessage.value = '';
+    
+    // Clear attachments but keep temp ref if needed (though we just reset)
     clearFile();
+    
+    // Reset Audio
+    audioBlob.value = null;
+    audioPreviewUrl.value = null;
+    audioChunks.value = [];
+    
     isSending.value = true;
 
     try {
@@ -494,6 +654,52 @@ onMounted(() => {
                                         </div>
                                     </template>
 
+                                    <!-- Audio Rendering -->
+                                    <template v-else-if="msg.attachment_type === 'audio'">
+                                        <div class="p-4 bg-opacity-10 rounded-2xl min-w-[260px] flex items-center gap-4 border"
+                                             :class="msg.sender_id === auth.user.id 
+                                                ? 'bg-blue-800 border-blue-500/30' 
+                                                : 'bg-gray-100 border-gray-200'"
+                                        >
+                                            <button @click="toggleAudio(msg.id)" 
+                                                class="w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 shadow-md transform hover:scale-105"
+                                                :class="msg.sender_id === auth.user.id ? 'bg-white text-blue-600' : 'bg-blue-600 text-white'"
+                                            >
+                                                <Pause v-if="msg.isPlaying" class="w-5 h-5 fill-current" />
+                                                <Play v-else class="w-5 h-5 fill-current ml-1" />
+                                            </button>
+                                            
+                                            <div class="flex-grow space-y-2">
+                                                 <input 
+                                                    type="range" 
+                                                    min="0" 
+                                                    max="100" 
+                                                    :value="msg.progress || 0" 
+                                                    @input="seekAudio(msg.id, $event)"
+                                                    class="w-full h-1.5 rounded-full appearance-none cursor-pointer"
+                                                    :style="{ 
+                                                        background: `linear-gradient(to right, ${msg.sender_id === auth.user.id ? 'white' : '#2563eb'} 0%, ${msg.sender_id === auth.user.id ? 'white' : '#2563eb'} ${msg.progress || 0}%, ${msg.sender_id === auth.user.id ? 'rgba(255,255,255,0.3)' : '#e2e8f0'} ${msg.progress || 0}%, ${msg.sender_id === auth.user.id ? 'rgba(255,255,255,0.3)' : '#e2e8f0'} 100%)` 
+                                                    }"
+                                                />
+                                                <div class="flex justify-between text-[10px] font-bold uppercase tracking-wider"
+                                                     :class="msg.sender_id === auth.user.id ? 'text-blue-100' : 'text-gray-400'"
+                                                >
+                                                    <span>{{ formatAudioTime(msg.currentTime) }}</span>
+                                                    <span>{{ formatAudioTime(msg.duration) }}</span>
+                                                </div>
+                                            </div>
+
+                                            <audio 
+                                                :ref="el => { if(el) audioElements[msg.id] = el }"
+                                                class="hidden"
+                                                @ended="onAudioEnded(msg.id)"
+                                                @timeupdate="onTimeUpdate(msg.id)"
+                                                @loadedmetadata="onLoadedMetadata(msg.id)"
+                                            >
+                                                <source :src="msg.id.toString().startsWith('temp') ? msg.attachment_path : secureUrls[msg.id]" type="audio/webm">
+                                            </audio>
+                                        </div>
+                                    </template>
                                     <!-- Generic File Rendering -->
                                     <template v-else-if="!msg.id.toString().startsWith('temp')">
                                         <div class="p-4 bg-gray-50/50 rounded-xl flex items-center space-x-3 border border-gray-100">
@@ -553,29 +759,83 @@ onMounted(() => {
                         </div>
                     </div>
                     <form @submit.prevent="sendMessage" class="flex items-center space-x-3">
-                        <button 
-                            type="button"
-                            @click="fileInput.click()"
-                            class="p-4 bg-gray-50 text-gray-400 rounded-2xl hover:bg-gray-100 hover:text-gray-600 transition"
-                        >
-                            <Paperclip class="w-6 h-6" />
-                        </button>
-                        <input 
-                            ref="fileInput"
-                            type="file" 
-                            accept="image/*,video/*,application/pdf,.doc,.docx" 
-                            class="hidden"
-                            @change="handleFileSelect"
-                        >
-                        <input 
-                            v-model="newMessage"
-                            type="text" 
-                            placeholder="Tapez un message..." 
-                            class="flex-grow px-6 py-4 rounded-2xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition font-medium text-sm"
-                        >
+                         <!-- Audio Recording Mode -->
+                        <div v-if="isRecording" class="flex-grow flex items-center px-2 py-2 rounded-2xl relative overflow-hidden transition-all duration-300">
+                             <!-- Glassmorphism Background -->
+                            <div class="absolute inset-0 bg-red-500/10 backdrop-blur-md border border-red-500/20 rounded-2xl z-0"></div>
+                            
+                            <!-- Animated Waveform Background -->
+                            <div class="absolute inset-0 flex items-center justify-center gap-1 opacity-20 z-0 px-20">
+                                <div class="w-1 h-3 bg-red-500 rounded-full animate-wave" style="animation-duration: 0.5s"></div>
+                                <div class="w-1 h-5 bg-red-500 rounded-full animate-wave" style="animation-duration: 0.7s"></div>
+                                <div class="w-1 h-8 bg-red-500 rounded-full animate-wave" style="animation-duration: 0.4s"></div>
+                                <div class="w-1 h-4 bg-red-500 rounded-full animate-wave" style="animation-duration: 0.6s"></div>
+                                <div class="w-1 h-6 bg-red-500 rounded-full animate-wave" style="animation-duration: 0.8s"></div>
+                                <div class="w-1 h-3 bg-red-500 rounded-full animate-wave" style="animation-duration: 0.5s"></div>
+                            </div>
+
+                            <div class="relative z-10 flex items-center w-full pl-4">
+                                <span class="w-3 h-3 bg-red-500 rounded-full mr-3 animate-pulse shadow-[0_0_10px_rgba(239,68,68,0.6)]"></span>
+                                <span class="font-bold font-mono text-red-600 mr-4 tracking-widest text-lg">{{ formatDuration(recordingDuration) }}</span>
+                                <span class="text-xs font-bold text-red-500 uppercase tracking-widest mr-auto">Enregistrement...</span>
+                                
+                                <button @click.prevent="cancelRecording" type="button" class="p-3 hover:bg-white/50 text-red-400 hover:text-red-500 rounded-xl mr-2 transition backdrop-blur-sm" title="Annuler">
+                                    <Trash2 class="w-6 h-6" />
+                                </button>
+                                <button @click.prevent="stopRecording" type="button" class="p-3 bg-red-500 text-white rounded-xl hover:bg-red-600 transition shadow-lg shadow-red-200 transform active:scale-95" title="Terminer">
+                                    <Send class="w-6 h-6" />
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Audio Preview Mode -->
+                        <div v-else-if="audioBlob" class="flex-grow flex items-center px-4 py-3 rounded-2xl border border-blue-100 bg-blue-50">
+                             <div class="w-10 h-10 bg-white rounded-full flex items-center justify-center mr-3 shadow-sm">
+                                <Mic class="w-5 h-5 text-blue-500" />
+                             </div>
+                             <audio controls :src="audioPreviewUrl" class="flex-grow h-8 mr-4 custom-audio"></audio>
+                             <button @click="cancelRecording" type="button" class="p-2 text-gray-400 hover:text-red-500 transition">
+                                <X class="w-5 h-5" />
+                             </button>
+                        </div>
+
+                        <!-- Normal Input Mode -->
+                        <template v-else>
+                            <button 
+                                type="button"
+                                @click="fileInput.click()"
+                                class="p-4 bg-gray-50 text-gray-400 rounded-2xl hover:bg-gray-100 hover:text-gray-600 transition"
+                            >
+                                <Paperclip class="w-6 h-6" />
+                            </button>
+                            <input 
+                                ref="fileInput"
+                                type="file" 
+                                accept="image/*,video/*,application/pdf,.doc,.docx" 
+                                class="hidden"
+                                @change="handleFileSelect"
+                            >
+                            <input 
+                                v-model="newMessage"
+                                type="text" 
+                                placeholder="Tapez un message..." 
+                                class="flex-grow px-6 py-4 rounded-2xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition font-medium text-sm"
+                            >
+                            
+                            <!-- Record Button (Visible if no text) -->
+                            <button 
+                                v-if="!newMessage.trim() && !selectedFile"
+                                type="button"
+                                @click="startRecording"
+                                class="p-4 bg-gray-50 text-gray-500 rounded-2xl hover:bg-gray-100 hover:text-gray-900 transition"
+                            >
+                                <Mic class="w-6 h-6" />
+                            </button>
+                        </template>
+
                         <button 
                             type="submit" 
-                            :disabled="(!newMessage.trim() && !selectedFile) || isSending"
+                            :disabled="(!newMessage.trim() && !selectedFile && !audioBlob) || isSending || isRecording"
                             class="p-4 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition disabled:opacity-50 disabled:grayscale shadow-xl shadow-blue-100 active:scale-95 flex items-center justify-center min-w-[56px]"
                         >
                             <Loader2 v-if="isSending" class="w-6 h-6 animate-spin" />
@@ -638,6 +898,28 @@ onMounted(() => {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #cbd5e1;
+}
+
+@keyframes wave {
+    0%, 100% { transform: scaleY(0.5); opacity: 0.5; }
+    50% { transform: scaleY(1.2); opacity: 1; }
+}
+.animate-wave {
+    animation-name: wave;
+    animation-iteration-count: infinite;
+    animation-timing-function: ease-in-out;
+}
+
+/* Range input styling */
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  height: 12px;
+  width: 12px;
+  border-radius: 50%;
+  background: white;
+  margin-top: -3px; /* You need to specify a margin in Chrome, but in Firefox and IE it is automatic */
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  cursor: pointer;
 }
 
 /* Toast Animations */
