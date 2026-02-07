@@ -1,11 +1,11 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useAuthStore } from '../store/auth';
 import api from '../services/api';
 import { 
   User, Mail, Phone, MapPin, Briefcase, GraduationCap, 
   Calendar, Eye, EyeOff, Camera, Check, Loader2, Save, Star,
-  Lock, AlertTriangle, Trash2
+  Lock, AlertTriangle, Trash2, Search
 } from 'lucide-vue-next';
 import { useRouter } from 'vue-router';
 
@@ -16,6 +16,65 @@ const saving = ref(false);
 const message = ref({ type: '', text: '' });
 const activeTab = ref('profile'); // profile, security
 const categories = ref([]);
+const categorySearch = ref('');
+
+// Grouper les catégories par domaine
+const categoryGroups = {
+    'Construction & Rénovation': [
+        'Plomberie', 'Électricité', 'Maçonnerie', 'Peinture & Décoration', 
+        'Menuiserie', 'Carrelage', 'Chauffage & Climatisation', 'Isolation', 
+        'Toiture & Couverture', 'Vitrerie'
+    ],
+    'Services à domicile': [
+        'Ménage & Nettoyage', 'Jardinage & Paysagisme', 'Garde d\'enfants', 
+        'Aide à domicile', 'Repassage', 'Cuisine à domicile'
+    ],
+    'Services professionnels': [
+        'Informatique & Dépannage', 'Cours particuliers', 'Coaching & Formation', 
+        'Traduction', 'Rédaction & Correction', 'Comptabilité', 'Conseil juridique', 
+        'Marketing & Communication', 'Design graphique', 'Développement web'
+    ],
+    'Transport & Logistique': [
+        'Déménagement', 'Transport de marchandises', 'Livraison', 'Coursier'
+    ],
+    'Événementiel': [
+        'Traiteur', 'Photographie', 'Vidéographie', 'Animation', 
+        'DJ & Musicien', 'Décoration événementielle'
+    ],
+    'Bien-être & Santé': [
+        'Coiffure à domicile', 'Esthétique & Beauté', 'Massage', 
+        'Fitness & Sport', 'Diététique'
+    ],
+    'Automobile': [
+        'Mécanique auto', 'Carrosserie', 'Dépannage auto', 'Nettoyage auto'
+    ],
+    'Animaux': [
+        'Toilettage', 'Garde d\'animaux', 'Promenade de chiens', 'Éducation canine'
+    ]
+};
+
+const filteredCategoryGroups = computed(() => {
+    const searchLower = categorySearch.value.toLowerCase();
+    const result = [];
+    
+    for (const [groupName, categoryNames] of Object.entries(categoryGroups)) {
+        const groupCategories = categories.value.filter(cat => 
+            categoryNames.includes(cat.name) &&
+            cat.name.toLowerCase().includes(searchLower)
+        );
+        if (groupCategories.length > 0) {
+            result.push({
+                name: groupName,
+                categories: groupCategories
+            });
+        }
+    }
+    return result;
+});
+
+const selectedCategoriesCount = computed(() => {
+    return form.value.category_ids.length;
+});
 
 const passwordForm = ref({
   current_password: '',
@@ -342,22 +401,51 @@ const days = [
             </div>
             <div class="space-y-6">
             <div>
-                <label class="block text-xs font-bold text-gray-500 uppercase mb-4">Catégories de service (plusieurs choix possibles)</label>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <label 
-                    v-for="cat in categories" 
-                    :key="cat.id"
-                    :class="form.category_ids.includes(cat.id) ? 'border-blue-600 bg-blue-50' : 'border-gray-100 hover:border-gray-200'"
-                    class="flex items-center space-x-3 p-3 rounded-xl border-2 cursor-pointer transition"
+                <div class="flex items-center justify-between mb-4">
+                  <label class="block text-xs font-bold text-gray-500 uppercase">Catégories de service</label>
+                  <span v-if="selectedCategoriesCount > 0" class="px-3 py-1 bg-blue-50 text-blue-700 text-xs rounded-full font-bold border border-blue-100">
+                    {{ selectedCategoriesCount }} sélectionnée{{ selectedCategoriesCount > 1 ? 's' : '' }}
+                  </span>
+                </div>
+                
+                <!-- Search Bar -->
+                <div class="relative mb-4">
+                  <Search class="absolute left-3 top-3.5 w-4 h-4 text-gray-400" />
+                  <input 
+                    v-model="categorySearch" 
+                    type="text" 
+                    placeholder="Rechercher une catégorie..."
+                    class="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition text-sm"
                   >
-                    <input 
-                      type="checkbox" 
-                      :value="cat.id" 
-                      v-model="form.category_ids"
-                      class="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    >
-                    <span class="text-sm font-medium text-gray-700">{{ cat.name }}</span>
-                  </label>
+                </div>
+
+                <!-- Grouped Categories -->
+                <div class="space-y-6 max-h-96 overflow-y-auto pr-2">
+                  <div v-for="group in filteredCategoryGroups" :key="group.name" class="space-y-3">
+                    <h4 class="text-xs font-black text-blue-600 uppercase tracking-wider sticky top-0 bg-white py-2">
+                      {{ group.name }}
+                    </h4>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <label 
+                        v-for="cat in group.categories" 
+                        :key="cat.id"
+                        :class="form.category_ids.includes(cat.id) ? 'border-blue-600 bg-blue-50' : 'border-gray-100 hover:border-gray-200'"
+                        class="flex items-center space-x-3 p-3 rounded-xl border-2 cursor-pointer transition"
+                      >
+                        <input 
+                          type="checkbox" 
+                          :value="cat.id" 
+                          v-model="form.category_ids"
+                          class="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        >
+                        <span class="text-sm font-medium text-gray-700">{{ cat.name }}</span>
+                      </label>
+                    </div>
+                  </div>
+                  
+                  <div v-if="filteredCategoryGroups.length === 0" class="text-center py-8">
+                    <p class="text-gray-400 text-sm">Aucune catégorie trouvée</p>
+                  </div>
                 </div>
               </div>
               <div>

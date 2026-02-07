@@ -19,6 +19,12 @@ class AuthController extends Controller
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
             'role' => 'required|in:provider,client',
+            // Prestataire specific fields
+            'city' => 'nullable|string',
+            'hourly_rate' => 'nullable|numeric',
+            'category_id' => 'nullable|exists:service_categories,id',
+            'experience' => 'nullable|string',
+            'description' => 'nullable|string',
         ]);
 
         $user = User::create([
@@ -31,6 +37,11 @@ class AuthController extends Controller
         if ($request->role === 'provider') {
             \App\Models\Prestataire::create([
                 'user_id' => $user->id,
+                'city' => $request->city,
+                'hourly_rate' => $request->hourly_rate,
+                'category_id' => $request->category_id,
+                'experience' => $request->experience,
+                'description' => $request->description,
             ]);
         } else {
             \App\Models\Client::create([
@@ -43,7 +54,7 @@ class AuthController extends Controller
         return response()->json([
             'access_token' => $token,
             'token_type' => 'Bearer',
-            'user' => $user,
+            'user' => $user->load(['prestataire', 'client']),
         ]);
     }
 

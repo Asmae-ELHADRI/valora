@@ -5,6 +5,9 @@ import { useAuthStore } from './store/auth';
 import api from './services/api';
 import echo from './services/echo';
 import { LogOut, User as UserIcon, MessageSquare, Search, Settings, CheckCircle, X, Info } from 'lucide-vue-next';
+import valoraLogo from './assets/logo-valora.png';
+import LanguageSwitcher from './components/LanguageSwitcher.vue';
+import BottomNav from './components/BottomNav.vue';
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -80,71 +83,100 @@ onUnmounted(() => {
 
 <template>
   <div class="min-h-screen bg-gray-50 flex flex-col">
-    <!-- Navbar -->
-    <nav class="bg-white border-b border-gray-200 sticky top-0 z-50">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between h-16">
+    <!-- Premium Navbar -->
+    <nav v-if="!['/login', '/register'].includes($route.path)" class="navbar-premium sticky top-0 z-50">
+      <!-- Gradient Background -->
+      <div class="navbar-gradient"></div>
+      
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        <div class="flex justify-between h-20">
           <div class="flex items-center">
-            <router-link to="/" class="flex-shrink-0 flex items-center">
-              <span class="text-2xl font-bold text-blue-600 tracking-tight">VALORA</span>
+            <!-- Logo with Premium Styling -->
+            <router-link to="/" class="shrink-0 flex items-center group">
+              <div class="logo-container">
+                <img :src="valoraLogo" alt="VALORA Logo" class="logo-image" />
+                <span class="text-3xl font-black tracking-tight logo-text logo-text-brown">
+                  VALORA
+                </span>
+                <div class="logo-underline"></div>
+              </div>
             </router-link>
-            <div class="hidden sm:ml-8 sm:flex sm:space-x-8">
-              <router-link to="/" class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
-                Accueil
+            
+            <!-- Navigation Links -->
+            <div class="hidden sm:ml-12 sm:flex sm:space-x-2">
+              <router-link to="/" class="nav-link">
+                <span>{{ $t('nav.home') }}</span>
+                <div class="nav-link-underline"></div>
               </router-link>
               <template v-if="auth.isAuthenticated">
-                <router-link v-if="auth.isProvider" to="/search" class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
-                  Missions
+                <router-link v-if="auth.isProvider" to="/search" class="nav-link">
+                  <span>{{ $t('nav.missions') }}</span>
+                  <div class="nav-link-underline"></div>
                 </router-link>
-                <router-link v-if="auth.isClient" to="/providers" class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
-                  Prestataires
+                <router-link v-if="auth.isClient" to="/providers" class="nav-link">
+                  <span>{{ $t('nav.providers') }}</span>
+                  <div class="nav-link-underline"></div>
                 </router-link>
               </template>
             </div>
           </div>
-          <div class="flex items-center space-x-4">
+          
+          <!-- Right Side Actions -->
+          <div class="flex items-center space-x-3">
             <template v-if="!auth.isAuthenticated">
-              <router-link to="/login" class="text-gray-500 hover:text-gray-700 px-3 py-2 text-sm font-medium">
-                Connexion
+              <router-link to="/login" class="nav-btn-secondary">
+                {{ $t('nav.login') }}
               </router-link>
-              <router-link to="/register" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition">
-                S'inscrire
+              <router-link to="/register" class="nav-btn-primary">
+                {{ $t('nav.register') }}
               </router-link>
             </template>
             <template v-else>
-              <router-link to="/messages" class="text-gray-500 hover:text-gray-700 p-2 relative">
+              <!-- Messages Icon -->
+              <router-link to="/messages" class="nav-icon-btn">
                 <MessageSquare class="w-5 h-5" />
-                <span v-if="unreadCount > 0" class="absolute top-0 right-0 w-4 h-4 bg-red-500 text-white text-[10px] flex items-center justify-center rounded-full font-bold">
+                <span v-if="unreadCount > 0" class="notification-badge bg-gradient-to-br from-red-500 to-red-600">
                   {{ unreadCount }}
                 </span>
               </router-link>
-              <router-link :to="auth.isProvider ? '/dashboard-provider' : (auth.isClient ? '/dashboard-client' : (auth.isAdmin ? '/dashboard-admin' : '/dashboard'))" class="text-gray-500 hover:text-gray-700 p-2 relative">
+              
+              <!-- Dashboard Icon -->
+              <router-link :to="auth.isProvider ? '/dashboard-provider' : (auth.isClient ? '/dashboard-client' : (auth.isAdmin ? '/dashboard-admin' : '/dashboard'))" class="nav-icon-btn">
                 <UserIcon class="w-5 h-5" />
-                <span v-if="reqCount > 0" class="absolute top-0 right-0 w-4 h-4 bg-orange-500 text-white text-[10px] flex items-center justify-center rounded-full font-bold border-2 border-white">
+                <span v-if="reqCount > 0" class="notification-badge bg-gradient-to-br from-orange-500 to-orange-600">
                   {{ reqCount }}
                 </span>
               </router-link>
-              <router-link to="/security" class="text-gray-500 hover:text-gray-700 p-2">
+              
+              <LanguageSwitcher />
+
+              <!-- Settings Icon -->
+              <router-link to="/security" class="nav-icon-btn">
                 <Settings class="w-5 h-5" />
               </router-link>
-              <button @click="logout" class="text-gray-500 hover:text-red-600 p-2">
+              
+              <!-- Logout Button -->
+              <button @click="logout" class="nav-icon-btn logout-btn">
                 <LogOut class="w-5 h-5" />
               </button>
             </template>
           </div>
         </div>
       </div>
+      
+      <!-- Bottom Border Glow -->
+      <div class="navbar-border-glow"></div>
     </nav>
 
     <!-- Main Content -->
-    <main class="flex-grow">
+    <main class="grow">
       <router-view></router-view>
     </main>
 
     <!-- Footer -->
-    <footer class="bg-white border-t border-gray-200 py-8">
+    <footer v-if="!['/login', '/register'].includes($route.path)" class="bg-white border-t border-gray-200 py-8">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-gray-500 text-sm">
-        <p>© 2026 VALORA. « C’est dans l’effort que l’humain se révèle »</p>
+        <p>© 2026 VALORA. {{ $t('common.footer_quote') }}</p>
       </div>
     </footer>
 
@@ -163,7 +195,7 @@ onUnmounted(() => {
               'bg-red-100': toast.type === 'error',
               'bg-blue-100': toast.type === 'info'
           }"
-               class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center mr-4">
+               class="shrink-0 w-10 h-10 rounded-full flex items-center justify-center mr-4">
               <CheckCircle v-if="toast.type === 'success'" class="w-5 h-5 text-green-600" />
               <X v-else-if="toast.type === 'error'" class="w-5 h-5 text-red-600" />
               <MessageSquare v-else class="w-5 h-5 text-blue-600" />
@@ -179,12 +211,294 @@ onUnmounted(() => {
           </button>
       </div>
     </Transition>
+
+    <!-- Mobile Bottom Navigation -->
+    <BottomNav v-if="auth.isAuthenticated" />
   </div>
 </template>
 
 <style>
+/* Import Premium Google Font */
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&display=swap');
+
+/* Premium Navbar Styles */
+.navbar-premium {
+  position: relative;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+/* Gradient Background with Blue and Brown */
+.navbar-gradient {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, 
+    rgba(37, 99, 235, 0.95) 0%,      /* Blue */
+    rgba(59, 130, 246, 0.92) 25%,    /* Lighter Blue */
+    rgba(139, 69, 19, 0.92) 75%,     /* Brown */
+    rgba(160, 82, 45, 0.95) 100%     /* Sienna Brown */
+  );
+  z-index: 1;
+}
+
+/* Bottom Border Glow */
+.navbar-border-glow {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, 
+    transparent 0%,
+    rgba(255, 255, 255, 0.5) 20%,
+    rgba(255, 255, 255, 0.8) 50%,
+    rgba(255, 255, 255, 0.5) 80%,
+    transparent 100%
+  );
+  animation: glow-pulse 3s ease-in-out infinite;
+}
+
+@keyframes glow-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+/* Logo Container */
+.logo-container {
+  position: relative;
+  padding: 8px 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.logo-container:hover {
+  transform: translateY(-2px);
+}
+
+/* Logo Image */
+.logo-image {
+  height: 45px;
+  width: 45px;
+  border-radius: 50%;
+  object-fit: cover;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.3));
+  transition: all 0.3s ease;
+  background: white;
+  padding: 2px;
+}
+
+.logo-container:hover .logo-image {
+  filter: drop-shadow(0 4px 12px rgba(255, 255, 255, 0.4));
+  transform: scale(1.05) rotate(5deg);
+}
+
+/* Logo Text with Premium Font */
+.logo-text {
+  position: relative;
+  display: inline-block;
+  letter-spacing: 0.02em;
+  font-family: 'Playfair Display', serif;
+  font-weight: 900;
+}
+
+.logo-text-brown {
+  color: #8b4513;
+  text-shadow: 
+    0 2px 4px rgba(0, 0, 0, 0.3),
+    0 0 20px rgba(218, 165, 32, 0.4);
+}
+
+.logo-container:hover .logo-text-brown {
+  text-shadow: 
+    0 2px 6px rgba(0, 0, 0, 0.4),
+    0 0 30px rgba(218, 165, 32, 0.6);
+}
+
+/* Logo Underline Animation */
+.logo-underline {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #ffffff, #fbbf24);
+  border-radius: 2px;
+  transition: width 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.logo-container:hover .logo-underline {
+  width: 100%;
+}
+
+/* Navigation Links */
+.nav-link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.75rem 1.25rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  text-decoration: none;
+  transition: all 0.3s ease;
+  border-radius: 12px;
+  letter-spacing: 0.01em;
+}
+
+.nav-link:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.15);
+  transform: translateY(-1px);
+}
+
+/* Navigation Link Underline */
+.nav-link-underline {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #fbbf24, #ffffff);
+  border-radius: 2px;
+  transition: width 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.nav-link:hover .nav-link-underline {
+  width: 70%;
+}
+
+.router-link-active.nav-link {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.2);
+  font-weight: 700;
+}
+
+.router-link-active.nav-link .nav-link-underline {
+  width: 70%;
+  background: linear-gradient(90deg, #ffffff, #fbbf24);
+}
+
+/* Primary Button (S'inscrire) */
+.nav-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.65rem 1.5rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #1e3a8a;
+  background: linear-gradient(135deg, #ffffff 0%, #fef3c7 100%);
+  border-radius: 12px;
+  text-decoration: none;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  letter-spacing: 0.02em;
+}
+
+.nav-btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 25px rgba(0, 0, 0, 0.3);
+  background: linear-gradient(135deg, #fef3c7 0%, #ffffff 100%);
+}
+
+.nav-btn-primary:active {
+  transform: translateY(0);
+}
+
+/* Secondary Button (Connexion) */
+.nav-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.65rem 1.5rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1.5px solid rgba(255, 255, 255, 0.3);
+  border-radius: 12px;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  letter-spacing: 0.01em;
+}
+
+.nav-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: translateY(-1px);
+}
+
+/* Icon Buttons */
+.nav-icon-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.65rem;
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  cursor: pointer;
+}
+
+.nav-icon-btn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.4);
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.nav-icon-btn:active {
+  transform: translateY(0) scale(1);
+}
+
+/* Logout Button Special Styling */
+.logout-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #fecaca;
+}
+
+/* Notification Badge */
+.notification-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 800;
+  color: #ffffff;
+  border-radius: 9px;
+  border: 2px solid rgba(37, 99, 235, 0.95);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  animation: badge-pulse 2s ease-in-out infinite;
+}
+
+@keyframes badge-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+/* Global Router Link Active State */
 .router-link-active {
-  color: #2563eb !important;
+  color: inherit !important;
 }
 
 /* Global Toast Animations */
@@ -200,5 +514,22 @@ onUnmounted(() => {
 .toast-leave-to {
   opacity: 0;
   transform: translateY(20px);
+}
+
+/* Responsive Adjustments */
+@media (max-width: 640px) {
+  .navbar-premium {
+    padding: 0.5rem 0;
+  }
+  
+  .logo-text {
+    font-size: 1.5rem;
+  }
+  
+  .nav-btn-primary,
+  .nav-btn-secondary {
+    padding: 0.5rem 1rem;
+    font-size: 0.85rem;
+  }
 }
 </style>

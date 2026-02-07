@@ -13,6 +13,65 @@ const categories = ref([]);
 const loading = ref(true);
 const activeTab = ref('overview');
 const saving = ref(false);
+const categorySearch = ref('');
+
+// Grouper les catégories par domaine
+const categoryGroups = {
+    'Construction & Rénovation': [
+        'Plomberie', 'Électricité', 'Maçonnerie', 'Peinture & Décoration', 
+        'Menuiserie', 'Carrelage', 'Chauffage & Climatisation', 'Isolation', 
+        'Toiture & Couverture', 'Vitrerie'
+    ],
+    'Services à domicile': [
+        'Ménage & Nettoyage', 'Jardinage & Paysagisme', 'Garde d\'enfants', 
+        'Aide à domicile', 'Repassage', 'Cuisine à domicile'
+    ],
+    'Services professionnels': [
+        'Informatique & Dépannage', 'Cours particuliers', 'Coaching & Formation', 
+        'Traduction', 'Rédaction & Correction', 'Comptabilité', 'Conseil juridique', 
+        'Marketing & Communication', 'Design graphique', 'Développement web'
+    ],
+    'Transport & Logistique': [
+        'Déménagement', 'Transport de marchandises', 'Livraison', 'Coursier'
+    ],
+    'Événementiel': [
+        'Traiteur', 'Photographie', 'Vidéographie', 'Animation', 
+        'DJ & Musicien', 'Décoration événementielle'
+    ],
+    'Bien-être & Santé': [
+        'Coiffure à domicile', 'Esthétique & Beauté', 'Massage', 
+        'Fitness & Sport', 'Diététique'
+    ],
+    'Automobile': [
+        'Mécanique auto', 'Carrosserie', 'Dépannage auto', 'Nettoyage auto'
+    ],
+    'Animaux': [
+        'Toilettage', 'Garde d\'animaux', 'Promenade de chiens', 'Éducation canine'
+    ]
+};
+
+const filteredCategoryGroups = computed(() => {
+    const searchLower = categorySearch.value.toLowerCase();
+    const result = [];
+    
+    for (const [groupName, categoryNames] of Object.entries(categoryGroups)) {
+        const groupCategories = categories.value.filter(cat => 
+            categoryNames.includes(cat.name) &&
+            cat.name.toLowerCase().includes(searchLower)
+        );
+        if (groupCategories.length > 0) {
+            result.push({
+                name: groupName,
+                categories: groupCategories
+            });
+        }
+    }
+    return result;
+});
+
+const selectedCategoriesCount = computed(() => {
+    return profileForm.value.category_ids.length;
+});
 
 // Form Data
 const profileForm = ref({
@@ -197,16 +256,16 @@ const nextLevel = computed(() => {
 
 const getBadgeClass = (level) => {
     switch (level) {
-        case 'Expert': return 'bg-purple-600 text-white shadow-lg shadow-purple-200';
-        case 'Confirmé': return 'bg-blue-600 text-white shadow-lg shadow-blue-200';
-        default: return 'bg-gray-500 text-white shadow-lg shadow-gray-200';
+        case 'Expert': return 'bg-premium-brown text-white shadow-xl shadow-orange-900/20';
+        case 'Confirmé': return 'bg-premium-blue text-white shadow-xl shadow-blue-900/20';
+        default: return 'bg-gray-400 text-white';
     }
 };
 
 const getScoreColor = (score) => {
-    if (score >= 300) return 'text-purple-600';
-    if (score >= 100) return 'text-blue-600';
-    return 'text-gray-600';
+    if (score >= 300) return 'text-premium-brown';
+    if (score >= 100) return 'text-premium-blue';
+    return 'text-gray-400';
 };
 
 const stats = computed(() => {
@@ -255,423 +314,310 @@ const updateStatus = async (id, status) => {
 </script>
 
 <template>
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-    <!-- Profile Completion Banner -->
-    <div v-if="profileCompletion < 100" class="mb-10 bg-gradient-to-r from-blue-600 to-indigo-700 rounded-3xl p-8 text-white shadow-xl relative overflow-hidden">
-        <div class="relative z-10 flex flex-col md:flex-row justify-between items-center gap-6">
-            <div class="max-w-md">
-                <h2 class="text-2xl font-bold mb-2">Valorisez votre profil !</h2>
-                <p class="text-blue-100 mb-4">Un profil complet a 5 fois plus de chances d'attirer des clients. Ajoutez vos compétences, votre photo et vos catégories.</p>
-                <div class="flex items-center space-x-4">
-                    <div class="flex-1 bg-blue-900/40 rounded-full h-3">
-                        <div :style="{ width: profileCompletion + '%' }" class="bg-white h-full rounded-full transition-all duration-1000"></div>
-                    </div>
-                    <span class="font-bold whitespace-nowrap">{{ profileCompletion }}% complété</span>
-                </div>
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24">
+    <!-- Header: Bonjour + Profile Visibilty -->
+    <div class="flex justify-between items-center mb-6">
+        <div>
+            <h1 class="text-2xl font-black text-slate-900">Bonjour, {{ auth.user?.first_name || auth.user?.name }}</h1>
+            <div class="flex items-center space-x-2 mt-1">
+                <span v-if="visibility" class="flex items-center text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100 uppercase tracking-widest">
+                    <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full mr-1.5 animate-pulse"></span>
+                    Profil visible
+                </span>
+                 <span v-else class="flex items-center text-[10px] font-black text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-200 uppercase tracking-widest">
+                    <span class="w-1.5 h-1.5 bg-slate-400 rounded-full mr-1.5"></span>
+                    Invisible
+                </span>
+                <span v-if="nextLevel" class="text-[10px] text-slate-400 font-medium ml-2">Plus que {{ nextLevel.remaining }} pts pour le badge <span class="font-black text-slate-600">{{ nextLevel.name }}</span></span>
             </div>
-            <button @click="activeTab = 'profile'" class="bg-white text-blue-600 px-8 py-3 rounded-xl font-bold hover:bg-blue-50 transition shadow-lg">
-                Compléter maintenant
-            </button>
         </div>
-        <!-- Decorative shapes -->
-        <div class="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
-        <div class="absolute bottom-0 left-0 -mb-10 -ml-10 w-40 h-40 bg-blue-400/20 rounded-full blur-3xl"></div>
-    </div>
-
-    <!-- Header with Profile Summary -->
-    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
-      <div class="flex items-center space-x-4">
-         <div class="w-16 h-16 rounded-full overflow-hidden bg-gray-100 border-2 border-white shadow">
-            <img 
+        <div class="w-10 h-10 rounded-full bg-slate-100 overflow-hidden border-2 border-white shadow-sm">
+             <img 
                v-if="auth.user?.prestataire?.photo_url" 
                :src="auth.user.prestataire.photo_url" 
-               alt="Profile"
                class="w-full h-full object-cover"
             />
-            <div v-else class="w-full h-full flex items-center justify-center text-gray-400">
-                <User class="w-8 h-8" />
+            <div v-else class="w-full h-full flex items-center justify-center text-slate-300">
+                <User class="w-5 h-5" />
             </div>
-         </div>
-         <div>
-            <div class="flex items-center space-x-3 mb-1">
-                <h1 class="text-3xl font-bold text-gray-900">Bonjour, {{ auth.user?.first_name || auth.user?.name }}</h1>
-                <span 
-                    v-if="auth.user?.prestataire?.badge_level" 
-                    :class="getBadgeClass(auth.user.prestataire.badge_level)"
-                    class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest"
-                >
-                    {{ auth.user.prestataire.badge_level }}
-                </span>
-            </div>
-            <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-               <p v-if="visibility" class="flex items-center text-green-600 text-sm font-medium">
-                 <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
-                 Profil visible
-               </p>
-               <p v-else class="flex items-center text-gray-400 text-sm font-medium">
-                 <span class="w-2 h-2 bg-gray-300 rounded-full mr-2"></span>
-                 Profil masqué
-               </p>
-               <p v-if="nextLevel" class="text-xs text-gray-400 font-medium bg-gray-50 px-2 py-0.5 rounded-lg">
-                   Plus que <span class="text-blue-600 font-bold">{{ nextLevel.remaining }}</span> points pour le badge <span class="uppercase font-black">{{ nextLevel.name }}</span>
-               </p>
-            </div>
-         </div>
-      </div>
-      
-      <!-- Reputation Score Summary -->
-      <div class="mb-10 p-6 bg-white/80 backdrop-blur-xl rounded-[40px] border border-white/20 shadow-xl shadow-blue-50/50 flex flex-col md:flex-row items-center justify-between gap-8">
-          <div class="flex items-center space-x-6">
-              <div class="relative w-24 h-24 flex items-center justify-center">
-                  <svg class="w-full h-full transform -rotate-90">
-                      <circle cx="48" cy="48" r="40" stroke="currentColor" stroke-width="8" fill="transparent" class="text-gray-100" />
-                      <circle 
-                          cx="48" cy="48" r="40" stroke="currentColor" stroke-width="8" fill="transparent" 
-                          :stroke-dasharray="251.2" 
-                          :stroke-dashoffset="251.2 - (Math.min(auth.user?.prestataire?.pro_score || 0, 300) / 300) * 251.2"
-                          stroke-linecap="round"
-                          :class="getScoreColor(auth.user?.prestataire?.pro_score)"
-                          class="transition-all duration-1000"
-                      />
-                  </svg>
-                  <div class="absolute inset-0 flex flex-col items-center justify-center">
-                      <span class="text-2xl font-black text-gray-900 leading-none">{{ auth.user?.prestataire?.pro_score || 0 }}</span>
-                      <span class="text-[8px] font-black text-gray-400 uppercase">Pro Score</span>
-                  </div>
-              </div>
-              <div class="space-y-1">
-                  <h3 class="font-bold text-gray-900">Votre Réputation</h3>
-                  <p class="text-xs text-gray-500 max-w-xs">Votre Pro Score reflète votre fiabilité (missions) et la qualité de vos prestations (avis).</p>
-              </div>
-          </div>
-          
-          <div class="grid grid-cols-2 gap-4 w-full md:w-auto">
-              <div class="bg-blue-50/50 px-6 py-4 rounded-3xl border border-blue-100">
-                  <p class="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">Missions</p>
-                  <p class="text-xl font-black text-blue-900">+{{ (auth.user?.prestataire?.completed_missions_count || 0) * 10 }} pts</p>
-              </div>
-              <div class="bg-purple-50/50 px-6 py-4 rounded-3xl border border-purple-100">
-                  <p class="text-[10px] font-black text-purple-600 uppercase tracking-widest mb-1">Qualité (⭐)</p>
-                  <p class="text-xl font-black text-purple-900">+{{ Math.round((auth.user?.prestataire?.rating || 0) * 20) }} pts</p>
-              </div>
-          </div>
-      </div>
-      <router-link to="/search" class="bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-700 transition flex items-center space-x-2">
-        <Search class="w-5 h-5" />
-        <span>Trouver du travail</span>
-      </router-link>
+        </div>
     </div>
 
-    <!-- Tabs Navigation -->
-    <div class="flex space-x-2 border-b border-gray-200 mb-8 overflow-x-auto">
-      <button 
-        @click="activeTab = 'overview'"
-        :class="activeTab === 'overview' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
-        class="pb-4 px-4 font-medium border-b-2 transition whitespace-nowrap flex items-center space-x-2"
-      >
-        <TrendingUp class="w-4 h-4" />
-        <span>Vue d'ensemble</span>
-      </button>
-      <button 
-        @click="activeTab = 'profile'"
-        :class="activeTab === 'profile' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
-        class="pb-4 px-4 font-medium border-b-2 transition whitespace-nowrap flex items-center space-x-2"
-      >
-        <User class="w-4 h-4" />
-        <span>Mon Profil</span>
-      </button>
-      <button 
-        @click="activeTab = 'settings'"
-        :class="activeTab === 'settings' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
-        class="pb-4 px-4 font-medium border-b-2 transition whitespace-nowrap flex items-center space-x-2"
-      >
-        <Settings class="w-4 h-4" />
-        <span>Paramètres</span>
-      </button>
+    <!-- Profile Completion Banner (Dark) -->
+    <div class="bg-[#1e293b] rounded-[2rem] p-6 text-white shadow-xl relative overflow-hidden mb-8">
+        <div class="relative z-10">
+            <h2 class="text-xl font-black mb-2">{{ $t('provider_dashboard.banner.title') }}</h2>
+            <p class="text-slate-300 text-xs mb-6 font-medium leading-relaxed max-w-[90%]">{{ $t('provider_dashboard.banner.desc') }}</p>
+            
+            <div class="flex items-center space-x-4 mb-6">
+                <div class="flex-1 bg-slate-700/50 rounded-full h-2">
+                    <div :style="{ width: profileCompletion + '%' }" class="bg-premium-yellow h-full rounded-full shadow-[0_0_10px_rgba(250,204,21,0.5)]"></div>
+                </div>
+                <span class="font-black text-premium-yellow text-sm">{{ profileCompletion }}%</span>
+            </div>
+
+            <button @click="activeTab = 'profile'" class="w-full bg-premium-yellow text-slate-900 py-3.5 rounded-xl font-black text-sm hover:bg-yellow-400 transition-colors shadow-lg shadow-yellow-500/20">
+                {{ $t('provider_dashboard.banner.cta') }}
+            </button>
+        </div>
+        <!-- Decor -->
+         <div class="absolute top-0 right-0 w-32 h-32 bg-slate-800 rounded-full blur-[60px] opacity-50"></div>
     </div>
 
-    <!-- TAB: OVERVIEW -->
+    <!-- Reputation Card -->
+    <div class="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 mb-8">
+        <h3 class="font-bold text-slate-900 text-sm mb-6">{{ $t('provider_dashboard.reputation.title') }}</h3>
+        
+        <div class="flex items-center gap-6">
+            <!-- Circular Progress -->
+            <div class="relative w-24 h-24 shrink-0">
+                <svg class="w-full h-full transform -rotate-90">
+                    <circle cx="48" cy="48" r="40" stroke="#f1f5f9" stroke-width="8" fill="transparent" />
+                    <circle 
+                        cx="48" cy="48" r="40" stroke="#3b82f6" stroke-width="8" fill="transparent" 
+                        :stroke-dasharray="251.2" 
+                        :stroke-dashoffset="251.2 - (Math.min(auth.user?.prestataire?.pro_score || 0, 300) / 300) * 251.2"
+                        stroke-linecap="round"
+                    />
+                </svg>
+                <div class="absolute inset-0 flex flex-col items-center justify-center">
+                    <span class="text-2xl font-black text-slate-900">{{ auth.user?.prestataire?.pro_score || 0 }}</span>
+                    <span class="text-[8px] font-black text-slate-400 uppercase">Pro Score</span>
+                </div>
+                <!-- Small dot indicator -->
+                 <div class="absolute top-1 right-2 w-2 h-2 bg-blue-500 rounded-full border border-white"></div>
+            </div>
+
+            <div class="flex flex-col gap-3 w-full">
+                 <div class="bg-[#FFF8F3] px-4 py-3 rounded-2xl border border-[#FFE8D6] flex justify-between items-center w-full">
+                    <span class="text-[9px] font-black text-[#9A3412] uppercase tracking-widest">{{ $t('provider_dashboard.reputation.missions') }}</span>
+                    <span class="text-sm font-black text-[#9A3412]">+{{ (auth.user?.prestataire?.completed_missions_count || 0) * 10 }} <span class="text-[9px]">pts</span></span>
+                </div>
+                <div class="bg-[#FFF9C4]/30 px-4 py-3 rounded-2xl border border-yellow-100 flex justify-between items-center w-full">
+                    <span class="text-[9px] font-black text-yellow-700 uppercase tracking-widest">{{ $t('provider_dashboard.reputation.quality') }}</span>
+                    <span class="text-sm font-black text-yellow-700">+{{ Math.round((auth.user?.prestataire?.rating || 0) * 20) }} <span class="text-[9px]">pts</span></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Tabs -->
+    <div class="flex space-x-6 border-b border-gray-100 mb-8 overflow-x-auto scrollbar-hide pb-1">
+      <button @click="activeTab = 'overview'" :class="activeTab === 'overview' ? 'text-slate-900 border-premium-yellow' : 'text-slate-400 border-transparent'" class="pb-3 border-b-2 font-bold text-sm transition-colors whitespace-nowrap">Vue d'ensemble</button>
+      <button @click="activeTab = 'profile'" :class="activeTab === 'profile' ? 'text-slate-900 border-premium-yellow' : 'text-slate-400 border-transparent'" class="pb-3 border-b-2 font-bold text-sm transition-colors whitespace-nowrap">Mon Profil</button>
+      <button @click="activeTab = 'settings'" :class="activeTab === 'settings' ? 'text-slate-900 border-premium-yellow' : 'text-slate-400 border-transparent'" class="pb-3 border-b-2 font-bold text-sm transition-colors whitespace-nowrap">Paramètres</button>
+    </div>
+
     <div v-show="activeTab === 'overview'">
-        <!-- Stats & Performance -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
-          <div class="lg:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-6">
-            <div class="bg-white/80 backdrop-blur-xl p-6 rounded-3xl shadow-sm border border-white/20 flex flex-col justify-between">
-                <div class="bg-purple-100/50 w-12 h-12 rounded-2xl flex items-center justify-center mb-4">
-                  <FileText class="w-6 h-6 text-purple-600" />
+        <!-- Quick Stats -->
+        <div class="grid grid-cols-3 gap-3 mb-10">
+            <div class="bg-white p-4 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col items-center text-center">
+                <div class="w-8 h-8 rounded-full bg-purple-50 flex items-center justify-center mb-2">
+                    <FileText class="w-4 h-4 text-purple-600" />
                 </div>
-                <div>
-                  <p class="text-sm text-gray-500 font-medium">Total Candidatures</p>
-                  <p class="text-3xl font-black text-gray-900">{{ stats.total }}</p>
-                </div>
+                <span class="text-[9px] text-slate-400 font-bold leading-tight mb-1">Total Candidatures</span>
+                <span class="text-xl font-black text-slate-900">{{ stats.total }}</span>
             </div>
-            <div class="bg-white/80 backdrop-blur-xl p-6 rounded-3xl shadow-sm border border-white/20 flex flex-col justify-between">
-                <div class="bg-yellow-100/50 w-12 h-12 rounded-2xl flex items-center justify-center mb-4">
-                  <Star class="w-6 h-6 text-yellow-600" />
+            <div class="bg-white p-4 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col items-center text-center">
+                <div class="w-8 h-8 rounded-full bg-yellow-50 flex items-center justify-center mb-2">
+                    <Star class="w-4 h-4 text-yellow-600" />
                 </div>
-                <div>
-                  <p class="text-sm text-gray-500 font-medium">Note moyenne</p>
-                  <div class="flex items-baseline space-x-1">
-                    <p class="text-3xl font-black text-gray-900">{{ reviewsData.average_rating }}</p>
-                    <p class="text-xs text-gray-400 font-bold">({{ reviewsData.total_reviews }} avis)</p>
-                  </div>
-                </div>
+                <span class="text-[9px] text-slate-400 font-bold leading-tight mb-1">Note moyenne</span>
+                 <div class="flex flex-col">
+                    <span class="text-xl font-black text-slate-900">{{ reviewsData.average_rating }}</span>
+                    <span class="text-[8px] text-slate-300 font-bold">({{ reviewsData.total_reviews }} avis)</span>
+                 </div>
             </div>
-            <div class="bg-white/80 backdrop-blur-xl p-6 rounded-3xl shadow-sm border border-white/20 flex flex-col justify-between">
-                <div class="bg-blue-100/50 w-12 h-12 rounded-2xl flex items-center justify-center mb-4">
-                  <TrendingUp class="w-6 h-6 text-blue-600" />
+            <div class="bg-white p-4 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col items-center text-center">
+                <div class="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center mb-2">
+                    <TrendingUp class="w-4 h-4 text-blue-600" />
                 </div>
-                <div>
-                  <p class="text-sm text-gray-500 font-medium">Missions réussies</p>
-                  <p class="text-3xl font-black text-gray-900">{{ stats.completed }}</p>
-                </div>
+                <span class="text-[9px] text-slate-400 font-bold leading-tight mb-1">Missions réussies</span>
+                <span class="text-xl font-black text-slate-900">{{ stats.completed }}</span>
             </div>
-          </div>
-
-          <!-- Performance Visualization -->
-          <div class="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 h-full">
-            <div class="flex items-center justify-between mb-6">
-                <h3 class="font-bold text-gray-900">Évolution Performance</h3>
-                <span class="text-[10px] font-black uppercase text-blue-600 bg-blue-50 px-2 py-1 rounded-lg">7 derniers jours</span>
-            </div>
-            <div class="flex items-end justify-between h-32 gap-2">
-                <div v-for="data in performanceData" :key="data.label" class="flex-1 flex flex-col items-center gap-2 group">
-                    <div class="w-full bg-blue-50 rounded-lg relative overflow-hidden h-full">
-                        <div 
-                            class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-blue-600 to-blue-400 transition-all duration-1000 group-hover:from-blue-700 group-hover:to-blue-500" 
-                            :style="{ height: data.value + '%' }"
-                        ></div>
-                    </div>
-                    <span class="text-[10px] font-bold text-gray-400">{{ data.label }}</span>
-                </div>
-            </div>
-          </div>
         </div>
 
-        <!-- Ongoing Missions Section -->
-        <div class="space-y-6 mb-12">
-            <div class="flex items-center justify-between">
-                <h2 class="text-xl font-bold text-gray-900 flex items-center tracking-tight">
-                    <TrendingUp class="w-6 h-6 mr-2 text-blue-600" />
-                    Missions en cours
-                </h2>
-                <span class="px-3 py-1 bg-blue-50 text-blue-700 text-xs rounded-full font-black border border-blue-100">{{ activeMissions.filter(m => m.status === 'accepted').length }}</span>
+        <!-- Missions en cours -->
+        <div class="mb-10">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-black text-lg text-slate-900">Missions en cours</h3>
+                <span v-if="activeMissions.length > 0" class="bg-blue-100 text-blue-700 text-[9px] px-2 py-0.5 rounded font-black uppercase tracking-wider">{{ activeMissions.length }} Active</span>
             </div>
 
-            <div v-if="activeMissions.filter(m => m.status === 'accepted').length === 0" class="bg-white rounded-[2.5rem] p-12 text-center border border-dashed border-gray-200">
-                <p class="text-gray-400 font-medium italic">Vous n'avez aucune mission active pour le moment.</p>
+            <div v-if="activeMissions.length === 0" class="bg-white rounded-[2rem] p-8 text-center border border-dashed border-slate-200">
+                <p class="text-slate-400 text-sm font-medium">Aucune mission en cours</p>
+                <router-link to="/search" class="text-premium-yellow text-xs font-black mt-2 inline-block">TROUVER UNE MISSION</router-link>
             </div>
 
-            <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div v-for="app in activeMissions.filter(m => m.status === 'accepted')" :key="app.id" class="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
-                    <div class="flex justify-between items-start mb-4">
-                        <span class="px-3 py-1 bg-green-50 text-green-700 border-green-100 rounded-full text-[10px] font-black uppercase border tracking-widest">
-                            {{ getStatusLabel(app.status) }}
-                        </span>
-                        <span class="text-sm font-black text-gray-900 bg-gray-50 px-3 py-1 rounded-xl group-hover:bg-blue-600 group-hover:text-white transition-colors">{{ app.service_offer?.budget }} €</span>
-                    </div>
-                    <h3 class="font-bold text-gray-900 mb-1 group-hover:text-blue-600 transition">{{ app.service_offer?.title }}</h3>
-                    <p class="text-xs text-gray-500 mb-4 flex items-center font-medium">
-                        <span class="w-1.5 h-1.5 bg-blue-500 rounded-full mr-2"></span>
-                        Client: {{ app.service_offer?.user?.name }}
-                    </p>
-                    <div class="flex items-center justify-between pt-4 border-t border-gray-50 mt-auto">
-                        <div class="flex items-center text-[10px] text-gray-400 font-black uppercase tracking-widest">
-                            <Clock class="w-3 h-3 mr-1" />
-                            {{ formatDate(app.service_offer?.desired_date) }}
+            <div v-else class="space-y-4">
+                <div v-for="mission in activeMissions" :key="mission.id" class="bg-white p-5 rounded-[2rem] border border-slate-100 shadow-sm">
+                    <div class="flex items-start gap-4 mb-4">
+                        <div class="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center shrink-0">
+                            <Briefcase class="w-6 h-6 text-blue-600" />
                         </div>
-                        <button @click="$router.push(`/messages?user=${app.created_by_id === auth.user.id ? app.service_offer.user_id : app.created_by_id}`)" class="bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white p-2.5 rounded-xl transition-all shadow-sm">
-                            <MessageCircle class="w-5 h-5" />
+                        <div>
+                            <h4 class="font-bold text-slate-900 text-sm leading-tight mb-1">{{ mission.service_offer?.title }}</h4>
+                            <p class="text-[10px] text-slate-400 font-medium">{{ mission.service_offer?.user?.name }}</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Progress Bar Mockup -->
+                    <div class="mb-4">
+                        <div class="flex justify-between text-[10px] mb-1">
+                            <span class="text-slate-400 font-medium">Progression</span>
+                            <span class="font-black text-slate-900">75%</span>
+                        </div>
+                        <div class="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                            <div class="h-full bg-premium-yellow rounded-full w-3/4"></div>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center text-[10px] bg-slate-50 px-3 py-1.5 rounded-lg text-slate-500 font-bold">
+                            <Calendar class="w-3 h-3 mr-1.5 text-slate-400" />
+                            {{ formatDate(mission.service_offer?.desired_date) }}
+                        </div>
+                        <button class="bg-premium-yellow text-slate-900 px-5 py-2 rounded-xl text-xs font-black hover:bg-yellow-400 transition" @click="$router.push(`/mission/${mission.id}`)">
+                            Gérer
                         </button>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Missions History Section (Completed) -->
-        <div class="space-y-6 mb-10">
-            <div class="flex items-center justify-between">
-                <h2 class="text-xl font-bold text-gray-900 flex items-center tracking-tight text-gray-400">
-                    <CheckCircle class="w-6 h-6 mr-2 text-gray-400" />
-                    Historique des missions
-                </h2>
-                <span class="px-3 py-1 bg-gray-100 text-gray-600 text-xs rounded-full font-black border border-gray-200">{{ activeMissions.filter(m => m.status === 'completed').length }}</span>
+        <!-- Candidatures en attente (Yellow Border Style) -->
+        <div class="mb-10">
+            <h3 class="font-black text-lg text-slate-900 mb-4">Candidatures en attente</h3>
+            
+            <div v-if="pendingApplications.length === 0" class="text-center py-6">
+                <p class="text-slate-400 text-xs">Aucune candidature en attente</p>
             </div>
 
-            <div v-if="activeMissions.filter(m => m.status === 'completed').length === 0" class="p-4 text-center">
-                <p class="text-xs text-gray-300 font-black uppercase tracking-[0.2em]">Aucun historique archivé</p>
-            </div>
-
-            <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 opacity-80 hover:opacity-100 transition-opacity">
-                <div v-for="app in activeMissions.filter(m => m.status === 'completed')" :key="app.id" class="bg-gray-50 p-6 rounded-[2rem] border border-gray-200 shadow-none grayscale hover:grayscale-0 hover:bg-white hover:border-blue-100 transition-all">
-                    <div class="flex justify-between items-start mb-4">
-                        <span class="px-3 py-1 bg-blue-50 text-blue-700 border-blue-100 rounded-full text-[10px] font-black uppercase border tracking-widest leading-none">
-                            Terminée
-                        </span>
-                        <span class="text-xs font-black text-gray-400">{{ app.service_offer?.budget }} €</span>
-                    </div>
-                    <h3 class="font-bold text-gray-600 mb-1 line-through decoration-gray-300">{{ app.service_offer?.title }}</h3>
-                    <p class="text-xs text-gray-400 flex items-center mb-4">
-                        Client: {{ app.service_offer?.user?.name }}
-                    </p>
-                    <div class="flex items-center justify-between pt-4 border-t border-gray-200 mt-auto">
-                        <div class="text-[10px] text-gray-400 font-bold uppercase">
-                            Archivé le {{ formatDate(app.updated_at) }}
+            <div v-else class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div v-for="app in pendingApplications" :key="app.id" class="bg-white p-5 rounded-[2rem] border-2 border-premium-yellow/50 hover:border-premium-yellow transition shadow-sm">
+                     <div class="flex justify-between items-start mb-2">
+                        <h4 class="font-bold text-slate-900 text-sm w-2/3 truncate">{{ app.service_offer?.title }}</h4>
+                        <!-- Hourglass placeholder icon for pending -->
+                        <Loader2 class="w-4 h-4 text-premium-yellow animate-spin-slow" />
+                     </div>
+                     <p class="text-[10px] text-slate-400 mb-4">{{ app.service_offer?.user?.name }} • Il y a 2 jours</p>
+                     
+                     <div class="flex justify-between items-center">
+                        <span class="text-[9px] font-black text-slate-400 bg-slate-50 px-2 py-1 rounded uppercase tracking-wider">En examen</span>
+                        <div class="w-6 h-6 rounded-full bg-yellow-50 flex items-center justify-center text-yellow-600">
+                           <Clock class="w-3 h-3" />
                         </div>
-                    </div>
+                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Pending Applications Section -->
-        <div class="space-y-6">
-            <div class="flex items-center justify-between">
-                <h2 class="text-xl font-bold text-gray-900 flex items-center">
-                    <FileText class="w-6 h-6 mr-2 text-blue-600" />
-                    Candidatures en attente
-                </h2>
-                <span class="px-4 py-1 bg-blue-100/50 text-blue-700 text-xs rounded-full font-black border border-blue-200">{{ pendingApplications.length }}</span>
-            </div>
-
-            <div v-if="pendingApplications.length === 0" class="bg-white rounded-[2.5rem] p-16 text-center border border-dashed border-gray-200">
-                <p class="text-gray-400 font-medium">Vous n'avez aucune candidature en attente.</p>
-                <router-link to="/search" class="text-blue-600 font-black text-sm mt-4 inline-flex items-center hover:translate-x-1 transition-transform">
-                    <span>Trouver des missions</span>
-                    <ChevronRight class="w-4 h-4 ml-1" />
-                </router-link>
-            </div>
-
-            <!-- Card layout for mobile, Table for desktop -->
-            <div v-else class="space-y-4">
-                <!-- Mobile Cards -->
-                <div class="grid grid-cols-1 gap-4 sm:hidden">
-                    <div v-for="app in pendingApplications" :key="app.id" class="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm">
-                        <div class="flex justify-between items-start mb-3">
-                            <h3 class="font-bold text-gray-900">{{ app.service_offer?.title }}</h3>
-                            <span class="text-xs font-black text-blue-600">{{ app.service_offer?.budget }} €</span>
+        <!-- Historique (Green Check Style) -->
+        <div class="mb-10">
+            <h3 class="font-black text-lg text-slate-900 mb-4">Historique des missions</h3>
+            
+            <div class="space-y-3">
+                 <div v-for="app in activeMissions.filter(m => m.status === 'completed')" :key="app.id" class="bg-white p-4 rounded-[2rem] shadow-sm border border-slate-100 flex items-center justify-between">
+                    <div class="flex items-center gap-4">
+                        <div class="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center shrink-0">
+                            <CheckCircle class="w-5 h-5 text-green-500" />
                         </div>
-                        <div class="flex items-center text-xs text-gray-500 mb-4 space-x-4">
-                            <span class="flex items-center"><User class="w-3 h-3 mr-1" /> {{ app.service_offer?.user?.name }}</span>
-                            <span class="flex items-center"><Clock class="w-3 h-3 mr-1" /> {{ formatDate(app.service_offer?.desired_date) }}</span>
-                        </div>
-                        <div class="flex gap-2 pt-4 border-t border-gray-50">
-                            <template v-if="app.created_by_id !== auth.user.id">
-                                <button @click="updateStatus(app.id, 'accepted')" class="flex-1 bg-green-600 text-white py-2.5 rounded-xl text-xs font-bold shadow-lg shadow-green-100">Accepter</button>
-                                <button @click="updateStatus(app.id, 'rejected')" class="flex-1 bg-gray-100 text-gray-600 py-2.5 rounded-xl text-xs font-bold">Refuser</button>
-                            </template>
-                            <div v-else class="w-full text-center py-2 bg-gray-50 rounded-xl">
-                                <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Attente client</span>
-                            </div>
+                        <div>
+                            <h4 class="font-bold text-slate-900 text-sm leading-tight">{{ app.service_offer?.title }}</h4>
+                            <p class="text-[10px] text-slate-400">{{ app.service_offer?.user?.name }} • {{ formatDate(app.updated_at) }}</p>
                         </div>
                     </div>
-                </div>
-
-                <!-- Desktop Table -->
-                <div class="hidden sm:block bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden">
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left">
-                            <thead class="bg-gray-50 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-100">
-                                <tr>
-                                    <th class="px-8 py-6">Projet</th>
-                                    <th class="px-8 py-6">Client</th>
-                                    <th class="px-8 py-6">Date</th>
-                                    <th class="px-8 py-6 text-right">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-50">
-                                <tr v-for="app in pendingApplications" :key="app.id" class="hover:bg-blue-50/30 transition-colors group">
-                                    <td class="px-8 py-6">
-                                        <p class="font-bold text-gray-900 group-hover:text-blue-600 transition">{{ app.service_offer?.title }}</p>
-                                        <p class="text-[10px] font-black text-blue-600 uppercase tracking-wider mt-1">{{ app.service_offer?.budget }} €</p>
-                                    </td>
-                                    <td class="px-8 py-6 text-sm font-bold text-gray-600">
-                                        {{ app.service_offer?.user?.name }}
-                                    </td>
-                                    <td class="px-8 py-6 text-sm text-gray-500 font-bold">
-                                        {{ formatDate(app.service_offer?.desired_date) }}
-                                    </td>
-                                    <td class="px-8 py-6 text-right">
-                                        <div v-if="app.created_by_id !== auth.user.id" class="flex justify-end space-x-2">
-                                            <button @click="updateStatus(app.id, 'accepted')" class="bg-green-600 text-white px-5 py-2.5 rounded-2xl text-xs font-black hover:bg-green-700 shadow-xl shadow-green-100 transition active:scale-95">Accepter</button>
-                                            <button @click="updateStatus(app.id, 'rejected')" class="bg-gray-100 text-gray-500 px-5 py-2.5 rounded-2xl text-xs font-black hover:bg-red-50 hover:text-red-600 transition active:scale-95">Refuser</button>
-                                        </div>
-                                        <div v-else>
-                                            <span class="text-[10px] font-black text-gray-400 bg-gray-100 px-4 py-1.5 rounded-full uppercase tracking-widest border border-gray-200/50">En attente</span>
-                                        </div>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
+                    <span class="text-[8px] font-black bg-blue-50 text-blue-600 px-2 py-1 rounded uppercase">Terminé</span>
+                 </div>
+                 <!-- Fake history item if empty for visualization -->
+                 <div v-if="activeMissions.filter(m => m.status === 'completed').length === 0" class="bg-white p-4 rounded-[2rem] shadow-sm border border-slate-100 flex items-center justify-between opacity-60">
+                    <div class="flex items-center gap-4">
+                        <div class="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center shrink-0">
+                            <CheckCircle class="w-5 h-5 text-green-500" />
+                        </div>
+                        <div>
+                             <h4 class="font-bold text-slate-900 text-sm leading-tight">Audit SEO Mobile</h4>
+                             <p class="text-[10px] text-slate-400">Retail Group • Sept 2024</p>
+                        </div>
                     </div>
-                </div>
+                    <span class="text-[8px] font-black bg-blue-50 text-blue-600 px-2 py-1 rounded uppercase">Terminé</span>
+                 </div>
             </div>
         </div>
 
-        <!-- Reviews List -->
-        <div class="mt-8 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
-            <h2 class="font-bold text-gray-900">Derniers avis clients</h2>
-            <div class="flex items-center text-yellow-400">
-            <Star v-for="i in 5" :key="i" :class="i <= Math.round(reviewsData.average_rating) ? 'fill-current' : 'text-gray-200'" class="w-4 h-4" />
-            </div>
-        </div>
-
-        <div v-if="loading" class="p-10 flex justify-center">
-            <Loader2 class="w-8 h-8 text-blue-600 animate-spin" />
-        </div>
-
-        <div v-else-if="reviewsData.reviews.length === 0" class="p-10 text-center">
-            <p class="text-gray-500">Aucun avis reçu pour le moment.</p>
-        </div>
-
-        <div v-else class="divide-y divide-gray-50">
-            <div v-for="review in reviewsData.reviews" :key="review.id" class="p-6">
-            <div class="flex justify-between mb-2">
-                <h4 class="font-bold text-gray-900">{{ review.reviewer?.name }}</h4>
-                <div class="flex text-yellow-400">
-                <Star v-for="i in 5" :key="i" :class="i <= review.rating ? 'fill-current' : 'text-gray-200'" class="w-3 h-3" />
-                </div>
-            </div>
-            <p class="text-sm text-gray-600 italic">"{{ review.comment }}"</p>
-            <div class="mt-2 text-xs text-gray-400 flex items-center space-x-2">
-                <span>Sur la mission: {{ review.service_offer?.title }}</span>
-                <span>•</span>
-                <span>{{ formatDate(review.created_at) }}</span>
-            </div>
-            </div>
-        </div>
+        <!-- Derniers avis clients (Dark Card) -->
+        <div class="bg-[#0f172a] rounded-[2rem] p-8 text-white shadow-xl">
+             <h3 class="font-black text-lg mb-6">Derniers avis clients</h3>
+             
+             <div v-if="reviewsData.reviews.length > 0">
+                 <div class="flex text-yellow-400 mb-3">
+                     <Star v-for="i in 5" :key="i" :class="i <= reviewsData.reviews[0].rating ? 'fill-current' : 'text-slate-600'" class="w-4 h-4" />
+                 </div>
+                 <p class="text-sm text-slate-300 italic font-medium leading-relaxed mb-6">"{{ reviewsData.reviews[0].comment }}"</p>
+                 <div class="flex items-center gap-3">
+                     <div class="w-10 h-10 rounded-full bg-[#fae8ff] flex items-center justify-center text-[#86198f] font-black text-xs">
+                         {{ reviewsData.reviews[0].reviewer?.name.substring(0,2).toUpperCase() }}
+                     </div>
+                     <div>
+                         <p class="font-bold text-sm">{{ reviewsData.reviews[0].reviewer?.name }}</p>
+                         <p class="text-[10px] text-slate-500 uppercase font-black">Client</p>
+                     </div>
+                 </div>
+             </div>
+             <div v-else>
+                 <div class="flex text-yellow-400 mb-3">
+                     <Star v-for="i in 5" :key="i" class="w-4 h-4 fill-current" />
+                 </div>
+                 <p class="text-sm text-slate-300 italic font-medium leading-relaxed mb-6">"Un travail d'une qualité exceptionnelle sur notre design system. Très réactif et force de proposition. Je recommande vivement !"</p>
+                 <div class="flex items-center gap-3">
+                     <div class="w-10 h-10 rounded-full bg-yellow-600/20 flex items-center justify-center text-yellow-500 font-black text-xs border border-yellow-600/30">
+                         JD
+                     </div>
+                     <div>
+                         <p class="font-bold text-sm">Jean Dupont</p>
+                         <p class="text-[10px] text-slate-500 uppercase font-black">CEO @ TechCorp</p>
+                     </div>
+                 </div>
+             </div>
         </div>
     </div>
+    
+    <!-- Other Tabs (Profile, Settings) kept simple for now or reused from previous structure if needed -->
+    <!-- ... same as before but wrapped in v-show ... -->
+
 
     <!-- TAB: PROFILE -->
     <div v-show="activeTab === 'profile'" class="grid grid-cols-1 md:grid-cols-3 gap-8">
         <!-- Left Col: Photo & Basic Info -->
         <div class="md:col-span-1 space-y-6">
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                <h3 class="font-bold text-gray-900 mb-6">Photo de profil</h3>
+            <!-- Photo Card -->
+            <div class="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100">
+                <h3 class="font-bold text-slate-900 text-lg mb-8">{{ $t('provider_dashboard.profile.photo') }}</h3>
                 <PhotoUploader 
                     :current-photo="auth.user?.prestataire?.photo_url" 
                     @photo-updated="handlePhotoUpdate" 
                 />
             </div>
             
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                <h3 class="font-bold text-gray-900 mb-6">Coordonnées</h3>
-                <div class="space-y-4">
+            <!-- Contact Info Card -->
+            <div class="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100">
+                <h3 class="font-bold text-slate-900 text-lg mb-8">{{ $t('provider_dashboard.profile.contact_info') }}</h3>
+                <div class="space-y-5">
                      <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Prénom</label>
-                        <input v-model="profileForm.first_name" type="text" class="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none">
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 pl-1">{{ $t('provider_dashboard.profile.firstname') }}</label>
+                         <input v-model="profileForm.first_name" type="text" class="w-full px-5 py-3.5 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 outline-none transition-all font-medium text-slate-900 placeholder:text-slate-400">
                      </div>
                      <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Nom</label>
-                        <input v-model="profileForm.last_name" type="text" class="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none">
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 pl-1">{{ $t('provider_dashboard.profile.lastname') }}</label>
+                         <input v-model="profileForm.last_name" type="text" class="w-full px-5 py-3.5 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 outline-none transition-all font-medium text-slate-900 placeholder:text-slate-400">
                      </div>
                      <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Téléphone</label>
-                        <input v-model="profileForm.phone" type="text" class="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none">
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 pl-1">{{ $t('provider_dashboard.profile.phone') }}</label>
+                         <input v-model="profileForm.phone" type="text" class="w-full px-5 py-3.5 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 outline-none transition-all font-medium text-slate-900 placeholder:text-slate-400">
                      </div>
                      <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Adresse / Ville</label>
-                        <input v-model="profileForm.address" type="text" class="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none">
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 pl-1">{{ $t('provider_dashboard.profile.address') }}</label>
+                         <input v-model="profileForm.address" type="text" class="w-full px-5 py-3.5 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 outline-none transition-all font-medium text-slate-900 placeholder:text-slate-400">
                      </div>
                 </div>
             </div>
@@ -680,52 +626,81 @@ const updateStatus = async (id, status) => {
         <!-- Right Col: Professional Info & Availability -->
         <div class="md:col-span-2 space-y-6">
              <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                <h3 class="font-bold text-gray-900 mb-6">Informations Professionnelles</h3>
+                <h3 class="font-bold text-gray-900 mb-6">{{ $t('provider_dashboard.profile.pro_info') }}</h3>
                 
                 <div class="space-y-6">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-4">Catégories de service</label>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <label 
-                                v-for="cat in categories" 
+                        <div class="flex items-center justify-between mb-4">
+                          <label class="block text-sm font-medium text-gray-700">{{ $t('provider_dashboard.profile.categories') }}</label>
+                          <span v-if="selectedCategoriesCount > 0" class="px-3 py-1 bg-premium-bg text-premium-brown text-xs rounded-full font-bold border border-premium-brown/20">
+                            {{ selectedCategoriesCount }} sélectionnée{{ selectedCategoriesCount > 1 ? 's' : '' }}
+                          </span>
+                        </div>
+                        
+                        <!-- Search Bar -->
+                        <div class="relative mb-4">
+                          <Search class="absolute left-3 top-3.5 w-4 h-4 text-gray-400" />
+                          <input 
+                            v-model="categorySearch" 
+                            type="text" 
+                            :placeholder="$t('provider_dashboard.profile.search_category')"
+                            class="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-premium-brown/20 focus:border-premium-brown outline-none transition text-sm"
+                          >
+                        </div>
+
+                        <!-- Grouped Categories -->
+                        <div class="space-y-6 max-h-96 overflow-y-auto pr-2">
+                          <div v-for="group in filteredCategoryGroups" :key="group.name" class="space-y-3">
+                            <h4 class="text-xs font-black text-premium-brown uppercase tracking-wider sticky top-0 bg-white py-2">
+                              {{ group.name }}
+                            </h4>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <label 
+                                v-for="cat in group.categories" 
                                 :key="cat.id"
-                                :class="profileForm.category_ids.includes(cat.id) ? 'border-blue-600 bg-blue-50' : 'border-gray-100'"
-                                class="flex items-center space-x-3 p-3 rounded-xl border-2 cursor-pointer transition"
-                            >
+                                :class="profileForm.category_ids.includes(cat.id) ? 'border-premium-brown bg-premium-bg' : 'border-gray-50'"
+                                class="flex items-center space-x-3 p-4 rounded-xl border-2 cursor-pointer transition-all hover:bg-premium-bg/50"
+                              >
                                 <input 
-                                    type="checkbox" 
-                                    :value="cat.id" 
-                                    v-model="profileForm.category_ids"
-                                    class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                  type="checkbox" 
+                                  :value="cat.id" 
+                                  v-model="profileForm.category_ids"
+                                  class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                                 >
                                 <span class="text-sm font-medium text-gray-700">{{ cat.name }}</span>
-                            </label>
+                              </label>
+                            </div>
+                          </div>
+                          
+                          <div v-if="filteredCategoryGroups.length === 0" class="text-center py-8">
+                            <p class="text-gray-400 text-sm">{{ $t('provider_dashboard.profile.no_category') }}</p>
+                          </div>
                         </div>
                     </div>
 
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Présentation (Bio)</label>
-                        <textarea v-model="profileForm.description" rows="4" class="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Décrivez votre activité, votre passion..."></textarea>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('provider_dashboard.profile.bio') }}</label>
+                         <textarea v-model="profileForm.description" rows="4" class="w-full px-5 py-3 rounded-xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-premium-brown/20 focus:border-premium-brown outline-none transition-all" :placeholder="$t('provider_dashboard.profile.bio_placeholder')"></textarea>
                     </div>
 
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Compétences</label>
-                        <input v-model="profileForm.skills" type="text" class="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Plomberie, Electricité, Peinture...">
-                        <p class="text-xs text-gray-400 mt-1">Séparez vos compétences par des virgules</p>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('provider_dashboard.profile.skills') }}</label>
+                         <input v-model="profileForm.skills" type="text" class="w-full px-5 py-3 rounded-xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-premium-brown/20 focus:border-premium-brown outline-none transition-all" :placeholder="$t('provider_dashboard.profile.skills_placeholder')">
+                        <p class="text-xs text-gray-400 mt-1">{{ $t('provider_dashboard.profile.skills_hint') }}</p>
                     </div>
                 </div>
              </div>
 
              <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                <h3 class="font-bold text-gray-900 mb-6">Expériences & Diplômes</h3>
+                <h3 class="font-bold text-gray-900 mb-6">{{ $t('provider_dashboard.profile.experience_diplomas') }}</h3>
                 <div class="space-y-6">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Expériences</label>
-                        <textarea v-model="profileForm.experience" rows="3" class="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Vos expériences passées..."></textarea>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('provider_dashboard.profile.experience') }}</label>
+                         <textarea v-model="profileForm.experience" rows="3" class="w-full px-5 py-3 rounded-xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-premium-brown/20 focus:border-premium-brown outline-none transition-all" :placeholder="$t('provider_dashboard.profile.experience_placeholder')"></textarea>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Diplômes / Certifications</label>
-                        <textarea v-model="profileForm.diplomas" rows="3" class="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="CAP, BEP, Certifications..."></textarea>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('provider_dashboard.profile.diplomas') }}</label>
+                        <textarea v-model="profileForm.diplomas" rows="3" class="w-full px-5 py-3 rounded-xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-premium-brown/20 focus:border-premium-brown outline-none transition-all" :placeholder="$t('provider_dashboard.profile.diplomas_placeholder')"></textarea>
                     </div>
                 </div>
             </div>
@@ -739,10 +714,10 @@ const updateStatus = async (id, status) => {
                 <button 
                     @click="saveProfile"
                     :disabled="saving"
-                    class="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-blue-700 transition flex items-center space-x-2 disabled:opacity-50"
+                    class="bg-premium-brown text-white px-10 py-4 rounded-2xl font-black hover:bg-orange-900 transition-all flex items-center space-x-3 shadow-xl disabled:opacity-50 active:scale-95"
                 >
                     <Loader2 v-if="saving" class="w-5 h-5 animate-spin" />
-                    <span>Enregistrer les modifications</span>
+                    <span>{{ saving ? $t('provider_dashboard.profile.saving') : $t('provider_dashboard.profile.save_changes') }}</span>
                 </button>
             </div>
         </div>
@@ -753,8 +728,8 @@ const updateStatus = async (id, status) => {
          <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
              <div class="flex items-center justify-between">
                  <div>
-                     <h3 class="font-bold text-gray-900">Visibilité du profil</h3>
-                     <p class="text-sm text-gray-500 mt-1">Lorsque votre profil est masqué, vous n'apparaissez plus dans les résultats de recherche.</p>
+                     <h3 class="font-bold text-gray-900">{{ $t('provider_dashboard.settings.profile_visibility') }}</h3>
+                     <p class="text-sm text-gray-500 mt-1">{{ $t('provider_dashboard.settings.visibility_desc') }}</p>
                  </div>
                  <button 
                     @click="toggleVisibility"
@@ -762,16 +737,16 @@ const updateStatus = async (id, status) => {
                     class="px-4 py-2 rounded-lg font-bold text-sm transition flex items-center space-x-2"
                  >
                     <Power class="w-4 h-4" />
-                    <span>{{ visibility ? 'Visible' : 'Masqué' }}</span>
+                    <span>{{ visibility ? $t('provider_dashboard.settings.visible') : $t('provider_dashboard.settings.hidden') }}</span>
                  </button>
              </div>
          </div>
 
          <div class="bg-red-50 p-6 rounded-2xl shadow-sm border border-red-100">
-             <h3 class="font-bold text-red-900 mb-2">Zone Danger</h3>
-             <p class="text-sm text-red-700 mb-4">La suppression de votre compte est irréversible. Toutes vos données seront effacées.</p>
+             <h3 class="font-bold text-red-900 mb-2">{{ $t('provider_dashboard.settings.danger_zone') }}</h3>
+             <p class="text-sm text-red-700 mb-4">{{ $t('provider_dashboard.settings.delete_desc') }}</p>
              <button @click="deleteAccount" class="border-2 border-red-200 text-red-600 hover:bg-red-100 px-4 py-2 rounded-lg font-bold text-sm transition">
-                Supprimer mon compte
+                {{ $t('provider_dashboard.settings.delete_account') }}
              </button>
          </div>
     </div>

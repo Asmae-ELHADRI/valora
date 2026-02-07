@@ -12,7 +12,9 @@ class Prestataire extends Model
 
     protected $fillable = [
         'user_id',
-        'category_id', // Keeping for backward compatibility temporarily
+        'city',
+        'hourly_rate',
+        'category_id',
         'skills',
         'description',
         'experience',

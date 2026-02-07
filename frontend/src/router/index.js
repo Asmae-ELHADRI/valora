@@ -18,6 +18,11 @@ const routes = [
         component: () => import('../views/Register.vue')
     },
     {
+        path: '/auth/callback',
+        name: 'SocialCallback',
+        component: () => import('../views/SocialCallback.vue')
+    },
+    {
         path: '/dashboard',
         name: 'Dashboard',
         component: () => import('../views/Dashboard.vue'),

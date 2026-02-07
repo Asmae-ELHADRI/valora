@@ -119,6 +119,10 @@ Route::middleware('auth:sanctum')->group(function () {
 Route::post('/register', [\App\Http\Controllers\Api\AuthController::class, 'register']);
 Route::post('/login', [\App\Http\Controllers\Api\AuthController::class, 'login']);
 
+// Social Auth
+Route::get('/auth/{provider}/redirect', [\App\Http\Controllers\Api\SocialAuthController::class, 'redirectToProvider']);
+Route::get('/auth/{provider}/callback', [\App\Http\Controllers\Api\SocialAuthController::class, 'handleProviderCallback']);
+
 // Password Reset (Public)
 Route::post('/password/forgot', [\App\Http\Controllers\Api\PasswordResetController::class, 'forgotSubmit']);
 Route::post('/password/reset', [\App\Http\Controllers\Api\PasswordResetController::class, 'resetSubmit']);

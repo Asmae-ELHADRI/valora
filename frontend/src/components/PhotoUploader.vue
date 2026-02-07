@@ -74,9 +74,9 @@ const uploadPhoto = async (file) => {
 </script>
 
 <template>
-  <div class="flex flex-col items-center space-y-4">
-    <div class="relative group cursor-pointer" @click="triggerFileInput">
-      <div class="w-32 h-32 rounded-full overflow-hidden border-4 border-white shadow-lg ring-2 ring-gray-100 bg-gray-50 flex items-center justify-center">
+  <div class="flex flex-col items-center">
+    <div class="relative group cursor-pointer mb-4" @click="triggerFileInput">
+      <div class="w-32 h-32 rounded-full overflow-hidden border-4 border-white shadow-sm ring-1 ring-gray-100 bg-gray-50 flex items-center justify-center transition-transform hover:scale-105 duration-300">
         <img 
           v-if="photoPreview || currentPhoto" 
           :src="photoPreview || currentPhoto" 
@@ -84,12 +84,12 @@ const uploadPhoto = async (file) => {
           alt="Profile"
         />
         <div v-else class="text-gray-300">
-           <Camera class="w-12 h-12" />
+           <Camera class="w-10 h-10 stroke-[1.5]" />
         </div>
         
         <!-- Overlay -->
-        <div class="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-          <Upload class="w-8 h-8 text-white" />
+        <div class="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full">
+          <Upload class="w-8 h-8 text-white drop-shadow-md" />
         </div>
       </div>
       
@@ -98,16 +98,16 @@ const uploadPhoto = async (file) => {
       </div>
     </div>
 
-    <div class="text-center">
+    <div class="text-center space-y-1">
       <button 
         type="button" 
         @click="triggerFileInput"
-        class="text-sm font-semibold text-blue-600 hover:text-blue-700"
+        class="text-sm font-bold text-blue-600 hover:text-blue-700 transition-colors"
       >
         Modifier la photo
       </button>
-      <p class="text-xs text-gray-400 mt-1">JPG, PNG max 2Mo</p>
-      <p v-if="error" class="text-xs text-red-500 mt-1">{{ error }}</p>
+      <p class="text-[10px] text-gray-400 font-medium">JPG, PNG max 2Mo</p>
+      <p v-if="error" class="text-xs text-red-500 mt-1 font-medium bg-red-50 px-2 py-1 rounded-lg">{{ error }}</p>
     </div>
 
     <input 

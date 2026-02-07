@@ -63,6 +63,35 @@ export const useAuthStore = defineStore('auth', {
             } catch (error) {
                 await this.logout()
             }
+        },
+        async socialLogin(provider) {
+            try {
+                const response = await api.get(`/api/auth/${provider}/redirect`);
+                if (response.data.url) {
+                    window.location.href = response.data.url;
+                }
+            } catch (error) {
+                console.error(`Error redirecting to ${provider}:`, error);
+                throw error;
+            }
+        },
+        async handleSocialCallback(provider, code) {
+            this.status = 'loading';
+            try {
+                const response = await api.get(`/api/auth/${provider}/callback`, {
+                    params: { code }
+                });
+                this.token = response.data.access_token;
+                this.user = response.data.user;
+                localStorage.setItem('token', this.token);
+                api.defaults.headers.common['Authorization'] = `Bearer ${this.token}`;
+                this.status = 'succeeded';
+                return response.data;
+            } catch (error) {
+                this.status = 'failed';
+                console.error(`Error handling ${provider} callback:`, error);
+                throw error;
+            }
         }
     }
-})
+});
