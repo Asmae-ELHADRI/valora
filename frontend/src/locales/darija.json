@@ -47,6 +47,7 @@
   },
   "auth": {
     "login_title": "دخل للكونط",
+    "register_title": "صاوب حساب",
     "email_placeholder": "الايميل ولا النمرة",
     "password_placeholder": "الكود",
     "remember_me": "عقل عليا",
@@ -81,7 +82,11 @@
     "fullname": "السمية والكنية",
     "certified_services": "خدمة مضمونة",
     "verified_profiles": "حرايفية بصح",
-    "create_client_account": "صاوب كونط كليان"
+    "create_client_account": "صاوب كونط كليان",
+    "invalid_credentials": "الايميل ولا الكود غالطين.",
+    "register_error": "مشكل فالتسجيل. فيريفيا لمعلومات ديالك.",
+    "account_disabled": "الكونط ديالك وقفو لادمين.",
+    "email_taken": "هاد الايميل فايت مستعمل."
   },
   "search": {
     "title": "قلب على خدمة",

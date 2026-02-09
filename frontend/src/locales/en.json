@@ -47,6 +47,7 @@
   },
   "auth": {
     "login_title": "Login",
+    "register_title": "Create an account",
     "email_placeholder": "Email or Phone Number",
     "password_placeholder": "Password",
     "remember_me": "Remember me",
@@ -81,7 +82,11 @@
     "fullname": "Full Name",
     "certified_services": "Certified Services",
     "verified_profiles": "Verified Profiles",
-    "create_client_account": "Create my client account"
+    "create_client_account": "Create my client account",
+    "invalid_credentials": "Invalid email or password.",
+    "register_error": "Registration error. Please check your information.",
+    "account_disabled": "Your account has been disabled by an administrator.",
+    "email_taken": "This email address is already in use."
   },
   "search": {
     "title": "Find a Mission",

@@ -336,7 +336,7 @@ onMounted(fetchDashboardData);
                          <Trash2 class="w-4 h-4" />
                       </button>
                   </div>
-                  <router-link :to="`/offer/${offer.id}`" class="bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-slate-800 transition">
+                  <router-link :to="`/edit-offer/${offer.id}`" class="bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-slate-800 transition">
                       Voir détails
                   </router-link>
               </div>

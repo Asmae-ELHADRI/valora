@@ -39,6 +39,7 @@ class ServiceCategoryController extends Controller
             'name' => 'required|string|max:255|unique:service_categories',
             'description' => 'nullable|string',
             'icon' => 'nullable|string',
+            'image' => 'nullable|string',
         ]);
 
         $category = ServiceCategory::create([
@@ -46,6 +47,7 @@ class ServiceCategoryController extends Controller
             'slug' => Str::slug($request->name),
             'description' => $request->description,
             'icon' => $request->icon,
+            'image' => $request->image,
         ]);
 
         return response()->json([
@@ -65,6 +67,7 @@ class ServiceCategoryController extends Controller
             'name' => 'required|string|max:255|unique:service_categories,name,' . $category->id,
             'description' => 'nullable|string',
             'icon' => 'nullable|string',
+            'image' => 'nullable|string',
         ]);
 
         $category->update([
@@ -72,6 +75,7 @@ class ServiceCategoryController extends Controller
             'slug' => Str::slug($request->name),
             'description' => $request->description,
             'icon' => $request->icon,
+            'image' => $request->image,
         ]);
 
         return response()->json([

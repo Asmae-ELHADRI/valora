@@ -78,11 +78,13 @@ class CategorySeeder extends Seeder
         ];
 
         foreach ($categories as $category) {
-            ServiceCategory::create([
-                'name' => $category,
-                'slug' => Str::slug($category),
-                'icon' => 'default-icon',
-            ]);
+            ServiceCategory::updateOrCreate(
+                ['slug' => Str::slug($category)],
+                [
+                    'name' => $category,
+                    'icon' => 'default-icon',
+                ]
+            );
         }
     }
 }

@@ -47,6 +47,7 @@
   },
   "auth": {
     "login_title": "Se connecter",
+    "register_title": "Créer un compte",
     "email_placeholder": "Email ou Numéro de téléphone",
     "password_placeholder": "Mot de passe",
     "remember_me": "Se souvenir de moi",
@@ -81,7 +82,11 @@
     "fullname": "Nom complet",
     "certified_services": "Services certifiés",
     "verified_profiles": "Profils vérifiés",
-    "create_client_account": "Créer mon compte client"
+    "create_client_account": "Créer mon compte client",
+    "invalid_credentials": "Email ou mot de passe incorrect.",
+    "register_error": "Erreur lors de l'inscription. Veuillez vérifier vos informations.",
+    "account_disabled": "Votre compte a été désactivé par un administrateur.",
+    "email_taken": "Cette adresse email est déjà utilisée."
   },
   "search": {
     "title": "Trouver une mission",

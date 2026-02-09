@@ -102,6 +102,11 @@ class User extends Authenticatable
         return $this->blockedUsers()->where('blocked_id', $userId)->exists();
     }
 
+    public function receivedReviews()
+    {
+        return $this->hasMany(Review::class, 'user_id');
+    }
+
     /**
      * The attributes that should be hidden for serialization.
      *

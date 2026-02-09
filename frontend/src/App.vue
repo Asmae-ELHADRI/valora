@@ -13,7 +13,12 @@ const auth = useAuthStore();
 const router = useRouter();
 const unreadCount = ref(0);
 const reqCount = ref(0);
+const isScrolled = ref(false);
 let countInterval = null;
+
+const handleScroll = () => {
+  isScrolled.value = window.scrollY > 20;
+};
 
 // Global Toast State
 const toast = ref({
@@ -60,6 +65,7 @@ const logout = async () => {
 
 onMounted(() => {
   fetchUnreadCount();
+  window.addEventListener('scroll', handleScroll);
 
   if (auth.user) {
     echo.private(`chat.${auth.user.id}`)
@@ -78,15 +84,18 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (countInterval) clearTimeout(countInterval);
+  window.removeEventListener('scroll', handleScroll);
 });
 </script>
 
 <template>
   <div class="min-h-screen bg-gray-50 flex flex-col">
     <!-- Premium Navbar -->
-    <nav v-if="!['/login', '/register'].includes($route.path)" class="navbar-premium sticky top-0 z-50">
+    <nav v-if="!['/login', '/register'].includes($route.path)" 
+         :class="[isScrolled ? 'navbar-transparent' : 'navbar-scrolled']"
+         class="navbar-premium sticky top-0 z-50 transition-all duration-500">
       <!-- Gradient Background -->
-      <div class="navbar-gradient"></div>
+      <div class="navbar-gradient" :class="{ 'opacity-0': isScrolled, 'opacity-100': !isScrolled }"></div>
       
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div class="flex justify-between h-20">
@@ -98,7 +107,6 @@ onUnmounted(() => {
                 <span class="text-3xl font-black tracking-tight logo-text logo-text-brown">
                   VALORA
                 </span>
-                <div class="logo-underline"></div>
               </div>
             </router-link>
             
@@ -164,8 +172,6 @@ onUnmounted(() => {
         </div>
       </div>
       
-      <!-- Bottom Border Glow -->
-      <div class="navbar-border-glow"></div>
     </nav>
 
     <!-- Main Content -->
@@ -176,7 +182,7 @@ onUnmounted(() => {
     <!-- Footer -->
     <footer v-if="!['/login', '/register'].includes($route.path)" class="bg-white border-t border-gray-200 py-8">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-gray-500 text-sm">
-        <p>© 2026 VALORA. {{ $t('common.footer_quote') }}</p>
+        <p>© 2026 VALORA {{ $t('common.footer_quote') }}</p>
       </div>
     </footer>
 
@@ -223,26 +229,34 @@ onUnmounted(() => {
 
 /* Premium Navbar Styles */
 .navbar-premium {
-  position: relative;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Gradient Background with Blue and Brown */
+.navbar-transparent {
+  background: transparent;
+  box-shadow: none;
+}
+
+.navbar-scrolled {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.3);
+}
+
+/* Gradient Background with Deeper Premium Palette */
 .navbar-gradient {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(135deg, 
-    rgba(37, 99, 235, 0.95) 0%,      /* Blue */
-    rgba(59, 130, 246, 0.92) 25%,    /* Lighter Blue */
-    rgba(139, 69, 19, 0.92) 75%,     /* Brown */
-    rgba(160, 82, 45, 0.95) 100%     /* Sienna Brown */
+  background: linear-gradient(165deg, 
+    rgba(15, 23, 42, 0.9) 0%,     /* Premium Blue */
+    rgba(30, 41, 59, 0.8) 40%,    /* Slate 800 */
+    rgba(69, 26, 3, 0.9) 100%     /* Deeper Brown */
   );
   z-index: 1;
+  transition: opacity 0.5s ease;
 }
 
 /* Bottom Border Glow */
@@ -308,16 +322,26 @@ onUnmounted(() => {
 }
 
 .logo-text-brown {
-  color: #8b4513;
+  transition: color 0.5s ease;
+}
+
+.navbar-transparent .logo-text-brown {
+  color: #0f172a;
+  text-shadow: none;
+}
+
+.navbar-scrolled .logo-text-brown {
+  color: #ffffff;
   text-shadow: 
-    0 2px 4px rgba(0, 0, 0, 0.3),
-    0 0 20px rgba(218, 165, 32, 0.4);
+    2px 2px 0px #92400e,
+    0 0 15px rgba(250, 204, 21, 0.3);
 }
 
 .logo-container:hover .logo-text-brown {
+  color: #facc15; /* Premium Yellow on hover */
   text-shadow: 
-    0 2px 6px rgba(0, 0, 0, 0.4),
-    0 0 30px rgba(218, 165, 32, 0.6);
+    2px 2px 0px #0f172a,
+    0 0 25px rgba(250, 204, 21, 0.5);
 }
 
 /* Logo Underline Animation */
@@ -344,11 +368,18 @@ onUnmounted(() => {
   padding: 0.75rem 1.25rem;
   font-size: 0.95rem;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
   text-decoration: none;
-  transition: all 0.3s ease;
+  transition: all 0.5s ease;
   border-radius: 12px;
   letter-spacing: 0.01em;
+}
+
+.navbar-transparent .nav-link {
+  color: #0f172a;
+}
+
+.navbar-scrolled .nav-link {
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .nav-link:hover {
@@ -365,7 +396,7 @@ onUnmounted(() => {
   transform: translateX(-50%);
   width: 0;
   height: 2px;
-  background: linear-gradient(90deg, #fbbf24, #ffffff);
+  background: #facc15; /* Premium Yellow */
   border-radius: 2px;
   transition: width 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
@@ -375,14 +406,14 @@ onUnmounted(() => {
 }
 
 .router-link-active.nav-link {
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.2);
-  font-weight: 700;
+  color: #facc15 !important;
+  background: rgba(250, 204, 21, 0.1);
+  font-weight: 800;
 }
 
 .router-link-active.nav-link .nav-link-underline {
   width: 70%;
-  background: linear-gradient(90deg, #ffffff, #fbbf24);
+  background: #facc15;
 }
 
 /* Primary Button (S'inscrire) */
@@ -403,8 +434,8 @@ onUnmounted(() => {
 
 .nav-btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 25px rgba(0, 0, 0, 0.3);
-  background: linear-gradient(135deg, #fef3c7 0%, #ffffff 100%);
+  box-shadow: 0 8px 30px rgba(250, 204, 21, 0.3);
+  background: #ffffff;
 }
 
 .nav-btn-primary:active {
@@ -418,15 +449,24 @@ onUnmounted(() => {
   padding: 0.65rem 1.5rem;
   font-size: 0.9rem;
   font-weight: 600;
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.15);
-  border: 1.5px solid rgba(255, 255, 255, 0.3);
   border-radius: 12px;
   text-decoration: none;
-  transition: all 0.3s ease;
+  transition: all 0.5s ease;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   letter-spacing: 0.01em;
+}
+
+.navbar-transparent .nav-btn-secondary {
+  color: #0f172a;
+  border: 1.5px solid rgba(15, 23, 42, 0.2);
+  background: rgba(15, 23, 42, 0.05);
+}
+
+.navbar-scrolled .nav-btn-secondary {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1.5px solid rgba(255, 255, 255, 0.3);
 }
 
 .nav-btn-secondary:hover {
@@ -442,14 +482,23 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   padding: 0.65rem;
-  color: rgba(255, 255, 255, 0.9);
-  background: rgba(255, 255, 255, 0.1);
-  border: 1.5px solid rgba(255, 255, 255, 0.2);
   border-radius: 12px;
-  transition: all 0.3s ease;
+  transition: all 0.5s ease;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   cursor: pointer;
+}
+
+.navbar-transparent .nav-icon-btn {
+  color: #0f172a;
+  background: rgba(15, 23, 42, 0.05);
+  border: 1.5px solid rgba(15, 23, 42, 0.1);
+}
+
+.navbar-scrolled .nav-icon-btn {
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
 }
 
 .nav-icon-btn:hover {

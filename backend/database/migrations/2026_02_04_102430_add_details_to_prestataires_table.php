@@ -12,9 +12,15 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('prestataires', function (Blueprint $table) {
-            $table->string('city')->nullable();
-            $table->decimal('hourly_rate', 10, 2)->nullable();
-            $table->foreignId('category_id')->nullable()->constrained('service_categories')->onDelete('set null');
+            if (!Schema::hasColumn('prestataires', 'city')) {
+                $table->string('city')->nullable();
+            }
+            if (!Schema::hasColumn('prestataires', 'hourly_rate')) {
+                $table->decimal('hourly_rate', 10, 2)->nullable();
+            }
+            if (!Schema::hasColumn('prestataires', 'category_id')) {
+                $table->foreignId('category_id')->nullable()->constrained('service_categories')->onDelete('set null');
+            }
         });
     }
 

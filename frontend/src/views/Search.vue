@@ -210,8 +210,9 @@ const formatDate = (date) => {
         class="bg-white p-7 rounded-[2.5rem] border border-gray-100 shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 cursor-pointer group flex flex-col h-full"
       >
         <div class="flex justify-between items-start mb-6">
-          <div class="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 group-hover:bg-slate-900 group-hover:text-white transition-all duration-300 shadow-sm">
-             <Briefcase class="w-6 h-6" />
+          <div class="w-14 h-14 bg-slate-50 rounded-2xl overflow-hidden flex items-center justify-center text-slate-400 group-hover:bg-slate-900 group-hover:text-white transition-all duration-300 shadow-sm border border-gray-100">
+             <img v-if="offer.category && offer.category.image" :src="offer.category.image" class="w-full h-full object-cover" />
+             <Briefcase v-else class="w-6 h-6" />
           </div>
           <span class="px-4 py-2 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-slate-200 group-hover:bg-slate-800 transition-colors">
             {{ offer.budget }} €
@@ -250,8 +251,13 @@ const formatDate = (date) => {
         </button>
         
         <div class="p-10 md:p-14">
-          <div class="flex items-center space-x-3 text-slate-900 mb-6">
-             <span class="px-4 py-1.5 bg-slate-100 rounded-full text-[10px] font-black uppercase tracking-widest border border-slate-200">{{ selectedOffer.category.name }}</span>
+          <div class="flex items-center justify-between mb-8">
+            <div class="flex items-center space-x-3 text-slate-900">
+               <span class="px-4 py-1.5 bg-slate-100 rounded-full text-[10px] font-black uppercase tracking-widest border border-slate-200">{{ selectedOffer.category.name }}</span>
+            </div>
+            <div v-if="selectedOffer.category && selectedOffer.category.image" class="w-16 h-16 rounded-2xl overflow-hidden border border-gray-100 shadow-sm">
+              <img :src="selectedOffer.category.image" class="w-full h-full object-cover" />
+            </div>
           </div>
           <h2 class="text-3xl md:text-4xl font-black text-slate-900 mb-8 leading-tight">{{ selectedOffer.title }}</h2>
           

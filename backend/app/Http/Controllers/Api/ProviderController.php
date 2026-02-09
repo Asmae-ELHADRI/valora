@@ -174,6 +174,9 @@ class ProviderController extends Controller
         $prestataire = $user->prestataire;
 
         if ($request->hasFile('photo')) {
+            if (!$prestataire) {
+                $prestataire = Prestataire::create(['user_id' => $user->id]);
+            }
             if ($prestataire->photo) {
                 Storage::delete($prestataire->photo);
             }
@@ -206,6 +209,12 @@ class ProviderController extends Controller
     public function toggleVisibility(Request $request)
     {
         $user = $request->user();
+        if (!$user->prestataire) {
+            return response()->json([
+                'message' => 'Profil prestataire non configuré'
+            ], 400);
+        }
+
         $user->prestataire->update([
             'is_visible' => !$user->prestataire->is_visible,
         ]);

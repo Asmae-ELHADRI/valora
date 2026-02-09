@@ -47,6 +47,7 @@
   },
   "auth": {
     "login_title": "تسجيل الدخول",
+    "register_title": "إنشاء حساب",
     "email_placeholder": "البريد الإلكتروني أو رقم الهاتف",
     "password_placeholder": "كلمة المرور",
     "remember_me": "تذكرني",
@@ -81,7 +82,11 @@
     "fullname": "الاسم الكامل",
     "certified_services": "خدمات معتمدة",
     "verified_profiles": "ملفات تم التحقق منها",
-    "create_client_account": "إنشاء حسابي"
+    "create_client_account": "إنشاء حسابي",
+    "invalid_credentials": "البريد الإلكتروني أو كلمة المرور غير صحيحة.",
+    "register_error": "خطأ في التسجيل. يرجى التحقق من معلوماتك.",
+    "account_disabled": "تم تعطيل حسابك من قبل المسؤول.",
+    "email_taken": "هذا البريد الإلكتروني مستخدم بالفعل."
   },
   "search": {
     "title": "العثور على مهمة",
