@@ -50,6 +50,33 @@ const categoryGroups = {
     ]
 };
 
+const commonSkills = [
+    'Plomberie', 'Électricité', 'Maçonnerie', 'Peinture', 'Menuiserie', 'Carrelage', 'Soudure',
+    'Ménage', 'Jardinage', 'Garde d\'enfants', 'Cuisine', 'Bricolage',
+    'Développement Web', 'Design Graphique', 'Marketing Digital', 'Rédaction', 'Traduction',
+    'Comptabilité', 'Conseil Juridique', 'Informatique', 'Réseaux',
+    'Déménagement', 'Livraison', 'Mécanique Auto', 'Nettoyage Auto',
+    'Photographie', 'Vidéographie', 'Coiffure', 'Esthétique', 'Massage', 'Fitness'
+];
+
+const skillSearch = ref('');
+const filteredSkills = computed(() => {
+    const search = skillSearch.value.toLowerCase();
+    if (!search) return commonSkills.filter(s => !profileForm.value.skills.includes(s));
+    return commonSkills.filter(s => s.toLowerCase().includes(search) && !profileForm.value.skills.includes(s));
+});
+
+const addSkill = (skill) => {
+    if (!profileForm.value.skills.includes(skill)) {
+        profileForm.value.skills.push(skill);
+    }
+    skillSearch.value = '';
+};
+
+const removeSkill = (skill) => {
+    profileForm.value.skills = profileForm.value.skills.filter(s => s !== skill);
+};
+
 const filteredCategoryGroups = computed(() => {
     const searchLower = categorySearch.value.toLowerCase();
     const result = [];
@@ -78,11 +105,14 @@ const profileForm = ref({
   first_name: '',
   last_name: '',
   phone: '',
+  birth_date: '',
+  cin: '',
   address: '',
-  skills: '',
-  description: '',
+  city: '',
+  skills: [],
   experience: '',
   diplomas: '',
+  hourly_rate: '',
   category_ids: [],
   availabilities: {}
 });
@@ -128,11 +158,14 @@ const initProfileForm = () => {
       first_name: user.first_name || '',
       last_name: user.last_name || '',
       phone: user.phone || '',
+      birth_date: user.prestataire?.birth_date ? user.prestataire.birth_date.substring(0, 10) : '',
+      cin: user.prestataire?.cin || '',
       address: user.address || '',
-      skills: user.prestataire?.skills || '',
-      description: user.prestataire?.description || '',
+      city: user.prestataire?.city || '',
+      skills: user.prestataire?.skills ? user.prestataire.skills.split(',').map(s => s.trim()) : [],
       experience: user.prestataire?.experience || '',
       diplomas: user.prestataire?.diplomas || '',
+      hourly_rate: user.prestataire?.hourly_rate || '',
       category_ids: userCategoryIds,
       availabilities: user.prestataire?.availabilities || {},
     };
@@ -158,7 +191,11 @@ watch(() => auth.user, () => {
 const saveProfile = async () => {
   saving.value = true;
   try {
-    const response = await api.post('/api/provider/profile', profileForm.value);
+    const dataToSend = {
+        ...profileForm.value,
+        skills: profileForm.value.skills.join(',') // Save as string
+    };
+    const response = await api.post('/api/provider/profile', dataToSend);
     auth.user = response.data.user; // Update store
     
     // Save availability
@@ -216,8 +253,11 @@ const profileCompletion = computed(() => {
         auth.user?.last_name,
         auth.user?.phone,
         auth.user?.address,
+        auth.user?.prestataire?.birth_date,
+        auth.user?.prestataire?.cin,
+        auth.user?.prestataire?.city,
+        auth.user?.prestataire?.hourly_rate,
         auth.user?.prestataire?.photo,
-        auth.user?.prestataire?.description,
         auth.user?.prestataire?.skills,
         auth.user?.prestataire?.categories?.length > 0
     ];
@@ -635,8 +675,20 @@ const updateStatus = async (id, status) => {
                          <input v-model="profileForm.last_name" type="text" class="w-full px-5 py-3.5 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 outline-none transition-all font-medium text-slate-900 placeholder:text-slate-400">
                      </div>
                      <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 pl-1">Date de naissance</label>
+                         <input v-model="profileForm.birth_date" type="date" class="w-full px-5 py-3.5 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 outline-none transition-all font-medium text-slate-900 placeholder:text-slate-400">
+                     </div>
+                     <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 pl-1">CIN</label>
+                         <input v-model="profileForm.cin" type="text" class="w-full px-5 py-3.5 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 outline-none transition-all font-medium text-slate-900 placeholder:text-slate-400">
+                     </div>
+                     <div>
                         <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 pl-1">{{ $t('provider_dashboard.profile.phone') }}</label>
                          <input v-model="profileForm.phone" type="text" class="w-full px-5 py-3.5 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 outline-none transition-all font-medium text-slate-900 placeholder:text-slate-400">
+                     </div>
+                     <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 pl-1">Ville</label>
+                         <input v-model="profileForm.city" type="text" class="w-full px-5 py-3.5 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 outline-none transition-all font-medium text-slate-900 placeholder:text-slate-400">
                      </div>
                      <div>
                         <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 pl-1">{{ $t('provider_dashboard.profile.address') }}</label>
@@ -702,14 +754,65 @@ const updateStatus = async (id, status) => {
                     </div>
 
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('provider_dashboard.profile.bio') }}</label>
-                         <textarea v-model="profileForm.description" rows="4" class="w-full px-5 py-3 rounded-xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-premium-brown/20 focus:border-premium-brown outline-none transition-all" :placeholder="$t('provider_dashboard.profile.bio_placeholder')"></textarea>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">{{ $t('provider_dashboard.profile.skills') }}</label>
+                        
+                        <!-- Selected Skills Tags -->
+                        <div class="flex flex-wrap gap-2 mb-4">
+                            <span 
+                                v-for="skill in profileForm.skills" 
+                                :key="skill"
+                                class="inline-flex items-center px-3 py-1 rounded-full bg-premium-bg text-premium-brown text-xs font-bold border border-premium-brown/20"
+                            >
+                                {{ skill }}
+                                <button @click="removeSkill(skill)" class="ml-2 hover:text-red-500">
+                                    <X class="w-3 h-3" />
+                                </button>
+                            </span>
+                            <span v-if="profileForm.skills.length === 0" class="text-xs text-gray-400 italic">Aucune compétence sélectionnée</span>
+                        </div>
+
+                        <!-- Skill Search & Dropdown -->
+                        <div class="relative">
+                            <Plus class="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                            <input 
+                                v-model="skillSearch" 
+                                type="text" 
+                                placeholder="Ajoutez une compétence (ex: Plomberie, Design...) et appuyez sur Entrée"
+                                class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-premium-brown/20 focus:border-premium-brown outline-none transition text-sm"
+                                @keydown.enter.prevent="skillSearch.trim() && addSkill(skillSearch.trim())"
+                            >
+                            
+                            <!-- Skill Suggestions Dropdown -->
+                            <div v-if="skillSearch" class="absolute z-20 w-full mt-2 bg-white border border-gray-100 rounded-xl shadow-xl max-h-64 overflow-y-auto">
+                                <!-- Option to add custom skill -->
+                                <button 
+                                    v-if="!profileForm.skills.includes(skillSearch.trim())"
+                                    @click="addSkill(skillSearch.trim())"
+                                    class="w-full px-4 py-3 text-left text-sm hover:bg-premium-bg hover:text-premium-brown transition-colors font-bold border-b border-gray-50 flex items-center justify-between group"
+                                >
+                                    <span class="truncate">Ajouter "{{ skillSearch }}"</span>
+                                    <Plus class="w-4 h-4 text-premium-brown opacity-0 group-hover:opacity-100 transition-opacity" />
+                                </button>
+
+                                <button 
+                                    v-for="skill in filteredSkills" 
+                                    :key="skill"
+                                    @click="addSkill(skill)"
+                                    class="w-full px-4 py-2.5 text-left text-sm hover:bg-premium-bg hover:text-premium-brown transition-colors font-medium border-b border-gray-50 last:border-0"
+                                >
+                                    {{ skill }}
+                                </button>
+
+                                <div v-if="filteredSkills.length === 0 && profileForm.skills.includes(skillSearch.trim())" class="p-4 text-center text-xs text-gray-400">
+                                    Cette compétence est déjà ajoutée
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('provider_dashboard.profile.skills') }}</label>
-                         <input v-model="profileForm.skills" type="text" class="w-full px-5 py-3 rounded-xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-premium-brown/20 focus:border-premium-brown outline-none transition-all" :placeholder="$t('provider_dashboard.profile.skills_placeholder')">
-                        <p class="text-xs text-gray-400 mt-1">{{ $t('provider_dashboard.profile.skills_hint') }}</p>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Prestation salarial (Tarif MAD/H)</label>
+                         <input v-model="profileForm.hourly_rate" type="number" step="0.01" class="w-full px-5 py-3 rounded-xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-premium-brown/20 focus:border-premium-brown outline-none transition-all" placeholder="Ex: 150.00">
                     </div>
                 </div>
              </div>

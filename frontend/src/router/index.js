@@ -41,6 +41,12 @@ const routes = [
         meta: { requiresAuth: true, role: 'provider' }
     },
     {
+        path: '/dashboard-prestataire',
+        name: 'DashboardPrestataire',
+        component: () => import('../views/DashboardPrestataire.vue'),
+        meta: { requiresAuth: true, role: 'provider' }
+    },
+    {
         path: '/dashboard-client',
         name: 'DashboardClient',
         component: () => import('../views/DashboardClient.vue'),

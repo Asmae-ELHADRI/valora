@@ -55,7 +55,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Provider profile management (restricted to providers)
     Route::middleware(['role:provider'])->prefix('provider')->group(function () {
+        Route::get('/profile', [\App\Http\Controllers\Api\ProviderController::class, 'getProfile']);
         Route::post('/profile', [\App\Http\Controllers\Api\ProviderController::class, 'updateProfile']);
+        Route::put('/profile', [\App\Http\Controllers\Api\ProviderController::class, 'updateProfile']);
         Route::post('/photo', [\App\Http\Controllers\Api\ProviderController::class, 'uploadPhoto']);
         Route::post('/availability', [\App\Http\Controllers\Api\ProviderController::class, 'updateAvailability']);
         Route::post('/visibility', [\App\Http\Controllers\Api\ProviderController::class, 'toggleVisibility']);

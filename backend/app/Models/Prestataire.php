@@ -12,6 +12,7 @@ class Prestataire extends Model
 
     protected $fillable = [
         'user_id',
+        'cin',
         'birth_date',
         'city',
         'hourly_rate',
@@ -29,6 +30,7 @@ class Prestataire extends Model
     ];
 
     protected $casts = [
+        'birth_date' => 'date',
         'availabilities' => 'array',
         'is_available' => 'boolean',
         'is_visible' => 'boolean',

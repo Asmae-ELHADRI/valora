@@ -117,6 +117,22 @@ class ProviderController extends Controller
         return response()->json($provider);
     }
 
+    public function getProfile(Request $request)
+    {
+        $user = $request->user()->load(['prestataire.categories']);
+        
+        if (!$user->prestataire) {
+            return response()->json([
+                'message' => 'Profil non créé',
+                'exists' => false
+            ]);
+        }
+
+        return response()->json([
+            'exists' => true,
+            'user' => $user
+        ]);
+    }
 
     public function updateProfile(Request $request)
     {
@@ -132,6 +148,10 @@ class ProviderController extends Controller
             'diplomas' => 'nullable|string',
             'category_ids' => 'nullable|array',
             'category_ids.*' => 'exists:service_categories,id',
+            'cin' => 'nullable|string|max:50',
+            'birth_date' => 'nullable|date',
+            'hourly_rate' => 'nullable|numeric|min:0',
+            'city' => 'nullable|string|max:255',
         ]);
 
         $user->update([
@@ -147,11 +167,15 @@ class ProviderController extends Controller
         }
 
         $prestataire->update([
+            'cin' => $request->cin,
+            'birth_date' => $request->birth_date,
+            'city' => $request->city,
+            'hourly_rate' => $request->hourly_rate,
             'skills' => $request->skills,
             'description' => $request->description,
             'experience' => $request->experience,
             'diplomas' => $request->diplomas,
-            'category_id' => !empty($request->category_ids) ? $request->category_ids[0] : null, // Keep for single-cat compatibility
+            'category_id' => !empty($request->category_ids) ? $request->category_ids[0] : null,
         ]);
 
         if ($request->has('category_ids')) {
