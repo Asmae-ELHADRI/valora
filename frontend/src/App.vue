@@ -5,8 +5,7 @@ import { useAuthStore } from './store/auth';
 import api from './services/api';
 import echo from './services/echo';
 import { LogOut, User as UserIcon, MessageSquare, Search, Settings, CheckCircle, X, Info } from 'lucide-vue-next';
-import valoraLogo from './assets/logo-valora.png';
-import LanguageSwitcher from './components/LanguageSwitcher.vue';
+import valoraLogo from './assets/v-logo.png';
 import BottomNav from './components/BottomNav.vue';
 
 const auth = useAuthStore();
@@ -135,9 +134,6 @@ onUnmounted(() => {
               <router-link to="/login" class="nav-btn-secondary">
                 {{ $t('nav.login') }}
               </router-link>
-              <router-link to="/register" class="nav-btn-primary">
-                {{ $t('nav.register') }}
-              </router-link>
             </template>
             <template v-else>
               <!-- Messages Icon -->
@@ -156,8 +152,6 @@ onUnmounted(() => {
                 </span>
               </router-link>
               
-              <LanguageSwitcher />
-
               <!-- Settings Icon -->
               <router-link to="/security" class="nav-icon-btn">
                 <Settings class="w-5 h-5" />
@@ -281,84 +275,6 @@ onUnmounted(() => {
   50% { opacity: 1; }
 }
 
-/* Logo Container */
-.logo-container {
-  position: relative;
-  padding: 8px 0;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-.logo-container:hover {
-  transform: translateY(-2px);
-}
-
-/* Logo Image */
-.logo-image {
-  height: 45px;
-  width: 45px;
-  border-radius: 50%;
-  object-fit: cover;
-  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.3));
-  transition: all 0.3s ease;
-  background: white;
-  padding: 2px;
-}
-
-.logo-container:hover .logo-image {
-  filter: drop-shadow(0 4px 12px rgba(255, 255, 255, 0.4));
-  transform: scale(1.05) rotate(5deg);
-}
-
-/* Logo Text with Premium Font */
-.logo-text {
-  position: relative;
-  display: inline-block;
-  letter-spacing: 0.02em;
-  font-family: 'Playfair Display', serif;
-  font-weight: 900;
-}
-
-.logo-text-brown {
-  transition: color 0.5s ease;
-}
-
-.navbar-transparent .logo-text-brown {
-  color: #0f172a;
-  text-shadow: none;
-}
-
-.navbar-scrolled .logo-text-brown {
-  color: #ffffff;
-  text-shadow: 
-    2px 2px 0px #92400e,
-    0 0 15px rgba(250, 204, 21, 0.3);
-}
-
-.logo-container:hover .logo-text-brown {
-  color: #facc15; /* Premium Yellow on hover */
-  text-shadow: 
-    2px 2px 0px #0f172a,
-    0 0 25px rgba(250, 204, 21, 0.5);
-}
-
-/* Logo Underline Animation */
-.logo-underline {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 0;
-  height: 3px;
-  background: linear-gradient(90deg, #ffffff, #fbbf24);
-  border-radius: 2px;
-  transition: width 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-.logo-container:hover .logo-underline {
-  width: 100%;
-}
 
 /* Navigation Links */
 .nav-link {

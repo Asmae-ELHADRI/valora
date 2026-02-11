@@ -26,6 +26,7 @@
     --foreground: #ffffff;
   }
 
+
   body {
     @apply bg-background text-foreground antialiased;
     font-family:
@@ -33,5 +34,64 @@
       system-ui,
       -apple-system,
       sans-serif;
+  }
+
+  /* --- Global Brand Logo Styles --- */
+  .logo-container {
+    position: relative;
+    padding: 8px 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    cursor: pointer;
+  }
+
+  .logo-container:hover {
+    transform: translateY(-2px);
+  }
+
+  .logo-image {
+    height: 45px;
+    width: 45px;
+    border-radius: 50%;
+    object-fit: cover;
+    filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.3));
+    transition: all 0.3s ease;
+    background: white;
+    padding: 2px;
+  }
+
+  .logo-container:hover .logo-image {
+    filter: drop-shadow(0 4px 12px rgba(255, 255, 255, 0.4));
+    transform: scale(1.05) rotate(5deg);
+  }
+
+  .logo-text {
+    position: relative;
+    display: inline-block;
+    letter-spacing: 0.02em;
+    font-family: 'Playfair Display', serif;
+    font-weight: 900;
+  }
+
+  .logo-text-brown {
+    transition: color 0.5s ease;
+    color: #ffffff;
+    text-shadow: 
+      2px 2px 0px #92400e,
+      0 0 15px rgba(250, 204, 21, 0.3);
+  }
+
+  .navbar-transparent .logo-text-brown {
+    color: #0f172a;
+    text-shadow: none;
+  }
+
+  .logo-container:hover .logo-text-brown {
+    color: #facc15;
+    text-shadow: 
+      2px 2px 0px #0f172a,
+      0 0 25px rgba(250, 204, 21, 0.5);
   }
 }

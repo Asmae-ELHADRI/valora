@@ -2,7 +2,7 @@
 import { ref, onMounted, computed, watch } from 'vue';
 import { useAuthStore } from '../store/auth';
 import api from '../services/api';
-import { Search, FileText, Star, TrendingUp, Clock, CheckCircle, XCircle, MapPin, Loader2, User, Settings, LogOut, Power, MessageCircle } from 'lucide-vue-next';
+import { Search, FileText, Star, TrendingUp, Clock, CheckCircle, XCircle, MapPin, Loader2, User, Settings, LogOut, Power, MessageCircle, ShieldCheck, Award } from 'lucide-vue-next';
 import PhotoUploader from '../components/PhotoUploader.vue';
 import AvailabilityScheduler from '../components/AvailabilityScheduler.vue';
 
@@ -331,14 +331,14 @@ const updateStatus = async (id, status) => {
                 <span v-if="nextLevel" class="text-[10px] text-slate-400 font-medium ml-2">Plus que {{ nextLevel.remaining }} pts pour le badge <span class="font-black text-slate-600">{{ nextLevel.name }}</span></span>
             </div>
         </div>
-        <div class="w-10 h-10 rounded-full bg-slate-100 overflow-hidden border-2 border-white shadow-sm">
+        <div class="w-12 h-12 rounded-full bg-white shadow-xl flex items-center justify-center border-4 border-white overflow-hidden group hover:scale-110 transition-transform duration-500">
              <img 
                v-if="auth.user?.prestataire?.photo_url" 
                :src="auth.user.prestataire.photo_url" 
                class="w-full h-full object-cover"
             />
             <div v-else class="w-full h-full flex items-center justify-center text-slate-300">
-                <User class="w-5 h-5" />
+                <User class="w-6 h-6" />
             </div>
         </div>
     </div>
@@ -409,6 +409,29 @@ const updateStatus = async (id, status) => {
     </div>
 
     <div v-show="activeTab === 'overview'">
+        <!-- Certification Card -->
+        <div v-if="auth.user?.prestataire?.is_certified" class="bg-gradient-to-br from-premium-blue to-slate-800 rounded-[2rem] p-8 mb-8 text-white shadow-2xl relative overflow-hidden group">
+            <div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div class="flex items-center space-x-6">
+                    <div class="w-16 h-16 bg-premium-yellow rounded-2xl flex items-center justify-center shadow-lg shadow-yellow-500/20 transform group-hover:rotate-6 transition-transform">
+                        <ShieldCheck class="w-10 h-10 text-premium-blue" />
+                    </div>
+                    <div>
+                        <h2 class="text-2xl font-black tracking-tight">Prestataire Certifié <span class="text-premium-yellow">Valora</span></h2>
+                        <p class="text-slate-300 text-xs font-medium uppercase tracking-[0.2em] mt-1 italic">Engagement & Excellence Vérifiés</p>
+                    </div>
+                </div>
+                <router-link to="/certificate" class="bg-white text-premium-blue px-8 py-4 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-premium-yellow hover:scale-105 transition-all shadow-xl active:scale-95 text-center">
+                    Voir mon certificat
+                </router-link>
+            </div>
+            <!-- Decorative circle -->
+            <div class="absolute -bottom-20 -right-20 w-64 h-64 bg-premium-yellow/10 rounded-full blur-3xl"></div>
+            <div class="absolute top-2 right-4 opacity-10">
+                <Award class="w-32 h-32" />
+            </div>
+        </div>
+
         <!-- Quick Stats -->
         <div class="grid grid-cols-3 gap-3 mb-10">
             <div class="bg-white p-4 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col items-center text-center">

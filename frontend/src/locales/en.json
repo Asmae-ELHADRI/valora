@@ -20,13 +20,16 @@
     "cancel": "Cancel",
     "delete": "Delete",
     "edit": "Edit",
-    "close": "Close"
+    "close": "Close",
+    "success_registration": "Registration successful! Redirecting..."
   },
   "home": {
-    "hero_subtitle": "« It is in effort that the human reveals himself »",
-    "hero_desc": "The platform that simplifies and secures the connection between talented providers and demanding clients.",
+    "hero_subtitle": "Valuing human excellence through effort.",
+    "hero_desc": "Valora is the alchemy of value and effort. It is here that the artisan's talent is celebrated and their work finds its true recognition. We believe that valuing humans begins with valuing their excellence.",
+    "slogan": "\"Value the <span class=\"text-[#8B5E3C] italic font-playfair lowercase\">effort</span> that reveals the human\"",
     "cta_start": "Start Now",
     "cta_explore": "Explore Services",
+    "hero_badge": "Talent at your fingertips",
     "stats": {
       "providers": "Providers",
       "missions": "Successful Missions",
@@ -43,7 +46,22 @@
     "simplicity_desc": "Find a service or apply for an offer in just a few clicks with our intuitive interface.",
     "ready_title": "Ready to turn your efforts into success?",
     "create_account": "Create an Account",
-    "become_provider": "Become a provider or find a service"
+    "become_provider": "Become a provider or find a service",
+    "artisans": {
+      "title": "Our Artisans",
+      "community": "Community",
+      "description": "Discover the exceptional talents that make up our network. Verified professionals, ready to help.",
+      "subtitle": "Passionate experts at your service"
+    },
+    "jobs": {
+      "title": "Job Offers",
+      "filter_category": "Category",
+      "filter_city": "City",
+      "filter_salary": "Min Salary",
+      "apply_btn": "Apply",
+      "all_categories": "All Categories",
+      "register_apply": "Register / Apply"
+    }
   },
   "auth": {
     "login_title": "Login",
@@ -58,6 +76,7 @@
     "welcome_title": "Welcome to",
     "what_to_do": "What would you like to do?",
     "role_client": "I'm looking for a service",
+    "hero_badge": "Talent at your fingertips",
     "role_provider": "I offer my services",
     "provider_form_title": "Provider Form",
     "provider_subtitle": "Your talent has value",
@@ -86,7 +105,29 @@
     "invalid_credentials": "Invalid email or password.",
     "register_error": "Registration error. Please check your information.",
     "account_disabled": "Your account has been disabled by an administrator.",
-    "email_taken": "This email address is already in use."
+    "email_taken": "This email address is already in use.",
+    "forgot_password": "Forgot password?",
+    "vision_badge": "VALORA Vision",
+    "concept_title": "The Concept",
+    "concept_text": "At Valora, we believe that behind every service lies unique expertise. Our platform is not just a simple connection tool; it is a springboard that highlights the human dimension and the excellence of Moroccan craftsmanship.",
+    "security_check": "Rigorous verification",
+    "quality_check": "Certified expert hands",
+    "ecosystem_desc": "A trusted ecosystem where every talent is certified and every mission becomes an opportunity to shine.",
+    "no_account": "No account yet?",
+    "already_account": "Already registered?",
+    "or_social": "Social Authentication"
+  },
+  "categories": {
+    "plomberie": "Plumbing",
+    "btp": "Construction",
+    "informatique": "IT / Tech",
+    "peinture": "Painting",
+    "electricite": "Electricity",
+    "jardinage": "Gardening",
+    "nettoyage": "Cleaning",
+    "maconnerie": "Masonry",
+    "couture": "Tailoring",
+    "design_interieur": "Interior Design"
   },
   "search": {
     "title": "Find a Mission",

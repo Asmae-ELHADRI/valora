@@ -2,9 +2,22 @@
 import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../store/auth';
-import { Lock, Mail, Loader2, Search, Briefcase, User, MapPin, Camera, Settings, Star, Sparkles, ArrowRight, Shield, Smartphone, PenTool } from 'lucide-vue-next';
-import valoraLogo from '../assets/logo-valora.png';
+import api from '../services/api';
+import { onMounted } from 'vue';
+import { 
+  Lock, Mail, Loader2, Search, Briefcase, User, MapPin, Camera, 
+  Settings, Star, Sparkles, ArrowRight, Shield, Smartphone, PenTool,
+  Hammer, Paintbrush, Zap, Scissors, Sprout, Wrench, Utensils,
+  Eye, EyeOff
+} from 'lucide-vue-next';
+import valoraLogo from '../assets/v-logo.png';
 import artisanBg from '../assets/auth-right-bg.jpg';
+
+const orbitIcons = [
+  Hammer, Wrench, Paintbrush, PenTool, Zap, Scissors, Sprout, Camera
+];
+
+const isVisible = ref(false);
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -12,10 +25,26 @@ const router = useRouter();
 // View State toggles
 const activeRole = ref('client'); // 'client' or 'provider'
 const isLoginMode = ref(true);
+const categories = ref([]);
+
+const fetchCategories = async () => {
+    try {
+        const response = await api.get('/api/offers/categories');
+        categories.value = response.data;
+    } catch (err) {
+        console.error('Erreur lors du chargement des catégories:', err);
+    }
+};
+
+onMounted(() => {
+    fetchCategories();
+    isVisible.value = true;
+});
 
 // Error Handling
 const error = ref('');
 const loading = ref(false);
+const registrationSuccess = ref(false);
 
 // Login Form State
 const loginForm = ref({
@@ -26,7 +55,8 @@ const loginForm = ref({
 
 // Client Registration State
 const clientForm = ref({
-    name: '',
+    nom: '',
+    prenom: '',
     email: '',
     password: '',
     password_confirmation: ''
@@ -38,14 +68,13 @@ const providerForm = ref({
     prenom: '',
     email: '',
     password: '',
-    password_confirmation: '',
-    metier: '',
-    expertise: '',
-    ville: '',
-    experience: '',
-    tarif: '',
-    description: ''
+    password_confirmation: ''
 });
+
+const showPassword = ref(false);
+const showConfirmPassword = ref(false);
+const togglePassword = () => showPassword.value = !showPassword.value;
+const toggleConfirmPassword = () => showConfirmPassword.value = !showConfirmPassword.value;
 
 const isProcessing = computed(() => loading.value);
 
@@ -86,13 +115,14 @@ const handleClientRegister = async () => {
     error.value = '';
     try {
         await auth.register({
-            name: clientForm.value.name,
+            name: `${clientForm.value.prenom} ${clientForm.value.nom}`,
             email: clientForm.value.email,
             password: clientForm.value.password,
             password_confirmation: clientForm.value.password_confirmation,
             role: 'client'
         });
-        router.push('/dashboard');
+        registrationSuccess.value = true;
+        setTimeout(() => router.push('/dashboard'), 1200);
     } catch (err) {
         error.value = getErrorMessage(err, 'auth.register_error');
     } finally {
@@ -109,13 +139,10 @@ const handleProviderRegister = async () => {
             email: providerForm.value.email,
             password: providerForm.value.password,
             password_confirmation: providerForm.value.password_confirmation,
-            role: 'provider',
-            city: providerForm.value.ville,
-            hourly_rate: providerForm.value.tarif,
-            experience: providerForm.value.experience,
-            description: providerForm.value.description
+            role: 'provider'
         });
-        router.push('/dashboard');
+        registrationSuccess.value = true;
+        setTimeout(() => router.push('/dashboard'), 1200);
     } catch (err) {
         error.value = getErrorMessage(err, 'auth.register_error');
     } finally {
@@ -133,12 +160,6 @@ const cities = [
     "Souk El Arbaa", "Tan-Tan", "Ouazzane", "Guercif", "Dakhla", "Midelt", "Azrou", 
     "Tinghir", "Chefchaouen", "Jerada", "Mrirt"
 ].sort();
-
-const jobs = [
-    "Ménage", "Bricolage", "Jardinage", "Plomberie", "Electricité", "Peinture", 
-    "Transport / Livraison", "Garde d'enfants", "Soins aux personnes agées", 
-    "Informatique", "Mécanique", "Cuisine", "Serrurerie", "Menuiserie", "Autres"
-];
 </script>
 
 <template>
@@ -147,9 +168,9 @@ const jobs = [
     <!-- Real Artisan Background with Premium Overlay -->
     <div class="absolute inset-0 z-0">
       <img :src="artisanBg" alt="Artisan Background" class="w-full h-full object-cover scale-105 animate-slow-zoom">
-      <div class="absolute inset-0 bg-gradient-to-br from-premium-blue/90 via-premium-blue/70 to-premium-brown/80 backdrop-blur-[2px]"></div>
+      <div class="absolute inset-0 bg-linear-to-br from-premium-blue/90 via-premium-blue/70 to-premium-brown/80 backdrop-blur-[2px]"></div>
       <!-- Animated Mesh Polish -->
-      <div class="absolute inset-0 opacity-30 bg-[radial-gradient(circle_at_50%_50%,_rgba(250,204,21,0.1),transparent_50%)] animate-pulse"></div>
+      <div class="absolute inset-0 opacity-30 bg-[radial-gradient(circle_at_50%_50%,rgba(250,204,21,0.1),transparent_50%)] animate-pulse"></div>
     </div>
 
     <div class="relative z-10 w-full max-w-6xl">
@@ -157,41 +178,61 @@ const jobs = [
         
         <!-- Left Side: Branding & Artisan Values -->
         <div class="hidden lg:flex flex-col space-y-10 animate-fade-in px-8">
-           <div class="flex items-center space-x-4">
-              <div class="w-20 h-20 bg-white rounded-3xl shadow-2xl p-2 flex items-center justify-center border-4 border-white group hover:rotate-6 transition-transform">
-                 <img :src="valoraLogo" alt="Valora" class="w-full h-full object-contain">
+           <div class="flex items-center space-x-12 relative">
+              <!-- Shared Logo Structure scaled up for Login -->
+              <div class="logo-container scale-[2.2] origin-left ml-4">
+                 <LanguageSwitcher class="absolute -top-6 -left-6 z-50 scale-50" />
+                 
+                 <img :src="valoraLogo" alt="VALORA Logo" class="logo-image" />
+                 <span class="text-3xl font-black tracking-tight logo-text logo-text-brown">
+                   VALORA
+                 </span>
+
+                 <!-- Orbiting Icons attached to the shared container -->
+                 <div>
+                 </div>
               </div>
-              <h1 class="text-5xl font-black text-white tracking-tighter drop-shadow-lg">VALORA<span class="text-premium-yellow">.</span></h1>
            </div>
 
-           <div class="space-y-6">
-              <div class="inline-flex items-center space-x-3 px-5 py-2.5 bg-premium-yellow text-premium-blue rounded-full shadow-xl animate-bounce-slow">
-                 <PenTool class="w-5 h-5" />
-                 <span class="text-xs font-black uppercase tracking-widest text-premium-blue">L'Art de Bien Servir</span>
-              </div>
-              <h2 class="text-6xl font-black text-white tracking-tighter leading-[0.9]">
-                {{ $t('auth.welcome_back_title', 'Simplifiez votre') }}<br>
-                <span class="text-premium-yellow italic font-playfair lowercase">{{ $t('auth.daily_life', 'quotidien') }}</span>
-              </h2>
-              <p class="text-xl text-white/70 font-medium max-w-md leading-relaxed">
-                {{ $t('auth.auth_desc', 'La plateforme de confiance qui connecte le talent des artisans locaux avec vos besoins du quotidien.') }}
-              </p>
-           </div>
+            <div class="space-y-8">
+               <div class="inline-flex items-center space-x-3 px-6 py-3 bg-premium-yellow/10 border border-premium-yellow/20 text-premium-yellow rounded-full backdrop-blur-sm">
+                  <span class="text-[10px] font-black uppercase tracking-[0.3em]">{{ $t('auth.vision_badge') }}</span>
+               </div>
+               
+                <h2 class="text-7xl font-black text-white tracking-tighter leading-[0.85]" v-html="$t('home.slogan')"></h2>
+
+               <div class="space-y-6 max-w-lg">
+      
+                  
+                  <div class="relative p-8 bg-white/5 backdrop-blur-xl rounded-[2.5rem] border border-white/10 shadow-2xl overflow-hidden group">
+                    <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                        <PenTool class="w-12 h-12 text-white" />
+                    </div>
+                    <h4 class="text-white font-black uppercase text-xs tracking-widest mb-3 flex items-center">
+                        <span class="w-8 h-px bg-premium-yellow mr-3"></span>
+                        {{ $t('auth.concept_title') }}
+                    </h4>
+                    <p class="text-sm text-white/70 leading-relaxed font-light italic">
+                      "Chez Valora, nous croyons que derrière chaque service se cache une expertise unique. Notre plateforme n'est pas qu'un simple outil de mise en relation, c'est un tremplin qui met en lumière la dimension humaine et l'excellence de l'artisanat marocain."
+                    </p>
+                  </div>
+               </div>
+            </div>
 
            <div class="grid grid-cols-2 gap-6 pt-4">
-              <div class="p-6 bg-white/10 backdrop-blur-xl rounded-[2.5rem] border border-white/20 shadow-2xl group hover:-translate-y-2 transition-all">
+              <div class="p-6 bg-white/10 backdrop-blur-xl rounded-4xl border border-white/20 shadow-2xl group hover:-translate-y-2 transition-all">
                  <div class="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-premium-yellow transition-colors">
                     <Shield class="w-6 h-6 text-white group-hover:text-premium-blue" />
                  </div>
-                 <h4 class="font-black text-white mb-1 uppercase text-xs tracking-widest">Sécurité</h4>
-                 <p class="text-white/60 text-[10px] font-bold">Vérification rigoureuse</p>
+                 <h4 class="font-black text-white mb-1 uppercase text-xs tracking-widest">{{ $t('common.security', 'Sécurité') }}</h4>
+                 <p class="text-white/60 text-[10px] font-bold">{{ $t('auth.security_check') }}</p>
               </div>
-              <div class="p-6 bg-white/10 backdrop-blur-xl rounded-[2.5rem] border border-white/20 shadow-2xl group hover:-translate-y-2 transition-all">
+              <div class="p-6 bg-white/10 backdrop-blur-xl rounded-4xl border border-white/20 shadow-2xl group hover:-translate-y-2 transition-all">
                  <div class="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-premium-yellow transition-colors">
                     <Star class="w-6 h-6 text-white group-hover:text-premium-blue" />
                  </div>
-                 <h4 class="font-black text-white mb-1 uppercase text-xs tracking-widest">Qualité</h4>
-                 <p class="text-white/60 text-[10px] font-bold">Mains d'experts certifiés</p>
+                 <h4 class="font-black text-white mb-1 uppercase text-xs tracking-widest">{{ $t('common.quality', 'Qualité') }}</h4>
+                 <p class="text-white/60 text-[10px] font-bold">{{ $t('auth.quality_check') }}</p>
               </div>
            </div>
         </div>
@@ -223,23 +264,28 @@ const jobs = [
                  </button>
               </div>
 
-              <!-- Login Form Container -->
+              <!-- Content Container -->
               <div class="space-y-8 relative z-10">
-                 <div class="text-center space-y-3">
-                    <h3 class="text-4xl font-black text-premium-blue tracking-tighter">
-                      {{ isLoginMode ? $t('auth.login_title') : $t('auth.register_title') }}
-                    </h3>
-                    <div class="w-12 h-1 bg-premium-yellow mx-auto rounded-full"></div>
-                 </div>
+                  <!-- Title Section -->
+                  <div class="text-center space-y-3">
+                     <h3 class="text-4xl font-black text-premium-blue tracking-tighter">
+                       {{ isLoginMode ? $t('auth.login_title') : $t('auth.register_title') }}
+                     </h3>
+                     <div class="w-12 h-1 bg-premium-yellow mx-auto rounded-full"></div>
+                  </div>
 
-                 <Transition name="fade-slide" mode="out-in">
-                    <div :key="isLoginMode">
+                  <!-- Feedback Messages (Visible for both Login and Register) -->
+                  <div v-if="error" class="p-4 bg-red-50 border border-red-100 rounded-2xl text-red-600 text-xs font-black animate-shake text-center uppercase tracking-wider relative z-20">
+                      {{ error.includes('.') ? $t(error) : error }}
+                  </div>
+                  <div v-if="registrationSuccess" class="p-4 bg-green-50 border border-green-100 rounded-2xl text-green-600 text-xs font-black animate-bounce-slow text-center uppercase tracking-wider relative z-20">
+                      {{ $t('common.success_registration') }}
+                  </div>
+
+                  <Transition name="fade-slide" mode="out-in">
+                     <div :key="isLoginMode">
                         <!-- Login Form -->
                         <form v-if="isLoginMode" @submit.prevent="handleLogin" class="space-y-6">
-                            <div v-if="error" class="p-4 bg-red-50 border border-red-100 rounded-2xl text-red-600 text-xs font-black animate-shake text-center uppercase tracking-wider">
-                                {{ error.includes('.') ? $t(error) : error }}
-                            </div>
-
                             <div class="space-y-2 group">
                                 <label class="text-[10px] uppercase font-black text-slate-400 tracking-[0.2em] pl-4 transition-colors group-focus-within:text-premium-blue">{{ $t('auth.email') }}</label>
                                 <div class="relative">
@@ -270,7 +316,7 @@ const jobs = [
                                <button type="button" class="text-[10px] font-black text-premium-blue hover:text-premium-brown transition-colors uppercase tracking-widest">{{ $t('auth.forgot_password', 'Mot de passe oublié ?') }}</button>
                             </div>
 
-                            <button type="submit" :disabled="loading" class="w-full bg-premium-blue text-white py-6 rounded-[1.5rem] font-black text-xs uppercase tracking-[0.4em] shadow-2xl shadow-premium-blue/30 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center space-x-3 disabled:opacity-50 mt-8 overflow-hidden relative group">
+                            <button type="submit" :disabled="loading" class="w-full bg-premium-blue text-white py-6 rounded-3xl font-black text-xs uppercase tracking-[0.4em] shadow-2xl shadow-premium-blue/30 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center space-x-3 disabled:opacity-50 mt-8 overflow-hidden relative group">
                                 <span class="relative z-10 flex items-center">
                                     <Loader2 v-if="loading" class="w-5 h-5 mr-3 animate-spin" />
                                     {{ loading ? $t('auth.logging_in') : $t('auth.login_button') }}
@@ -284,101 +330,115 @@ const jobs = [
                            <!-- Client Register -->
                            <form v-if="activeRole === 'client'" @submit.prevent="handleClientRegister" class="space-y-6">
                                <div class="space-y-5">
-                                  <div class="relative group">
-                                     <input v-model="clientForm.name" type="text" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl py-5 pl-14 pr-6 outline-none focus:ring-4 focus:ring-premium-blue/5 transition-all font-bold text-slate-700" :placeholder="$t('auth.fullname')">
-                                     <User class="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-premium-blue transition-all" />
+                                  <div class="grid grid-cols-2 gap-4">
+                                     <div class="relative group">
+                                         <input v-model="clientForm.prenom" type="text" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl py-5 pl-14 pr-6 outline-none focus:ring-4 focus:ring-premium-blue/5 transition-all font-bold text-slate-700" :placeholder="$t('auth.firstname')">
+                                         <User class="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-premium-blue transition-all" />
+                                     </div>
+                                     <div class="relative group">
+                                         <input v-model="clientForm.nom" type="text" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl py-5 pl-14 pr-6 outline-none focus:ring-4 focus:ring-premium-blue/5 transition-all font-bold text-slate-700" :placeholder="$t('auth.name')">
+                                         <User class="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-premium-blue transition-all" />
+                                     </div>
                                   </div>
                                   <div class="relative group">
                                      <input v-model="clientForm.email" type="email" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl py-5 pl-14 pr-6 outline-none focus:ring-4 focus:ring-premium-blue/5 transition-all font-bold text-slate-700" :placeholder="$t('auth.email')">
                                      <Mail class="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-premium-blue transition-all" />
                                   </div>
-                                  <div class="grid grid-cols-2 gap-4">
-                                     <input v-model="clientForm.password" type="password" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl py-5 px-6 outline-none focus:ring-4 focus:ring-premium-blue/5 transition-all font-bold text-slate-700" :placeholder="$t('auth.password')">
-                                     <input v-model="clientForm.password_confirmation" type="password" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl py-5 px-6 outline-none focus:ring-4 focus:ring-premium-blue/5 transition-all font-bold text-slate-700" :placeholder="$t('auth.confirm_password')">
+                                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                     <div class="relative group">
+                                        <input v-model="clientForm.password" :type="showPassword ? 'text' : 'password'" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl py-5 pl-14 pr-12 outline-none focus:ring-4 focus:ring-premium-blue/5 transition-all font-bold text-slate-700" :placeholder="$t('auth.password')">
+                                        <Lock class="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-premium-blue transition-all" />
+                                        <button type="button" @click="togglePassword" class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-premium-blue transition-colors">
+                                            <Eye v-if="!showPassword" class="w-5 h-5" />
+                                            <EyeOff v-else class="w-5 h-5" />
+                                        </button>
+                                     </div>
+                                     <div class="relative group">
+                                        <input v-model="clientForm.password_confirmation" :type="showConfirmPassword ? 'text' : 'password'" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl py-5 pl-14 pr-12 outline-none focus:ring-4 focus:ring-premium-blue/5 transition-all font-bold text-slate-700" :placeholder="$t('auth.confirm_password')">
+                                        <Lock class="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-premium-blue transition-all" />
+                                        <button type="button" @click="toggleConfirmPassword" class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-premium-blue transition-colors">
+                                            <Eye v-if="!showConfirmPassword" class="w-5 h-5" />
+                                            <EyeOff v-else class="w-5 h-5" />
+                                        </button>
+                                     </div>
                                   </div>
                                </div>
-                               <button type="submit" :disabled="loading" class="w-full bg-premium-blue text-white py-6 rounded-[1.5rem] font-black text-xs uppercase tracking-[0.4em] shadow-2xl hover:scale-[1.02] active:scale-95 transition-all mt-6">
+                               <button type="submit" :disabled="loading" class="w-full bg-premium-blue text-white py-6 rounded-3xl font-black text-xs uppercase tracking-[0.4em] shadow-2xl hover:scale-[1.02] active:scale-95 transition-all mt-6">
                                   {{ loading ? $t('auth.signing_up') : $t('auth.create_client_account') }}
                                 </button>
                            </form>
 
-                           <!-- Provider Register (Detailed) -->
-                           <form v-else @submit.prevent="handleProviderRegister" class="space-y-5 max-h-[500px] overflow-y-auto pr-3 custom-scrollbar">
-                                <div class="grid grid-cols-2 gap-4">
-                                    <input v-model="providerForm.nom" type="text" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl py-4 px-6 outline-none focus:ring-4 focus:ring-premium-blue/5 transition-all font-bold text-slate-700" :placeholder="$t('auth.name')">
-                                    <input v-model="providerForm.prenom" type="text" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl py-4 px-6 outline-none focus:ring-4 focus:ring-premium-blue/5 transition-all font-bold text-slate-700" :placeholder="$t('auth.firstname')">
-                                </div>
-                                <div class="relative group">
-                                    <input v-model="providerForm.email" type="email" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl py-4 pl-14 pr-6 outline-none focus:ring-4 focus:ring-premium-blue/5 transition-all font-bold text-slate-700" :placeholder="$t('auth.email')">
-                                    <Mail class="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-premium-blue" />
-                                </div>
-                                <div class="grid grid-cols-2 gap-4">
-                                    <input v-model="providerForm.password" type="password" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl py-4 px-6 outline-none focus:ring-4 focus:ring-premium-blue/5 transition-all font-bold text-slate-700" :placeholder="$t('auth.password')">
-                                    <input v-model="providerForm.password_confirmation" type="password" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl py-4 px-6 outline-none focus:ring-4 focus:ring-premium-blue/5 transition-all font-bold text-slate-700" :placeholder="$t('auth.confirm_password')">
-                                </div>
-
-                                <div class="grid grid-cols-2 gap-4">
-                                    <select v-model="providerForm.metier" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl py-4 px-5 outline-none focus:ring-4 focus:ring-premium-blue/5 transition-all font-bold text-slate-700 appearance-none cursor-pointer">
-                                        <option value="" disabled>{{ $t('auth.select_job') }}</option>
-                                        <option v-for="job in jobs" :key="job" :value="job">{{ job }}</option>
-                                    </select>
-                                    <select v-model="providerForm.ville" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl py-4 px-5 outline-none focus:ring-4 focus:ring-premium-blue/5 transition-all font-bold text-slate-700 appearance-none cursor-pointer">
-                                        <option value="" disabled>{{ $t('auth.select_city', 'Ville') }}</option>
-                                        <option v-for="city in cities" :key="city" :value="city">{{ city }}</option>
-                                    </select>
-                                </div>
-
-                                <div class="relative group">
-                                    <input v-model="providerForm.experience" type="text" class="w-full bg-slate-50 border border-slate-200 rounded-2xl py-4 pl-14 pr-6 outline-none focus:ring-4 focus:ring-premium-blue/5 transition-all font-bold text-slate-700" :placeholder="$t('auth.experience_placeholder')">
-                                    <Smartphone class="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-premium-blue" />
-                                </div>
-
-                                <div class="flex items-center space-x-6 bg-premium-yellow/5 p-5 rounded-[2rem] border border-premium-yellow/10">
-                                   <div class="flex-1">
-                                      <label class="text-[10px] uppercase font-black text-premium-brown block mb-1 tracking-widest opacity-60">{{ $t('auth.rate_label', 'Tarif horaire') }}</label>
-                                      <input v-model="providerForm.tarif" type="text" class="w-full bg-transparent outline-none font-black text-premium-blue text-lg" placeholder="100 MAD">
-                                   </div>
-                                   <div class="w-px h-12 bg-premium-yellow/20"></div>
-                                   <button type="button" class="flex flex-col items-center justify-center p-3 rounded-2xl hover:bg-premium-yellow/20 transition-all active:scale-95">
-                                      <Camera class="w-6 h-6 text-premium-brown mb-1.5" />
-                                      <span class="text-[9px] font-black uppercase text-premium-brown tracking-tighter">Photo</span>
-                                   </button>
+                           <!-- Provider Register (Simplified) -->
+                           <form v-else @submit.prevent="handleProviderRegister" class="space-y-6">
+                                <div class="space-y-5">
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <div class="relative group">
+                                            <input v-model="providerForm.prenom" type="text" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl py-5 pl-14 pr-6 outline-none focus:ring-4 focus:ring-premium-blue/5 transition-all font-bold text-slate-700" :placeholder="$t('auth.firstname')">
+                                            <User class="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-premium-blue transition-all" />
+                                        </div>
+                                        <div class="relative group">
+                                            <input v-model="providerForm.nom" type="text" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl py-5 pl-14 pr-6 outline-none focus:ring-4 focus:ring-premium-blue/5 transition-all font-bold text-slate-700" :placeholder="$t('auth.name')">
+                                            <User class="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-premium-blue transition-all" />
+                                        </div>
+                                    </div>
+                                    <div class="relative group">
+                                        <input v-model="providerForm.email" type="email" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl py-5 pl-14 pr-6 outline-none focus:ring-4 focus:ring-premium-blue/5 transition-all font-bold text-slate-700" :placeholder="$t('auth.email')">
+                                        <Mail class="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-premium-blue transition-all" />
+                                    </div>
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div class="relative group">
+                                            <input v-model="providerForm.password" :type="showPassword ? 'text' : 'password'" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl py-5 pl-14 pr-12 outline-none focus:ring-4 focus:ring-premium-blue/5 transition-all font-bold text-slate-700" :placeholder="$t('auth.password')">
+                                            <Lock class="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-premium-blue transition-all" />
+                                            <button type="button" @click="togglePassword" class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-premium-blue transition-colors">
+                                                <Eye v-if="!showPassword" class="w-5 h-5" />
+                                                <EyeOff v-else class="w-5 h-5" />
+                                            </button>
+                                        </div>
+                                        <div class="relative group">
+                                            <input v-model="providerForm.password_confirmation" :type="showConfirmPassword ? 'text' : 'password'" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl py-5 pl-14 pr-12 outline-none focus:ring-4 focus:ring-premium-blue/5 transition-all font-bold text-slate-700" :placeholder="$t('auth.confirm_password')">
+                                            <Lock class="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-premium-blue transition-all" />
+                                            <button type="button" @click="toggleConfirmPassword" class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-premium-blue transition-colors">
+                                                <Eye v-if="!showConfirmPassword" class="w-5 h-5" />
+                                                <EyeOff v-else class="w-5 h-5" />
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
 
-                                <button type="submit" :disabled="loading" class="w-full bg-premium-blue text-white py-6 rounded-[2rem] font-black text-xs uppercase tracking-[0.4em] shadow-2xl hover:scale-[1.01] active:scale-95 transition-all sticky bottom-0">
-                                   {{ loading ? $t('auth.signing_up') : $t('auth.signup_provider') }}
+                                <button type="submit" :disabled="loading" class="w-full bg-premium-blue text-white py-6 rounded-4xl font-black text-xs uppercase tracking-[0.4em] shadow-2xl hover:scale-[1.01] active:scale-95 transition-all mt-4 shrink-0">
+                                    {{ loading ? $t('auth.signing_up') : $t('auth.signup_provider') }}
                                 </button>
                            </form>
                         </div>
-                    </div>
-                 </Transition>
+                     </div>
+                  </Transition>
 
-                 <!-- Toggle Login/Register & Socials -->
-                 <div class="space-y-10 pt-4">
-                    <div class="flex items-center justify-center space-x-3 text-[11px] font-black uppercase tracking-[0.2em]">
-                       <span class="text-slate-400">{{ isLoginMode ? $t('auth.no_account', 'Pas encore de compte ?') : $t('auth.already_account', 'Déjà inscrit ?') }}</span>
-                       <button @click="isLoginMode = !isLoginMode" class="text-premium-blue hover:text-premium-brown transition-colors underline underline-offset-8 decoration-2 decoration-premium-yellow/30">
-                          {{ isLoginMode ? $t('auth.register_title') : $t('auth.login_title') }}
-                       </button>
-                    </div>
+                  <!-- Toggle Login/Register & Socials -->
+                  <div class="space-y-10 pt-4">
+                     <div class="flex items-center justify-center space-x-3 text-[11px] font-black uppercase tracking-[0.2em]">
+                        <span class="text-slate-400">{{ isLoginMode ? $t('auth.no_account', 'Pas encore de compte ?') : $t('auth.already_account', 'Déjà inscrit ?') }}</span>
+                        <button @click="isLoginMode = !isLoginMode" class="text-premium-blue hover:text-premium-brown transition-colors underline underline-offset-8 decoration-2 decoration-premium-yellow/30">
+                           {{ isLoginMode ? $t('auth.register_title') : $t('auth.login_title') }}
+                        </button>
+                     </div>
 
-                    <div class="relative py-2">
-                       <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-slate-100"></div></div>
-                       <div class="relative flex justify-center text-[10px] uppercase font-black tracking-[0.3em]"><span class="bg-white/80 px-6 text-slate-300 backdrop-blur-md">{{ $t('auth.or_social', 'Authentification sociale') }}</span></div>
-                    </div>
+                     <div class="relative py-2">
+                        <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-slate-100"></div></div>
+                        <div class="relative flex justify-center text-[10px] uppercase font-black tracking-[0.3em]"><span class="bg-white/80 px-6 text-slate-300 backdrop-blur-md">{{ $t('auth.or_social', 'Authentification sociale') }}</span></div>
+                     </div>
 
-                    <div class="flex justify-center space-x-8">
-                       <button @click="auth.socialLogin('google')" class="w-16 h-16 bg-white border border-slate-100 rounded-[1.5rem] flex items-center justify-center hover:shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1)] hover:-translate-y-2 transition-all duration-500 group">
-                          <img src="https://www.google.com/favicon.ico" class="w-6 h-6 grayscale opacity-40 group-hover:grayscale-0 group-hover:opacity-100 transition-all" alt="Google">
-                       </button>
-                       <button @click="auth.socialLogin('facebook')" class="w-16 h-16 bg-white border border-slate-100 rounded-[1.5rem] flex items-center justify-center hover:shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1)] hover:-translate-y-2 transition-all duration-500 group">
-                          <div class="bg-blue-600/10 rounded-full w-7 h-7 flex items-center justify-center text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-all"><span class="text-[12px] font-black">f</span></div>
-                       </button>
-                    </div>
-                 </div>
-              </div>
-           </div>
-        </div>
+                     <div class="flex justify-center space-x-8">
+                        <button @click="auth.socialLogin('google')" class="w-16 h-16 bg-white border border-slate-100 rounded-3xl flex items-center justify-center hover:shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1)] hover:-translate-y-2 transition-all duration-500 group">
+                           <img src="https://www.google.com/favicon.ico" class="w-6 h-6 grayscale opacity-40 group-hover:grayscale-0 group-hover:opacity-100 transition-all" alt="Google">
+                        </button>
+                        <button @click="auth.socialLogin('facebook')" class="w-16 h-16 bg-white border border-slate-100 rounded-3xl flex items-center justify-center hover:shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1)] hover:-translate-y-2 transition-all duration-500 group">
+                           <div class="bg-blue-600/10 rounded-full w-7 h-7 flex items-center justify-center text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-all"><span class="text-[12px] font-black">f</span></div>
+                        </button>
+                     </div>
+                  </div>
+               </div>
+            </div>
+         </div>
       </div>
     </div>
   </div>
@@ -390,6 +450,53 @@ const jobs = [
 
 .font-outfit { font-family: 'Outfit', sans-serif; }
 .font-playfair { font-family: 'Playfair Display', serif; }
+
+@keyframes orbit {
+  0% {
+    transform: rotate(var(--delay)) translateX(var(--orbit-radius)) rotate(calc(-1 * var(--delay))) scale(1.1);
+    opacity: 0.9;
+    filter: blur(0px);
+    z-index: 20;
+  }
+  25% {
+    transform: rotate(calc(var(--delay) + 90deg)) translateX(var(--orbit-radius)) rotate(calc(-1 * (var(--delay) + 90deg))) scale(0.9);
+    opacity: 0.5;
+    filter: blur(2px);
+    z-index: 5;
+  }
+  50% {
+    transform: rotate(calc(var(--delay) + 180deg)) translateX(var(--orbit-radius)) rotate(calc(-1 * (var(--delay) + 180deg))) scale(0.7);
+    opacity: 0.2;
+    filter: blur(4px);
+    z-index: 0;
+  }
+  75% {
+    transform: rotate(calc(var(--delay) + 270deg)) translateX(var(--orbit-radius)) rotate(calc(-1 * (var(--delay) + 270deg))) scale(0.9);
+    opacity: 0.5;
+    filter: blur(2px);
+    z-index: 5;
+  }
+  100% {
+    transform: rotate(calc(var(--delay) + 360deg)) translateX(var(--orbit-radius)) rotate(calc(-1 * (var(--delay) + 360deg))) scale(1.1);
+    opacity: 0.9;
+    filter: blur(0px);
+    z-index: 20;
+  }
+}
+
+.orbit-item {
+  --orbit-radius: 80px;
+  will-change: transform, opacity, filter;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin-slow {
+  animation: spin 80s linear infinite;
+}
 
 @keyframes slow-zoom {
   from { transform: scale(1); }
@@ -441,6 +548,14 @@ const jobs = [
   50% { transform: translateY(-10px); }
 }
 .animate-bounce-slow { animation: bounce-slow 4s ease-in-out infinite; }
+
+@keyframes yellow-shine {
+  0%, 100% { color: white; text-shadow: 0 0 0px rgba(250, 204, 21, 0); }
+  50% { color: #facc15; text-shadow: 0 0 20px rgba(250, 204, 21, 0.8); }
+}
+.animate-yellow-shine {
+  animation: yellow-shine 4s ease-in-out infinite;
+}
 
 .bg-premium-blue { background-color: #0f172a; }
 .text-premium-blue { color: #0f172a; }

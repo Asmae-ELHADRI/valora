@@ -14,17 +14,24 @@ class BadgeSeeder extends Seeder
     {
         $badges = [
             [
+                'name' => 'Certifié Valora',
+                'slug' => 'certifie',
+                'threshold' => 100,
+                'description' => 'Prestataire officiel certifié par la plateforme après 10 missions réussies.',
+                'icon' => 'check-circle'
+            ],
+            [
                 'name' => 'Confirmé',
                 'slug' => 'confirme',
-                'threshold' => 100,
-                'description' => 'Prestataire ayant fait ses preuves avec une qualité constante.',
+                'threshold' => 250,
+                'description' => 'Prestataire ayant fait ses preuves avec une qualité constante sur plus de 25 missions.',
                 'icon' => 'award'
             ],
             [
                 'name' => 'Expert',
                 'slug' => 'expert',
-                'threshold' => 300,
-                'description' => 'Elite de la plateforme, reconnu pour son excellence et sa fiabilité.',
+                'threshold' => 500,
+                'description' => 'Elite de la plateforme, reconnu pour son excellence sur plus de 50 missions.',
                 'icon' => 'shield-check'
             ],
         ];

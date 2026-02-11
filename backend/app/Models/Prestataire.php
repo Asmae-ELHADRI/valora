@@ -12,6 +12,7 @@ class Prestataire extends Model
 
     protected $fillable = [
         'user_id',
+        'birth_date',
         'city',
         'hourly_rate',
         'category_id',
@@ -24,6 +25,7 @@ class Prestataire extends Model
         'is_visible',
         'photo',
         'rating',
+        'certified_at',
     ];
 
     protected $casts = [
@@ -32,7 +34,7 @@ class Prestataire extends Model
         'is_visible' => 'boolean',
     ];
 
-    protected $appends = ['photo_url', 'badge_level', 'completed_missions_count', 'pro_score', 'current_badges'];
+    protected $appends = ['photo_url', 'badge_level', 'completed_missions_count', 'pro_score', 'current_badges', 'is_certified'];
 
     public function user()
     {
@@ -81,6 +83,11 @@ class Prestataire extends Model
     {
         $highestBadge = $this->badges()->orderByDesc('threshold')->first();
         return $highestBadge ? $highestBadge->name : 'Débutant';
+    }
+
+    public function getIsCertifiedAttribute()
+    {
+        return $this->certified_at !== null || $this->completed_missions_count >= 10;
     }
 
     public function getPhotoUrlAttribute()

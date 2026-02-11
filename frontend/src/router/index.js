@@ -99,6 +99,12 @@ const routes = [
         name: 'ProviderSearch',
         component: () => import('../views/ProviderSearch.vue'),
         meta: { requiresAuth: true, role: 'client' }
+    },
+    {
+        path: '/certificate',
+        name: 'Certificate',
+        component: () => import('../views/Certificate.vue'),
+        meta: { requiresAuth: true, role: 'provider' }
     }
 ]
 

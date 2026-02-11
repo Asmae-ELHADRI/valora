@@ -14,11 +14,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/users/{id}/basic', [AuthController::class, 'getBasicInfo']);
     Route::post('/logout', [AuthController::class, 'logout']);
 
-    // Offer routes
-    Route::get('/offers', [\App\Http\Controllers\Api\ServiceOfferController::class, 'index']);
-    Route::get('/offers/categories', [\App\Http\Controllers\Api\ServiceOfferController::class, 'categories']);
+    // Offer routes (Protected)
     Route::get('/offers/my-offers', [\App\Http\Controllers\Api\ServiceOfferController::class, 'myOffers']);
-    Route::get('/offers/{id}', [\App\Http\Controllers\Api\ServiceOfferController::class, 'show']);
     Route::post('/offers', [\App\Http\Controllers\Api\ServiceOfferController::class, 'store']);
     Route::put('/offers/{id}', [\App\Http\Controllers\Api\ServiceOfferController::class, 'update']);
     Route::delete('/offers/{id}', [\App\Http\Controllers\Api\ServiceOfferController::class, 'destroy']);
@@ -62,6 +59,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/photo', [\App\Http\Controllers\Api\ProviderController::class, 'uploadPhoto']);
         Route::post('/availability', [\App\Http\Controllers\Api\ProviderController::class, 'updateAvailability']);
         Route::post('/visibility', [\App\Http\Controllers\Api\ProviderController::class, 'toggleVisibility']);
+        Route::get('/certificate', [\App\Http\Controllers\Api\CertificateController::class, 'show']);
     });
 
     // Client routes
@@ -114,6 +112,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/alerts', [\App\Http\Controllers\Api\AdminController::class, 'securityAlerts']);
     });
 });
+
+// Offers (Public)
+Route::get('/offers', [\App\Http\Controllers\Api\ServiceOfferController::class, 'index']);
+Route::get('/offers/categories', [\App\Http\Controllers\Api\ServiceOfferController::class, 'categories']);
+Route::get('/offers/{id}', [\App\Http\Controllers\Api\ServiceOfferController::class, 'show']);
 
 // Auth (Public)
 Route::post('/register', [\App\Http\Controllers\Api\AuthController::class, 'register']);

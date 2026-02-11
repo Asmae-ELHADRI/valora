@@ -24,6 +24,7 @@ class AuthController extends Controller
             'hourly_rate' => 'nullable|numeric',
             'category_id' => 'nullable|exists:service_categories,id',
             'experience' => 'nullable|string',
+            'birth_date' => 'nullable|date',
             'description' => 'nullable|string',
         ]);
 
@@ -41,6 +42,7 @@ class AuthController extends Controller
                 'hourly_rate' => $request->hourly_rate,
                 'category_id' => $request->category_id,
                 'experience' => $request->experience,
+                'birth_date' => $request->birth_date,
                 'description' => $request->description,
             ]);
         } else {

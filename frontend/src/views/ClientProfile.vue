@@ -55,8 +55,8 @@ onMounted(initForm);
     <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
         <!-- Photo -->
         <div class="md:col-span-1 space-y-6">
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                <h3 class="font-bold text-gray-900 mb-6">Logo / Photo</h3>
+            <div class="bg-white p-6 rounded-4xl shadow-sm border border-slate-100">
+                <h3 class="font-bold text-slate-900 mb-6">Logo / Photo</h3>
                 <PhotoUploader 
                     :current-photo="auth.user?.client?.photo_url" 
                     upload-url="/api/client/photo"
@@ -67,49 +67,49 @@ onMounted(initForm);
 
         <!-- Info -->
         <div class="md:col-span-2">
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                <h3 class="font-bold text-gray-900 mb-6">Informations personnelles</h3>
+            <div class="bg-white p-8 rounded-4xl shadow-sm border border-slate-100">
+                <h3 class="font-bold text-slate-900 mb-8">Informations personnelles</h3>
                 <form @submit.prevent="updateProfile" class="space-y-6">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Prénom</label>
-                            <input v-model="profileForm.first_name" type="text" class="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none">
+                            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 pl-1">Prénom</label>
+                            <input v-model="profileForm.first_name" type="text" class="w-full px-5 py-3.5 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 outline-none transition-all font-medium text-slate-900 placeholder:text-slate-400">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Nom</label>
-                            <input v-model="profileForm.last_name" type="text" class="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none">
+                            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 pl-1">Nom</label>
+                            <input v-model="profileForm.last_name" type="text" class="w-full px-5 py-3.5 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 outline-none transition-all font-medium text-slate-900 placeholder:text-slate-400">
                         </div>
                     </div>
 
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Type de compte</label>
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 pl-1">Type de compte</label>
                         <div class="flex space-x-4">
-                            <label class="flex items-center space-x-2 cursor-pointer bg-gray-50 px-4 py-2 rounded-xl border border-gray-200 hover:bg-gray-100" :class="{'ring-2 ring-blue-500 border-blue-500': profileForm.type === 'individual'}">
+                            <label class="flex items-center space-x-2 cursor-pointer bg-slate-50 px-5 py-3 rounded-2xl border border-slate-100 hover:bg-white transition-all" :class="{'ring-2 ring-premium-yellow border-premium-yellow bg-white': profileForm.type === 'individual'}">
                                 <input type="radio" v-model="profileForm.type" value="individual" class="hidden">
-                                <User class="w-4 h-4 text-gray-500" />
-                                <span class="font-medium text-sm">Particulier</span>
+                                <User class="w-4 h-4 text-slate-500" />
+                                <span class="font-bold text-sm text-slate-700">Particulier</span>
                             </label>
-                            <label class="flex items-center space-x-2 cursor-pointer bg-gray-50 px-4 py-2 rounded-xl border border-gray-200 hover:bg-gray-100" :class="{'ring-2 ring-blue-500 border-blue-500': profileForm.type === 'company'}">
+                            <label class="flex items-center space-x-2 cursor-pointer bg-slate-50 px-5 py-3 rounded-2xl border border-slate-100 hover:bg-white transition-all" :class="{'ring-2 ring-premium-yellow border-premium-yellow bg-white': profileForm.type === 'company'}">
                                 <input type="radio" v-model="profileForm.type" value="company" class="hidden">
-                                <Briefcase class="w-4 h-4 text-gray-500" />
-                                <span class="font-medium text-sm">Entreprise</span>
+                                <Briefcase class="w-4 h-4 text-slate-500" />
+                                <span class="font-bold text-sm text-slate-700">Entreprise</span>
                             </label>
                         </div>
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Téléphone</label>
+                            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 pl-1">Téléphone</label>
                              <div class="relative">
-                                <Phone class="w-4 h-4 text-gray-400 absolute left-3 top-3.5" />
-                                <input v-model="profileForm.phone" type="text" class="w-full pl-10 pr-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none">
+                                <Phone class="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+                                <input v-model="profileForm.phone" type="text" class="w-full pl-12 pr-5 py-3.5 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 outline-none transition-all font-medium text-slate-900 placeholder:text-slate-400">
                             </div>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Adresse</label>
+                            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 pl-1">Adresse</label>
                             <div class="relative">
-                                <MapPin class="w-4 h-4 text-gray-400 absolute left-3 top-3.5" />
-                                <input v-model="profileForm.address" type="text" class="w-full pl-10 pr-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none">
+                                <MapPin class="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+                                <input v-model="profileForm.address" type="text" class="w-full pl-12 pr-5 py-3.5 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 outline-none transition-all font-medium text-slate-900 placeholder:text-slate-400">
                             </div>
                         </div>
                     </div>
@@ -118,7 +118,7 @@ onMounted(initForm);
                         <button 
                             type="submit"
                             :disabled="saving"
-                            class="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-blue-700 transition flex items-center space-x-2 disabled:opacity-50"
+                            class="bg-premium-blue text-white px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-xl shadow-blue-900/10 flex items-center space-x-3 disabled:opacity-50"
                         >
                             <Loader2 v-if="saving" class="w-5 h-5 animate-spin" />
                             <Save v-else class="w-5 h-5" />

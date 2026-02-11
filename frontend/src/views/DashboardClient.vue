@@ -240,9 +240,12 @@ onMounted(fetchDashboardData);
                 <span class="text-[10px] text-slate-400 font-medium ml-2">Bienvenue sur votre espace</span>
             </div>
         </div>
-        <div class="w-10 h-10 rounded-full bg-slate-100 overflow-hidden border-2 border-white shadow-sm">
-             <div class="w-full h-full flex items-center justify-center text-slate-300">
-                <User class="w-5 h-5" />
+        <div class="w-12 h-12 rounded-full bg-white shadow-xl flex items-center justify-center border-4 border-white overflow-hidden group hover:scale-110 transition-transform duration-500">
+             <div v-if="auth.user?.photo" class="w-full h-full">
+                <img :src="auth.user.photo" class="w-full h-full object-cover">
+             </div>
+             <div v-else class="w-full h-full flex items-center justify-center text-slate-300">
+                <User class="w-6 h-6" />
             </div>
         </div>
     </div>
@@ -270,21 +273,21 @@ onMounted(fetchDashboardData);
 
     <!-- Quick Stats -->
     <div class="grid grid-cols-3 gap-3 mb-8">
-        <div class="bg-white p-4 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col items-center text-center">
+        <div class="bg-white p-4 rounded-4xl border border-slate-100 shadow-sm flex flex-col items-center text-center">
             <div class="w-8 h-8 rounded-full bg-green-50 flex items-center justify-center mb-2">
                 <CheckCircle class="w-4 h-4 text-green-600" />
             </div>
             <span class="text-[9px] text-slate-400 font-bold leading-tight mb-1">Ouvertes</span>
             <span class="text-xl font-black text-slate-900">{{ stats.open }}</span>
         </div>
-        <div class="bg-white p-4 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col items-center text-center">
+        <div class="bg-white p-4 rounded-4xl border border-slate-100 shadow-sm flex flex-col items-center text-center">
             <div class="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center mb-2">
                 <Clock class="w-4 h-4 text-blue-600" />
             </div>
             <span class="text-[9px] text-slate-400 font-bold leading-tight mb-1">En cours</span>
             <span class="text-xl font-black text-slate-900">{{ stats.in_progress }}</span>
         </div>
-        <div class="bg-white p-4 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col items-center text-center">
+        <div class="bg-white p-4 rounded-4xl border border-slate-100 shadow-sm flex flex-col items-center text-center">
             <div class="w-8 h-8 rounded-full bg-purple-50 flex items-center justify-center mb-2">
                 <CheckCircle class="w-4 h-4 text-purple-600" />
             </div>
@@ -298,6 +301,7 @@ onMounted(fetchDashboardData);
       <button @click="activeTab = 'offers'" :class="activeTab === 'offers' ? 'text-slate-900 border-premium-yellow' : 'text-slate-400 border-transparent'" class="pb-3 border-b-2 font-bold text-sm transition-colors whitespace-nowrap">Mes Annonces</button>
       <button @click="activeTab = 'requests'" :class="activeTab === 'requests' ? 'text-slate-900 border-premium-yellow' : 'text-slate-400 border-transparent'" class="pb-3 border-b-2 font-bold text-sm transition-colors whitespace-nowrap">Candidatures reçues</button>
       <button @click="activeTab = 'reviews'" :class="activeTab === 'reviews' ? 'text-slate-900 border-premium-yellow' : 'text-slate-400 border-transparent'" class="pb-3 border-b-2 font-bold text-sm transition-colors whitespace-nowrap">Mes Avis</button>
+      <button @click="activeTab = 'profile'" :class="activeTab === 'profile' ? 'text-slate-900 border-premium-yellow' : 'text-slate-400 border-transparent'" class="pb-3 border-b-2 font-bold text-sm transition-colors whitespace-nowrap">Mon Profil</button>
     </div>
 
     <!-- TAB: OFFERS -->
@@ -409,8 +413,13 @@ onMounted(fetchDashboardData);
         </div>
     </div>
 
+    <!-- TAB: PROFILE -->
+    <div v-show="activeTab === 'profile'">
+        <ClientProfile />
+    </div>
+
     <!-- Modal Review -->
-    <div v-if="showReviewModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+    <div v-if="showReviewModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-100 flex items-center justify-center p-4">
         <div class="bg-white rounded-[2.5rem] p-8 w-full max-w-md shadow-2xl relative">
             <button @click="showReviewModal = false" class="absolute top-6 right-6 text-slate-300 hover:text-slate-500 transition">
                 <XCircle class="w-6 h-6" />

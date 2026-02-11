@@ -22,9 +22,10 @@ api.interceptors.response.use(
         if (error.response && error.response.status === 401) {
             // Token expired or invalid
             localStorage.removeItem('token');
-            // Redirect to login - using window since router might not be available here directly depending on setup, 
-            // but imports are possible. Ideally using store logic.
-            window.location.href = '/login';
+            // Redirect to login only if not already there
+            if (window.location.pathname !== '/login') {
+                window.location.href = '/login';
+            }
         }
         return Promise.reject(error);
     }

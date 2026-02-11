@@ -6,9 +6,14 @@ import {
   Search, Filter, MapPin, Star, Briefcase, 
   ChevronRight, X, Loader2, Info, User,
   MessageSquare, GraduationCap, Award, Send, CheckCircle, AlertCircle,
-  ShieldAlert, Ban
+  ShieldAlert, Ban, ShieldCheck,
+  PenTool, Hammer, Paintbrush, Zap, Scissors, Sprout, Wrench, Utensils, Camera
 } from 'lucide-vue-next';
 import { useRouter } from 'vue-router';
+
+const orbitIcons = [
+  PenTool, Hammer, Paintbrush, Zap, Scissors, Sprout, Wrench, Utensils, Camera
+];
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -184,6 +189,7 @@ const blockUser = async () => {
 const getBadgeClass = (level) => {
     switch (level) {
         case 'Expert': return 'bg-purple-600 text-white shadow-lg shadow-purple-200';
+        case 'Certifié Valora': return 'bg-premium-blue text-white shadow-lg shadow-blue-900/40 ring-2 ring-premium-yellow/50';
         case 'Confirmé': return 'bg-blue-600 text-white shadow-lg shadow-blue-200';
         default: return 'bg-gray-500 text-white shadow-lg shadow-gray-200';
     }
@@ -312,8 +318,9 @@ const getBadgeClass = (level) => {
         <span 
             v-if="provider.prestataire?.badge_level" 
             :class="getBadgeClass(provider.prestataire.badge_level)"
-            class="mt-1 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest leading-none"
+            class="mt-1 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest flex items-center gap-1 shadow-md transition-all group-hover:scale-105"
         >
+            <ShieldCheck v-if="provider.prestataire?.badge_level === 'Certifié Valora'" class="w-3 h-3" />
             {{ provider.prestataire.badge_level }}
         </span>
 
@@ -358,10 +365,29 @@ const getBadgeClass = (level) => {
         
         <div class="overflow-y-auto p-10">
           <div class="flex flex-col md:flex-row items-center md:items-start gap-8 mb-10">
-            <div class="w-40 h-40 rounded-[40px] bg-gray-100 overflow-hidden border-8 border-gray-50 shadow-inner flex-shrink-0">
-              <img v-if="selectedProvider.prestataire?.photo" :src="`http://localhost:8000/storage/${selectedProvider.prestataire.photo}`" class="w-full h-full object-cover">
-              <div v-else class="w-full h-full flex items-center justify-center text-gray-300">
-                <User class="w-16 h-16" />
+            <!-- Avatar with Premium Orbit Border -->
+            <div class="relative w-40 h-40 flex-shrink-0 flex items-center justify-center">
+              <div class="absolute inset-0 border-4 border-dashed border-premium-yellow/30 rounded-full animate-spin-slow"></div>
+              
+              <!-- Orbiting Tools -->
+              <div 
+                v-for="(Icon, index) in orbitIcons" 
+                :key="index"
+                class="orbit-item absolute w-8 h-8 flex items-center justify-center bg-white/80 backdrop-blur-md rounded-lg border border-slate-100 shadow-sm transition-all duration-1000 z-10"
+                :style="{
+                  'animation': `orbit ${15 + index * 2}s linear infinite`,
+                  '--delay': `${(360 / orbitIcons.length) * index}deg`,
+                  '--orbit-radius': '95px'
+                }"
+              >
+                <Icon class="w-4 h-4 text-slate-600" />
+              </div>
+
+              <div class="relative z-20 w-full h-full bg-white rounded-full p-2 shadow-2xl border-8 border-gray-50 flex items-center justify-center overflow-hidden transition-transform duration-700 hover:rotate-6">
+                <img v-if="selectedProvider.prestataire?.photo" :src="`http://localhost:8000/storage/${selectedProvider.prestataire.photo}`" class="w-full h-full object-cover rounded-full">
+                <div v-else class="w-full h-full flex items-center justify-center text-gray-300">
+                  <User class="w-16 h-16" />
+                </div>
               </div>
             </div>
             
@@ -370,6 +396,14 @@ const getBadgeClass = (level) => {
                 <h2 class="text-4xl font-black text-gray-900 leading-tight">{{ selectedProvider.name }}</h2>
                 <div class="flex flex-wrap justify-center md:justify-start gap-2 mt-2">
                   <div class="flex flex-wrap justify-center md:justify-start gap-2">
+                    <span 
+                        v-if="selectedProvider.prestataire?.badge_level" 
+                        :class="getBadgeClass(selectedProvider.prestataire.badge_level)"
+                        class="px-4 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 shadow-lg"
+                    >
+                        <ShieldCheck v-if="selectedProvider.prestataire?.badge_level === 'Certifié Valora'" class="w-4 h-4" />
+                        {{ selectedProvider.prestataire.badge_level }}
+                    </span>
                     <span 
                       v-for="cat in selectedProvider.prestataire?.categories" 
                       :key="cat.id"
@@ -642,4 +676,25 @@ const getBadgeClass = (level) => {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+@keyframes orbit {
+  from {
+    transform: rotate(var(--delay)) translateX(var(--orbit-radius)) rotate(calc(-1 * var(--delay)));
+  }
+  to {
+    transform: rotate(calc(var(--delay) + 360deg)) translateX(var(--orbit-radius)) rotate(calc(-1 * (var(--delay) + 360deg)));
+  }
+}
+
+.animate-spin-slow {
+  animation: spin 60s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.bg-premium-yellow { background-color: #facc15; }
+
 </style>
