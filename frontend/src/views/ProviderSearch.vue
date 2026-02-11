@@ -7,7 +7,7 @@ import {
   ChevronRight, X, Loader2, Info, User,
   MessageSquare, GraduationCap, Award, Send, CheckCircle, AlertCircle,
   ShieldAlert, Ban, ShieldCheck,
-  PenTool, Hammer, Paintbrush, Zap, Scissors, Sprout, Wrench, Utensils, Camera
+  PenTool, Hammer, Paintbrush, Zap, Scissors, Sprout, Wrench, Utensils, Camera, Plus
 } from 'lucide-vue-next';
 import { useRouter } from 'vue-router';
 
@@ -194,6 +194,19 @@ const getBadgeClass = (level) => {
         default: return 'bg-gray-500 text-white shadow-lg shadow-gray-200';
     }
 };
+import { MOROCCAN_CITIES } from '../constants/cities';
+
+const citySearch = ref('');
+const filteredCities = computed(() => {
+    if (!citySearch.value) return [];
+    const search = citySearch.value.toLowerCase();
+    return MOROCCAN_CITIES.filter(city => city.toLowerCase().includes(search));
+});
+
+const selectCity = (city) => {
+    filters.value.location = city;
+    citySearch.value = '';
+};
 </script>
 
 <template>
@@ -257,9 +270,29 @@ const getBadgeClass = (level) => {
           <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Disponible le</label>
           <input v-model="filters.availability_date" type="date" class="w-full px-5 py-3.5 rounded-2xl border-none bg-white shadow-sm focus:ring-2 focus:ring-blue-500 outline-none text-sm font-bold text-gray-700">
         </div>
-        <div>
-          <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Localisation</label>
-          <input v-model="filters.location" type="text" placeholder="Ville..." class="w-full px-5 py-3.5 rounded-2xl border-none bg-white shadow-sm focus:ring-2 focus:ring-blue-500 outline-none text-sm font-bold text-gray-700">
+        <div class="grow relative">
+          <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 pl-2">Localisation</label>
+          <div class="relative">
+            <input 
+                v-model="citySearch" 
+                type="text" 
+                :placeholder="filters.location || 'Ville...'" 
+                class="w-full px-5 py-3.5 rounded-2xl border-none bg-white shadow-sm focus:ring-2 focus:ring-blue-500 outline-none text-sm font-bold text-gray-700"
+            >
+            
+            <!-- City suggestions -->
+            <div v-if="filteredCities.length > 0" class="absolute z-50 w-full mt-2 bg-white border border-slate-100 rounded-2xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                <button 
+                    v-for="city in filteredCities" 
+                    :key="city"
+                    @click="selectCity(city)"
+                    class="w-full px-5 py-3 text-left text-sm font-bold hover:bg-slate-50 transition-colors flex items-center justify-between group"
+                >
+                    <span>{{ city }}</span>
+                    <Plus class="w-4 h-4 text-slate-300 group-hover:text-slate-900" />
+                </button>
+            </div>
+          </div>
         </div>
       </div>
 
