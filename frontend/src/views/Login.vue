@@ -59,7 +59,8 @@ const clientForm = ref({
     prenom: '',
     email: '',
     password: '',
-    password_confirmation: ''
+    password_confirmation: '',
+    city: ''
 });
 
 // Provider Registration State
@@ -68,7 +69,8 @@ const providerForm = ref({
     prenom: '',
     email: '',
     password: '',
-    password_confirmation: ''
+    password_confirmation: '',
+    city: ''
 });
 
 const showPassword = ref(false);
@@ -119,6 +121,7 @@ const handleClientRegister = async () => {
             email: clientForm.value.email,
             password: clientForm.value.password,
             password_confirmation: clientForm.value.password_confirmation,
+            city: clientForm.value.city,
             role: 'client'
         });
         registrationSuccess.value = true;
@@ -139,6 +142,7 @@ const handleProviderRegister = async () => {
             email: providerForm.value.email,
             password: providerForm.value.password,
             password_confirmation: providerForm.value.password_confirmation,
+            city: providerForm.value.city,
             role: 'provider'
         });
         registrationSuccess.value = true;
@@ -384,6 +388,31 @@ const cities = [
                                     <div class="relative group">
                                         <input v-model="providerForm.email" type="email" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl py-5 pl-14 pr-6 outline-none focus:ring-4 focus:ring-premium-blue/5 transition-all font-bold text-slate-700" :placeholder="$t('auth.email')">
                                         <Mail class="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-premium-blue transition-all" />
+                                    </div>
+                                    <div class="relative group">
+                                        <div class="relative">
+                                            <input 
+                                                v-model="citySearch" 
+                                                type="text" 
+                                                :placeholder="providerForm.city || $t('auth.city')"
+                                                class="w-full bg-slate-50 border border-slate-200 rounded-2xl py-5 pl-14 pr-6 outline-none focus:ring-4 focus:ring-premium-blue/5 transition-all font-bold text-slate-700"
+                                            >
+                                            <MapPin class="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-premium-blue transition-all" />
+                                            
+                                            <!-- City suggestions -->
+                                            <div v-if="filteredCities.length > 0" class="absolute z-30 w-full mt-2 bg-white border border-slate-100 rounded-2xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                                                <button 
+                                                    v-for="city in filteredCities" 
+                                                    :key="city"
+                                                    type="button"
+                                                    @click="selectCity(city, providerForm)"
+                                                    class="w-full px-5 py-3 text-left text-sm font-bold hover:bg-slate-50 transition-colors flex items-center justify-between group text-premium-blue"
+                                                >
+                                                    <span>{{ city }}</span>
+                                                    <MapPin class="w-4 h-4 text-slate-300 group-hover:text-premium-blue" />
+                                                </button>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div class="relative group">

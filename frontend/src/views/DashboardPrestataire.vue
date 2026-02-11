@@ -4,7 +4,7 @@ import { useAuthStore } from '../store/auth';
 import api from '../services/api';
 import { 
   User, Mail, Phone, MapPin, Briefcase, Calendar, Clock, 
-  Camera, CheckCircle, AlertCircle, Loader2, Edit3, Save, X, Fingerprint, Coins
+  Camera, CheckCircle, AlertCircle, Loader2, Edit3, Save, X, Fingerprint, Coins, Plus
 } from 'lucide-vue-next';
 import PhotoUploader from '../components/PhotoUploader.vue';
 
@@ -18,6 +18,19 @@ const success = ref(null);
 const mode = ref('view');
 const profileExists = ref(false);
 const categories = ref([]);
+
+import { MOROCCAN_CITIES } from '../constants/cities';
+const citySearch = ref('');
+const filteredCities = computed(() => {
+    if (!citySearch.value) return [];
+    const search = citySearch.value.toLowerCase();
+    return MOROCCAN_CITIES.filter(city => city.toLowerCase().includes(search));
+});
+
+const selectCity = (city) => {
+    profileData.value.city = city;
+    citySearch.value = '';
+};
 
 const profileData = ref({
   first_name: '',
@@ -310,6 +323,42 @@ const userFullName = computed(() => {
                         <input v-model="profileData.birth_date" type="date" required class="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:bg-white focus:ring-4 focus:ring-premium-blue/5 outline-none transition-all font-bold text-slate-700">
                     </div>
                     <div class="space-y-2">
+                  <!-- City Selection -->
+                  <div class="relative">
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 pl-1">Ville</label>
+                    <div class="flex gap-2">
+                        <div class="flex-1 relative">
+                            <MapPin class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                            <input 
+                                v-model="citySearch" 
+                                type="text" 
+                                :placeholder="profileData.city || 'Rechercher une ville...'"
+                                class="w-full pl-11 pr-5 py-3.5 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 outline-none transition-all font-medium text-slate-900 placeholder:text-slate-400"
+                            >
+                        </div>
+                    </div>
+                    
+                    <!-- City suggestions -->
+                    <div v-if="filteredCities.length > 0" class="absolute z-10 w-full mt-2 bg-white border border-slate-100 rounded-2xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                        <button 
+                            v-for="city in filteredCities" 
+                            :key="city"
+                            type="button"
+                            @click="selectCity(city)"
+                            class="w-full px-5 py-3 text-left text-sm font-medium hover:bg-slate-50 transition-colors flex items-center justify-between group"
+                        >
+                            <span>{{ city }}</span>
+                            <Plus class="w-4 h-4 text-slate-300 group-hover:text-slate-900" />
+                        </button>
+                    </div>
+                  </div>
+
+                  <!-- Address Field -->
+                  <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 pl-1">{{ $t('provider_dashboard.profile.address') }}</label>
+                    <input v-model="profileData.address" type="text" class="w-full px-5 py-3.5 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 outline-none transition-all font-medium text-slate-900 placeholder:text-slate-400">
+                  </div>
+                    <div class="space-y-2">
                         <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-4">CIN</label>
                         <input v-model="profileData.cin" type="text" required class="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:bg-white focus:ring-4 focus:ring-premium-blue/5 outline-none transition-all font-bold text-slate-700">
                     </div>
@@ -317,12 +366,6 @@ const userFullName = computed(() => {
                         <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-4">Téléphone</label>
                         <input v-model="profileData.phone" type="text" required class="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:bg-white focus:ring-4 focus:ring-premium-blue/5 outline-none transition-all font-bold text-slate-700">
                     </div>
-                    <div class="space-y-2 md:col-span-2">
-                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-4">Adresse complète</label>
-                        <input v-model="profileData.address" type="text" required class="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:bg-white focus:ring-4 focus:ring-premium-blue/5 outline-none transition-all font-bold text-slate-700">
-                    </div>
-                    <div class="space-y-2 md:col-span-2">
-                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-4">Ville</label>
                         <input v-model="profileData.city" type="text" required class="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:bg-white focus:ring-4 focus:ring-premium-blue/5 outline-none transition-all font-bold text-slate-700">
                     </div>
                   </div>

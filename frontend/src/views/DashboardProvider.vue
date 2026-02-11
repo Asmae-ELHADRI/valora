@@ -2,7 +2,7 @@
 import { ref, onMounted, computed, watch } from 'vue';
 import { useAuthStore } from '../store/auth';
 import api from '../services/api';
-import { Search, FileText, Star, TrendingUp, Clock, CheckCircle, XCircle, MapPin, Loader2, User, Settings, LogOut, Power, MessageCircle, ShieldCheck, Award } from 'lucide-vue-next';
+import { Search, FileText, Star, TrendingUp, Clock, CheckCircle, XCircle, MapPin, Loader2, User, Settings, LogOut, Power, MessageCircle, ShieldCheck, Award, Plus } from 'lucide-vue-next';
 import PhotoUploader from '../components/PhotoUploader.vue';
 import AvailabilityScheduler from '../components/AvailabilityScheduler.vue';
 
@@ -50,32 +50,6 @@ const categoryGroups = {
     ]
 };
 
-const commonSkills = [
-    'Plomberie', 'Électricité', 'Maçonnerie', 'Peinture', 'Menuiserie', 'Carrelage', 'Soudure',
-    'Ménage', 'Jardinage', 'Garde d\'enfants', 'Cuisine', 'Bricolage',
-    'Développement Web', 'Design Graphique', 'Marketing Digital', 'Rédaction', 'Traduction',
-    'Comptabilité', 'Conseil Juridique', 'Informatique', 'Réseaux',
-    'Déménagement', 'Livraison', 'Mécanique Auto', 'Nettoyage Auto',
-    'Photographie', 'Vidéographie', 'Coiffure', 'Esthétique', 'Massage', 'Fitness'
-];
-
-const skillSearch = ref('');
-const filteredSkills = computed(() => {
-    const search = skillSearch.value.toLowerCase();
-    if (!search) return commonSkills.filter(s => !profileForm.value.skills.includes(s));
-    return commonSkills.filter(s => s.toLowerCase().includes(search) && !profileForm.value.skills.includes(s));
-});
-
-const addSkill = (skill) => {
-    if (!profileForm.value.skills.includes(skill)) {
-        profileForm.value.skills.push(skill);
-    }
-    skillSearch.value = '';
-};
-
-const removeSkill = (skill) => {
-    profileForm.value.skills = profileForm.value.skills.filter(s => s !== skill);
-};
 
 const filteredCategoryGroups = computed(() => {
     const searchLower = categorySearch.value.toLowerCase();
@@ -100,6 +74,16 @@ const selectedCategoriesCount = computed(() => {
     return profileForm.value.category_ids.length;
 });
 
+const hasDiploma = ref('');
+
+watch(hasDiploma, (val) => {
+    if (val === 'Non') {
+        profileForm.value.diplomas = 'Non';
+    } else if (val === 'Oui' && profileForm.value.diplomas === 'Non') {
+        profileForm.value.diplomas = '';
+    }
+});
+
 // Form Data
 const profileForm = ref({
   first_name: '',
@@ -109,13 +93,21 @@ const profileForm = ref({
   cin: '',
   address: '',
   city: '',
-  skills: [],
+  skills: '',
   experience: '',
   diplomas: '',
   hourly_rate: '',
-  category_ids: [],
-  availabilities: {}
+  availabilities: {},
+  description: [] // Detailed experiences list
 });
+
+const addDetailedExperience = () => {
+    profileForm.value.description.push('');
+};
+
+const removeDetailedExperience = (index) => {
+    profileForm.value.description.splice(index, 1);
+};
 
 const visibility = ref(true);
 
@@ -162,13 +154,24 @@ const initProfileForm = () => {
       cin: user.prestataire?.cin || '',
       address: user.address || '',
       city: user.prestataire?.city || '',
-      skills: user.prestataire?.skills ? user.prestataire.skills.split(',').map(s => s.trim()) : [],
+      skills: user.prestataire?.skills || '',
       experience: user.prestataire?.experience || '',
       diplomas: user.prestataire?.diplomas || '',
       hourly_rate: user.prestataire?.hourly_rate || '',
       category_ids: userCategoryIds,
       availabilities: user.prestataire?.availabilities || {},
+      description: user.prestataire?.description ? user.prestataire.description.split('|||') : []
     };
+    
+    // Initialize hasDiploma state
+    if (user.prestataire?.diplomas === 'Non') {
+        hasDiploma.value = 'Non';
+    } else if (user.prestataire?.diplomas) {
+        hasDiploma.value = 'Oui';
+    } else {
+        hasDiploma.value = '';
+    }
+
     visibility.value = user.prestataire?.is_visible ?? true;
   }
 };
@@ -193,7 +196,7 @@ const saveProfile = async () => {
   try {
     const dataToSend = {
         ...profileForm.value,
-        skills: profileForm.value.skills.join(',') // Save as string
+        description: profileForm.value.description.filter(e => e.trim() !== '').join('|||')
     };
     const response = await api.post('/api/provider/profile', dataToSend);
     auth.user = response.data.user; // Update store
@@ -755,59 +758,7 @@ const updateStatus = async (id, status) => {
 
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">{{ $t('provider_dashboard.profile.skills') }}</label>
-                        
-                        <!-- Selected Skills Tags -->
-                        <div class="flex flex-wrap gap-2 mb-4">
-                            <span 
-                                v-for="skill in profileForm.skills" 
-                                :key="skill"
-                                class="inline-flex items-center px-3 py-1 rounded-full bg-premium-bg text-premium-brown text-xs font-bold border border-premium-brown/20"
-                            >
-                                {{ skill }}
-                                <button @click="removeSkill(skill)" class="ml-2 hover:text-red-500">
-                                    <X class="w-3 h-3" />
-                                </button>
-                            </span>
-                            <span v-if="profileForm.skills.length === 0" class="text-xs text-gray-400 italic">Aucune compétence sélectionnée</span>
-                        </div>
-
-                        <!-- Skill Search & Dropdown -->
-                        <div class="relative">
-                            <Plus class="absolute left-3 top-3 w-4 h-4 text-gray-400" />
-                            <input 
-                                v-model="skillSearch" 
-                                type="text" 
-                                placeholder="Ajoutez une compétence (ex: Plomberie, Design...) et appuyez sur Entrée"
-                                class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-premium-brown/20 focus:border-premium-brown outline-none transition text-sm"
-                                @keydown.enter.prevent="skillSearch.trim() && addSkill(skillSearch.trim())"
-                            >
-                            
-                            <!-- Skill Suggestions Dropdown -->
-                            <div v-if="skillSearch" class="absolute z-20 w-full mt-2 bg-white border border-gray-100 rounded-xl shadow-xl max-h-64 overflow-y-auto">
-                                <!-- Option to add custom skill -->
-                                <button 
-                                    v-if="!profileForm.skills.includes(skillSearch.trim())"
-                                    @click="addSkill(skillSearch.trim())"
-                                    class="w-full px-4 py-3 text-left text-sm hover:bg-premium-bg hover:text-premium-brown transition-colors font-bold border-b border-gray-50 flex items-center justify-between group"
-                                >
-                                    <span class="truncate">Ajouter "{{ skillSearch }}"</span>
-                                    <Plus class="w-4 h-4 text-premium-brown opacity-0 group-hover:opacity-100 transition-opacity" />
-                                </button>
-
-                                <button 
-                                    v-for="skill in filteredSkills" 
-                                    :key="skill"
-                                    @click="addSkill(skill)"
-                                    class="w-full px-4 py-2.5 text-left text-sm hover:bg-premium-bg hover:text-premium-brown transition-colors font-medium border-b border-gray-50 last:border-0"
-                                >
-                                    {{ skill }}
-                                </button>
-
-                                <div v-if="filteredSkills.length === 0 && profileForm.skills.includes(skillSearch.trim())" class="p-4 text-center text-xs text-gray-400">
-                                    Cette compétence est déjà ajoutée
-                                </div>
-                            </div>
-                        </div>
+                         <input v-model="profileForm.skills" type="text" class="w-full px-5 py-3 rounded-xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-premium-brown/20 focus:border-premium-brown outline-none transition-all" placeholder="Ex: Plomberie, Électricité, Jardinage...">
                     </div>
 
                     <div>
@@ -821,12 +772,65 @@ const updateStatus = async (id, status) => {
                 <h3 class="font-bold text-gray-900 mb-6">{{ $t('provider_dashboard.profile.experience_diplomas') }}</h3>
                 <div class="space-y-6">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('provider_dashboard.profile.experience') }}</label>
-                         <textarea v-model="profileForm.experience" rows="3" class="w-full px-5 py-3 rounded-xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-premium-brown/20 focus:border-premium-brown outline-none transition-all" :placeholder="$t('provider_dashboard.profile.experience_placeholder')"></textarea>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">{{ $t('provider_dashboard.profile.experience') }}</label>
+                        <select v-model="profileForm.experience" class="w-full px-5 py-3 rounded-xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-premium-brown/20 focus:border-premium-brown outline-none transition-all font-medium text-gray-700 appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22m6%208%204%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-size-[1.25rem_1.25rem] bg-position-[right_1.25rem_center] bg-no-repeat mb-6">
+                            <option value="">Sélectionnez votre expérience</option>
+                            <option value="Débutant">Débutant</option>
+                            <option value="Entre 1 an et 2 ans">Entre 1 an et 2 ans</option>
+                            <option value="Plus de 4 ans">Plus de 4 ans</option>
+                        </select>
+
+                        <!-- Detailed Experiences List -->
+                        <div class="mt-8">
+                            <div class="flex items-center justify-between mb-4">
+                                <label class="block text-sm font-bold text-slate-700 uppercase tracking-wider">Vos expériences détaillées</label>
+                                <button 
+                                    @click="addDetailedExperience" 
+                                    type="button"
+                                    class="flex items-center space-x-1.5 px-3 py-1.5 bg-premium-bg text-premium-brown rounded-lg hover:bg-premium-brown/10 transition-colors text-xs font-bold"
+                                >
+                                    <Plus class="w-3.5 h-3.5" />
+                                    <span>Nouveau</span>
+                                </button>
+                            </div>
+
+                            <div class="space-y-3">
+                                <div v-for="(exp, index) in profileForm.description" :key="index" class="flex gap-2 group animate-in slide-in-from-left-2 duration-200">
+                                    <div class="flex-1 relative">
+                                        <input 
+                                            v-model="profileForm.description[index]" 
+                                            type="text" 
+                                            class="w-full px-5 py-3 rounded-xl border border-gray-100 bg-white focus:ring-2 focus:ring-premium-brown/20 focus:border-premium-brown outline-none transition-all text-sm pr-10"
+                                            placeholder="Ex: 2 ans chez Entreprise X..."
+                                        >
+                                    </div>
+                                    <button 
+                                        @click="removeDetailedExperience(index)" 
+                                        type="button"
+                                        class="p-3 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                                    >
+                                        <XCircle class="w-5 h-5" />
+                                    </button>
+                                </div>
+                                
+                                <div v-if="profileForm.description.length === 0" class="text-center py-6 bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
+                                    <p class="text-xs text-gray-400">Cliquez sur "Nouveau" pour lister vos expériences spécifiques</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('provider_dashboard.profile.diplomas') }}</label>
-                        <textarea v-model="profileForm.diplomas" rows="3" class="w-full px-5 py-3 rounded-xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-premium-brown/20 focus:border-premium-brown outline-none transition-all" :placeholder="$t('provider_dashboard.profile.diplomas_placeholder')"></textarea>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Diplôme ou Certificat ?</label>
+                        <select v-model="hasDiploma" class="w-full px-5 py-3 rounded-xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-premium-brown/20 focus:border-premium-brown outline-none transition-all font-medium text-gray-700 appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22m6%208%204%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-size-[1.25rem_1.25rem] bg-position-[right_1.25rem_center] bg-no-repeat mb-4">
+                            <option value="">Choisir...</option>
+                            <option value="Oui">Oui</option>
+                            <option value="Non">Non</option>
+                        </select>
+
+                        <div v-if="hasDiploma === 'Oui'" class="mt-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                             <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 pl-1">Précisez votre diplôme ou certificat</label>
+                             <textarea v-model="profileForm.diplomas" rows="3" class="w-full px-5 py-3 rounded-xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-premium-brown/20 focus:border-premium-brown outline-none transition-all" placeholder="Ex: CAP Plomberie, Certificat de formation..."></textarea>
+                        </div>
                     </div>
                 </div>
             </div>
