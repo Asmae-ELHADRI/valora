@@ -52,7 +52,7 @@ const loading = ref(true);
 const reportsLoading = ref(false);
 const rolesLoading = ref(false);
 const statsLoading = ref(true);
-const activeTab = ref('users'); // users, reports, roles, categories, governance, content, badges
+const activeTab = ref('roles'); // users, reports, roles, categories, governance, content, badges
 const governanceSettings = ref([]);
 const settingsLoading = ref(false);
 const fullOffers = ref([]);
@@ -97,6 +97,78 @@ const userForm = ref({
   role_id: null
 });
 const formLoading = ref(false);
+
+const adminReportForm = ref({
+  reported_id: null,
+  reported_name: '',
+  reason: '',
+  description: ''
+});
+const showAdminReportModal = ref(false);
+const userSearchResults = ref([]);
+const searchLoading = ref(false);
+
+const openAdminReportModal = (user = null) => {
+    if (user) {
+        adminReportForm.value = {
+            reported_id: user.id,
+            reported_name: user.name,
+            reason: '',
+            description: ''
+        };
+    } else {
+        adminReportForm.value = {
+            reported_id: null,
+            reported_name: '',
+            reason: '',
+            description: ''
+        };
+    }
+    userSearchResults.value = [];
+    showAdminReportModal.value = true;
+};
+
+const searchUsersForReport = async (query) => {
+    if (!query || query.length < 2) {
+        userSearchResults.value = [];
+        return;
+    }
+    searchLoading.value = true;
+    try {
+        const res = await api.get('/api/admin/users', { params: { search: query } });
+        userSearchResults.value = res.data.data;
+    } catch (err) {
+        console.error('Erreur recherche users:', err);
+    } finally {
+        searchLoading.value = false;
+    }
+};
+
+const selectUserForReport = (user) => {
+    adminReportForm.value.reported_id = user.id;
+    adminReportForm.value.reported_name = user.name;
+    userSearchResults.value = [];
+};
+
+const submitAdminReport = async () => {
+    if (!adminReportForm.value.reported_id || !adminReportForm.value.reason) return;
+    
+    formLoading.value = true;
+    try {
+        await api.post('/api/report', {
+            reported_id: adminReportForm.value.reported_id,
+            reason: adminReportForm.value.reason,
+        });
+        showAdminReportModal.value = false;
+        alert('Signalement créé avec succès');
+        if (activeTab.value === 'reports') fetchComplaints();
+        fetchStats();
+    } catch (err) {
+        alert(err.response?.data?.message || 'Erreur lors de la création du signalement');
+    } finally {
+        formLoading.value = false;
+    }
+};
 
 const chartOptions = computed(() => ({
   responsive: true,
@@ -269,6 +341,46 @@ const deleteUser = async (id) => {
   }
 };
 
+const fetchSettings = async () => {
+    settingsLoading.value = true;
+    try {
+        const res = await api.get('/api/admin/settings');
+        governanceSettings.value = res.data;
+    } catch (err) {
+        console.error('Erreur settings:', err);
+    } finally {
+        settingsLoading.value = false;
+    }
+};
+
+const saveSettings = async () => {
+    settingsLoading.value = true;
+    try {
+        await api.put('/api/admin/settings', { settings: governanceSettings.value });
+        alert('Paramètres enregistrés avec succès');
+    } catch (err) {
+        alert('Erreur lors de l\'enregistrement des paramètres');
+    } finally {
+        settingsLoading.value = false;
+    }
+};
+
+const fetchAllContent = async () => {
+    contentLoading.value = true;
+    try {
+        const [offersRes, missionsRes] = await Promise.all([
+            api.get('/api/admin/offers-list'),
+            api.get('/api/admin/missions-list')
+        ]);
+        fullOffers.value = offersRes.data.data;
+        fullMissions.value = missionsRes.data.data;
+    } catch (err) {
+        console.error('Erreur contenu:', err);
+    } finally {
+        contentLoading.value = false;
+    }
+};
+
 watch([() => filters.value.role], () => {
   fetchUsers(1);
 });
@@ -280,9 +392,12 @@ watch(() => filters.value.search, () => {
 });
 
 watch(activeTab, (newTab) => {
+    if (newTab === 'users') fetchUsers();
+    if (newTab === 'roles') fetchRoles();
     if (newTab === 'governance') fetchSettings();
     if (newTab === 'content') fetchAllContent();
     if (newTab === 'badges') fetchBadges();
+    if (newTab === 'reports') fetchComplaints();
 });
 
 onMounted(() => {
@@ -467,7 +582,7 @@ const getRoleClass = (role) => {
     <div v-if="activeTab === 'users'" class="space-y-6">
       <!-- Filters -->
       <div class="flex flex-col md:flex-row gap-4 items-center justify-between bg-white p-4 rounded-3xl border border-gray-100 shadow-sm">
-        <div class="relative flex-grow max-w-md w-full">
+        <div class="relative grow max-w-md w-full">
           <Search class="absolute left-5 top-4 w-5 h-5 text-gray-400" />
           <input 
             v-model="filters.search"
@@ -479,7 +594,7 @@ const getRoleClass = (role) => {
         <div class="flex items-center space-x-3 w-full md:w-auto">
           <select 
             v-model="filters.role"
-            class="flex-grow md:flex-none px-6 py-4 bg-gray-50 border-none rounded-2xl text-sm font-bold text-gray-700 focus:ring-2 focus:ring-blue-500 outline-none"
+            class="grow md:flex-none px-6 py-4 bg-gray-50 border-none rounded-2xl text-sm font-bold text-gray-700 focus:ring-2 focus:ring-blue-500 outline-none"
           >
             <option value="">Tous les rôles</option>
             <option value="provider">Prestataires</option>
@@ -503,10 +618,13 @@ const getRoleClass = (role) => {
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-50">
-              <tr v-if="loading" v-for="i in 5" :key="i" class="animate-pulse">
-                <td colspan="5" class="px-8 py-8"><div class="h-4 bg-gray-100 rounded w-full"></div></td>
-              </tr>
-              <tr v-else v-for="user in users" :key="user.id" class="hover:bg-gray-50/30 transition-colors">
+              <template v-if="loading">
+                <tr v-for="i in 5" :key="i" class="animate-pulse">
+                  <td colspan="5" class="px-8 py-8"><div class="h-4 bg-gray-100 rounded w-full"></div></td>
+                </tr>
+              </template>
+              <template v-else>
+                <tr v-for="user in users" :key="user.id" class="hover:bg-gray-50/30 transition-colors">
                 <td class="px-8 py-6">
                   <div class="flex items-center space-x-4">
                     <div class="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center text-gray-400 font-bold overflow-hidden border border-gray-100">
@@ -540,6 +658,9 @@ const getRoleClass = (role) => {
                 </td>
                 <td class="px-8 py-6 text-right">
                   <div class="flex items-center justify-end space-x-2">
+                    <button @click="openAdminReportModal(user)" class="p-2.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition" title="Signaler cet utilisateur">
+                      <ShieldAlert class="w-5 h-5" />
+                    </button>
                     <button @click="openEditModal(user)" class="p-2.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition">
                       <Edit class="w-5 h-5" />
                     </button>
@@ -548,15 +669,16 @@ const getRoleClass = (role) => {
                     </button>
                   </div>
                 </td>
-              </tr>
-              <tr v-if="!loading && users.length === 0">
-                <td colspan="5" class="py-20 text-center">
-                  <div class="w-20 h-20 bg-gray-50 rounded-3xl flex items-center justify-center mx-auto mb-4 text-gray-300">
-                    <Search class="w-10 h-10" />
-                  </div>
-                  <p class="text-gray-400 font-bold">Aucun utilisateur trouvé</p>
-                </td>
-              </tr>
+                </tr>
+                <tr v-if="users.length === 0">
+                  <td colspan="5" class="py-20 text-center">
+                    <div class="w-20 h-20 bg-gray-50 rounded-3xl flex items-center justify-center mx-auto mb-4 text-gray-300">
+                      <Search class="w-10 h-10" />
+                    </div>
+                    <p class="text-gray-400 font-bold">Aucun utilisateur trouvé</p>
+                  </td>
+                </tr>
+              </template>
             </tbody>
           </table>
         </div>
@@ -684,6 +806,105 @@ const getRoleClass = (role) => {
             </div>
         </div>
     </div>
+    <!-- Content: Reports/Complaints -->
+    <div v-if="activeTab === 'reports'" class="space-y-6">
+      <div class="bg-white rounded-[40px] border border-gray-100 shadow-sm overflow-hidden">
+        <div class="p-8 border-b border-gray-50 bg-gray-50/50 flex justify-between items-center">
+            <h3 class="text-xl font-black text-gray-900">Signalements & Litiges</h3>
+            <div class="flex items-center space-x-4">
+                <span class="px-3 py-1 bg-red-100 text-red-700 rounded-full text-[10px] font-black uppercase">{{ complaints.length }} Signalements</span>
+                <button @click="openAdminReportModal()" class="bg-red-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-red-700 transition shadow-lg shadow-red-100 flex items-center space-x-2">
+                    <Flag class="w-4 h-4" />
+                    <span>Signaler un compte</span>
+                </button>
+            </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="bg-gray-50/50">
+                <th class="px-8 py-5 text-xs font-black text-gray-400 uppercase tracking-widest">Auteur / Cible</th>
+                <th class="px-8 py-5 text-xs font-black text-gray-400 uppercase tracking-widest">Raison</th>
+                <th class="px-8 py-5 text-xs font-black text-gray-400 uppercase tracking-widest">Statut</th>
+                <th class="px-8 py-5 text-xs font-black text-gray-400 uppercase tracking-widest">Date</th>
+                <th class="px-8 py-5 text-right text-xs font-black text-gray-400 uppercase tracking-widest">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-50">
+              <template v-if="reportsLoading">
+                <tr v-for="i in 3" :key="i" class="animate-pulse">
+                  <td colspan="5" class="px-8 py-8"><div class="h-4 bg-gray-100 rounded w-full"></div></td>
+                </tr>
+              </template>
+              <template v-else>
+                <tr v-for="comp in complaints" :key="comp.id" class="hover:bg-gray-50/30 transition">
+                  <td class="px-8 py-6">
+                    <div class="flex flex-col">
+                      <span class="text-xs font-bold text-gray-900">Par: {{ comp.reporter?.name }}</span>
+                      <span class="text-[10px] text-red-500 font-bold uppercase mt-1">Contre: {{ comp.reported?.name }}</span>
+                    </div>
+                  </td>
+                  <td class="px-8 py-6">
+                    <p class="text-sm text-gray-700 font-medium">{{ comp.reason || 'Aucun détail fourni' }}</p>
+                    <p v-if="comp.description" class="text-[10px] text-gray-400 mt-1 italic">{{ comp.description }}</p>
+                  </td>
+                  <td class="px-8 py-6">
+                    <span class="px-2 py-1 rounded text-[8px] font-black uppercase tracking-widest"
+                          :class="{
+                            'bg-red-50 text-red-600': comp.status === 'pending',
+                            'bg-green-50 text-green-600': comp.status === 'resolved',
+                            'bg-gray-50 text-gray-400': comp.status === 'ignored'
+                          }">
+                      {{ comp.status }}
+                    </span>
+                  </td>
+                  <td class="px-8 py-6 text-xs text-gray-500 font-medium">
+                    {{ new Date(comp.created_at).toLocaleDateString() }}
+                  </td>
+                  <td class="px-8 py-6 text-right">
+                    <div class="flex items-center justify-end space-x-2">
+                      <button v-if="comp.status === 'pending'" @click="updateComplaintStatus(comp, 'resolved')" class="p-2 text-green-600 hover:bg-green-50 rounded-lg transition" title="Marquer comme résolu">
+                        <CheckCircle class="w-5 h-5" />
+                      </button>
+                      <button v-if="comp.status === 'pending'" @click="updateComplaintStatus(comp, 'ignored')" class="p-2 text-gray-400 hover:bg-gray-100 rounded-lg transition" title="Ignorer">
+                        <ShieldAlert class="w-5 h-5" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+                <tr v-if="complaints.length === 0">
+                  <td colspan="5" class="py-20 text-center text-gray-400 font-bold italic">
+                    Aucun signalement à traiter
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+        
+        <!-- Pagination Signalements -->
+        <div v-if="complaintsPagination.last_page > 1" class="px-8 py-6 bg-gray-50/30 border-t border-gray-50 flex items-center justify-between">
+          <p class="text-xs text-gray-500 font-bold uppercase tracking-widest">Page {{ complaintsPagination.current_page }} sur {{ complaintsPagination.last_page }}</p>
+          <div class="flex space-x-2">
+            <button 
+              @click="fetchComplaints(complaintsPagination.current_page - 1)" 
+              :disabled="complaintsPagination.current_page === 1"
+              class="px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition"
+            >
+              Précédent
+            </button>
+            <button 
+              @click="fetchComplaints(complaintsPagination.current_page + 1)" 
+              :disabled="complaintsPagination.current_page === complaintsPagination.last_page"
+              class="px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition"
+            >
+              Suivant
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div v-if="activeTab === 'roles'" class="space-y-8">
       <div v-if="rolesLoading" class="flex items-center justify-center py-20">
         <Loader2 class="w-10 h-10 animate-spin text-gray-300" />
@@ -725,6 +946,12 @@ const getRoleClass = (role) => {
             </div>
           </div>
         </div>
+      </div>
+      <div v-if="roles.length === 0 && !rolesLoading" class="py-20 text-center bg-white rounded-[40px] border border-gray-100 shadow-sm">
+        <div class="w-20 h-20 bg-gray-50 rounded-3xl flex items-center justify-center mx-auto mb-4 text-gray-300">
+          <Shield class="w-10 h-10" />
+        </div>
+        <p class="text-gray-400 font-bold italic">Aucun rôle trouvé dans le système</p>
       </div>
     </div>
 
@@ -782,7 +1009,7 @@ const getRoleClass = (role) => {
             </div>
 
             <div class="mt-12 bg-blue-50/50 p-6 rounded-3xl border border-blue-100 flex items-start space-x-4">
-                <AlertTriangle class="w-6 h-6 text-blue-600 flex-shrink-0 mt-1" />
+                <AlertTriangle class="w-6 h-6 text-blue-600 shrink-0 mt-1" />
                 <p class="text-xs text-blue-700 leading-relaxed font-medium">
                     <span class="font-black uppercase tracking-widest block mb-1">Impact sur le système</span>
                     La modification d'un seuil est immédiate. Les prestataires dont le score ne correspond plus aux règles verront leurs badges synchronisés automatiquement lors de leur prochaine activité (fin de mission, nouvel avis).
@@ -792,7 +1019,7 @@ const getRoleClass = (role) => {
     </div>
     <div v-if="showUserModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" @click="showUserModal = false"></div>
-      <div class="relative bg-white w-full max-w-lg rounded-[40px] shadow-2xl p-10 animate-in fade-in zoom-in duration-300">
+        <div class="relative bg-white w-full max-w-lg rounded-4xl shadow-2xl p-10 animate-in fade-in zoom-in duration-300">
         <div class="flex items-center justify-between mb-10">
           <div class="flex items-center space-x-4">
             <div class="w-12 h-12 bg-gray-900 rounded-2xl flex items-center justify-center text-white">
@@ -848,12 +1075,112 @@ const getRoleClass = (role) => {
           </div>
 
           <div class="pt-6 flex gap-4">
-            <button type="button" @click="showUserModal = false" class="flex-grow py-4 rounded-2xl font-bold text-gray-500 hover:bg-gray-50 transition">
+            <button type="button" @click="showUserModal = false" class="grow py-4 rounded-2xl font-bold text-gray-500 hover:bg-gray-50 transition">
               Annuler
             </button>
-            <button type="submit" :disabled="formLoading" class="flex-grow py-4 rounded-2xl font-bold bg-blue-600 text-white hover:bg-blue-700 shadow-xl shadow-blue-100 transition active:scale-[0.98] flex items-center justify-center">
+            <button type="submit" :disabled="formLoading" class="grow py-4 rounded-2xl font-bold bg-blue-600 text-white hover:bg-blue-700 shadow-xl shadow-blue-100 transition active:scale-[0.98] flex items-center justify-center">
               <Loader2 v-if="formLoading" class="w-5 h-5 animate-spin mr-2" />
               <span>{{ isEditing ? 'Mettre à jour' : 'Créer le compte' }}</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal Signalement Admin -->
+    <div v-if="showAdminReportModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" @click="showAdminReportModal = false"></div>
+      <div class="relative bg-white w-full max-w-lg rounded-4xl shadow-2xl p-10 animate-in fade-in zoom-in duration-300 pointer-events-auto">
+        <div class="flex items-center justify-between mb-10">
+          <div class="flex items-center space-x-4">
+            <div class="w-12 h-12 bg-red-600 rounded-2xl flex items-center justify-center text-white text-center">
+              <ShieldAlert class="w-6 h-6 inline-block" />
+            </div>
+            <div>
+              <h3 class="text-2xl font-black text-gray-900">Signaler un compte</h3>
+              <p class="text-gray-500 text-sm font-medium">Initier manuellement un processus de signalement.</p>
+            </div>
+          </div>
+        </div>
+
+        <form @submit.prevent="submitAdminReport" class="space-y-6">
+          <div class="space-y-2">
+            <label class="block text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Utilisateur à signaler</label>
+            <div v-if="adminReportForm.reported_id" class="flex items-center justify-between p-4 bg-red-50 rounded-2xl border border-red-100">
+              <div class="flex items-center space-x-3">
+                <div class="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center text-red-600">
+                  <User class="w-4 h-4" />
+                </div>
+                <span class="font-black text-red-900">{{ adminReportForm.reported_name }}</span>
+              </div>
+              <button type="button" @click="adminReportForm.reported_id = null; adminReportForm.reported_name = ''" class="text-red-400 hover:text-red-600 transition">
+                <XCircle class="w-5 h-5" />
+              </button>
+            </div>
+            <div v-else class="relative">
+              <Search class="absolute left-5 top-4 w-5 h-5 text-gray-400" />
+              <input 
+                type="text" 
+                placeholder="Rechercher un utilisateur..." 
+                @input="e => searchUsersForReport(e.target.value)"
+                class="w-full pl-14 pr-6 py-4 bg-gray-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-red-500 transition"
+              >
+              <!-- Search Results Dropdown -->
+              <div v-if="userSearchResults.length > 0" class="absolute z-50 left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-gray-100 max-h-60 overflow-y-auto">
+                <button 
+                  v-for="u in userSearchResults" 
+                  :key="u.id" 
+                  type="button"
+                  @click="selectUserForReport(u)"
+                  class="w-full flex items-center space-x-4 px-6 py-4 hover:bg-gray-50 transition text-left"
+                >
+                  <div class="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center text-gray-400 font-bold overflow-hidden border border-gray-100">
+                    <img v-if="u.client?.photo || u.prestataire?.photo" :src="u.client?.photo || u.prestataire?.photo" class="w-full h-full object-cover">
+                    <User v-else class="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p class="text-sm font-bold text-gray-900 leading-tight">{{ u.name }}</p>
+                    <p class="text-[10px] text-gray-500">{{ u.email }}</p>
+                  </div>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="space-y-2">
+            <label class="block text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Raison du signalement</label>
+            <div class="relative">
+              <AlertTriangle class="absolute left-5 top-4 w-5 h-5 text-gray-400" />
+              <select v-model="adminReportForm.reason" required class="w-full pl-14 pr-6 py-4 bg-gray-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-red-500 transition appearance-none font-bold text-gray-700">
+                <option value="">Sélectionnez une raison</option>
+                <option value="Comportement inapproprié">Comportement inapproprié</option>
+                <option value="Fraude ou Arnaque">Fraude ou Arnaque</option>
+                <option value="Faux profil">Faux profil</option>
+                <option value="Contenu abusif">Contenu abusif</option>
+                <option value="Non-respect des engagements">Non-respect des engagements</option>
+                <option value="Autre">Autre</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="space-y-2">
+            <label class="block text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Détails supplémentaires</label>
+            <textarea 
+              v-model="adminReportForm.description" 
+              rows="3" 
+              placeholder="Décrivez les faits..."
+              class="w-full px-6 py-4 bg-gray-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-red-500 transition font-medium text-gray-700"
+            ></textarea>
+          </div>
+
+          <div class="pt-6 flex gap-4">
+            <button type="button" @click="showAdminReportModal = false" class="grow py-4 rounded-2xl font-bold text-gray-500 hover:bg-gray-50 transition">
+              Annuler
+            </button>
+            <button type="submit" :disabled="formLoading || !adminReportForm.reported_id || !adminReportForm.reason" class="grow py-4 rounded-2xl font-bold bg-red-600 text-white hover:bg-red-700 shadow-xl shadow-red-100 transition active:scale-[0.98] flex items-center justify-center">
+              <Loader2 v-if="formLoading" class="w-5 h-5 animate-spin mr-2" />
+              <Flag v-else class="w-5 h-5 mr-2" />
+              <span>Confirmer le signalement</span>
             </button>
           </div>
         </form>

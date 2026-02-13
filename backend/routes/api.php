@@ -35,6 +35,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/messages/{userId}', [\App\Http\Controllers\Api\MessageController::class, 'show']);
     Route::post('/messages/{userId}/read', [\App\Http\Controllers\Api\MessageController::class, 'markAsRead']);
     Route::post('/messages', [\App\Http\Controllers\Api\MessageController::class, 'store']);
+    Route::delete('/messages/{id}', [\App\Http\Controllers\Api\MessageController::class, 'destroy']);
 
     // Review routes
     Route::get('/reviews/provider', [\App\Http\Controllers\Api\ReviewController::class, 'providerReviews']);
@@ -43,15 +44,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/reviews/{id}', [\App\Http\Controllers\Api\ReviewController::class, 'update']);
     Route::delete('/reviews/{id}', [\App\Http\Controllers\Api\ReviewController::class, 'destroy']);
 
+    // Notifications
+    Route::get('/notifications', [\App\Http\Controllers\Api\NotificationController::class, 'index']);
+    Route::post('/notifications/{id}/read', [\App\Http\Controllers\Api\NotificationController::class, 'markAsRead']);
+    Route::post('/notifications/read-all', [\App\Http\Controllers\Api\NotificationController::class, 'markAllAsRead']);
+    Route::delete('/notifications/{id}', [\App\Http\Controllers\Api\NotificationController::class, 'destroy']);
+
     // Security & Account
     Route::post('/password/update', [\App\Http\Controllers\Api\AuthController::class, 'updatePassword']);
     Route::delete('/account/delete', [\App\Http\Controllers\Api\AuthController::class, 'deleteAccount']);
 
-    // Provider browsing (accessible by all auth users)
-    Route::prefix('provider')->group(function () {
-        Route::get('/', [\App\Http\Controllers\Api\ProviderController::class, 'index']);
-        Route::get('/{id}', [\App\Http\Controllers\Api\ProviderController::class, 'show']);
-    });
 
     // Provider profile management (restricted to providers)
     Route::middleware(['role:provider'])->prefix('provider')->group(function () {
@@ -112,6 +114,10 @@ Route::middleware('auth:sanctum')->group(function () {
         // Security Logs & Alerts
         Route::get('/logs', [\App\Http\Controllers\Api\AdminController::class, 'logs']);
         Route::get('/alerts', [\App\Http\Controllers\Api\AdminController::class, 'securityAlerts']);
+
+        // Badge Management
+        Route::get('/badges', [\App\Http\Controllers\Api\AdminController::class, 'badgesList']);
+        Route::put('/badges/{id}', [\App\Http\Controllers\Api\AdminController::class, 'updateBadge']);
     });
 });
 
@@ -131,3 +137,14 @@ Route::get('/auth/{provider}/callback', [\App\Http\Controllers\Api\SocialAuthCon
 // Password Reset (Public)
 Route::post('/password/forgot', [\App\Http\Controllers\Api\PasswordResetController::class, 'forgotSubmit']);
 Route::post('/password/reset', [\App\Http\Controllers\Api\PasswordResetController::class, 'resetSubmit']);
+
+// Provider (Public)
+Route::prefix('provider')->group(function () {
+    Route::get('/', [\App\Http\Controllers\Api\ProviderController::class, 'index']);
+    Route::get('/{id}', [\App\Http\Controllers\Api\ProviderController::class, 'show']);
+});
+
+// Fallback login route for Sanctum/Broadcasting redirects
+Route::get('/login', function () {
+    return response()->json(['message' => 'Unauthenticated.'], 401);
+})->name('login');

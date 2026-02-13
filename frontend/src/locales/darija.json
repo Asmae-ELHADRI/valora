@@ -18,6 +18,8 @@
     "footer_quote": "« بنادم كيبان معدنو فاش كيتعذب »",
     "save": "سجل",
     "cancel": "لغي",
+    "security": "الأمان",
+    "quality": "الجودة",
     "delete": "مسح",
     "edit": "بدل",
     "close": "سد",
@@ -25,7 +27,9 @@
   },
   "home": {
     "hero_subtitle": "تثمين التميز ديال بنادم من خلال التمارة.",
-    "slogan": "\"قدّر <span class=\"text-[#8B5E3C] italic font-playfair lowercase\">المجهود</span> لي كيبيّن بنادم\"",
+    "slogan_part1": "قدّر",
+    "slogan_highlight": "المجهود",
+    "slogan_part2": "لي كيبيّن بنادم",
     "hero_badge": "الحرفة بين يديك",
     "hero_desc": "فالورا هي الملاقية بين القيمة والتمارة. هنا فين كتحصد الموهبة ديال الحرايفية الاعتبار والاعتراف اللي كتستحق. حيث كنآمنو باللي باش تعز بنادم، خاصك تعز خدمتو وتميزو.",
     "cta_start": "بدا دابا",
@@ -126,7 +130,15 @@
     "nettoyage": "تجفاف",
     "maconnerie": "لمعلم دالبني",
     "couture": "خياطة",
-    "design_interieur": "ديزاين"
+    "design_interieur": "ديزاين",
+    "jardinage_paysagisme": "جردة وتنسيق",
+    "menage_nettoyage": "تجفاف ونقا",
+    "garde_enfants": "مقابلة الدراري",
+    "aide_domicile": "عوين فالدار",
+    "repassage": "حديد",
+    "cuisine_domicile": "طياب فالدار",
+    "construction_renovation": "بني وصليح",
+    "services_domicile": "خدمة الدار"
   },
   "search": {
     "title": "قلب على خدمة",

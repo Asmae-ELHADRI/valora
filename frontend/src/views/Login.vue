@@ -12,6 +12,7 @@ import {
 } from 'lucide-vue-next';
 import valoraLogo from '../assets/v-logo.png';
 import artisanBg from '../assets/auth-right-bg.jpg';
+import LanguageSwitcher from '../components/LanguageSwitcher.vue';
 
 const orbitIcons = [
   Hammer, Wrench, Paintbrush, PenTool, Zap, Scissors, Sprout, Camera
@@ -59,8 +60,7 @@ const clientForm = ref({
     prenom: '',
     email: '',
     password: '',
-    password_confirmation: '',
-    city: ''
+    password_confirmation: ''
 });
 
 // Provider Registration State
@@ -69,8 +69,7 @@ const providerForm = ref({
     prenom: '',
     email: '',
     password: '',
-    password_confirmation: '',
-    city: ''
+    password_confirmation: ''
 });
 
 const showPassword = ref(false);
@@ -89,6 +88,14 @@ const getErrorMessage = (err, defaultMsg) => {
     return err.response?.data?.message || defaultMsg;
 };
 
+const isProfileIncomplete = (user) => {
+    if (user.role !== 'provider') return false;
+    const p = user.prestataire;
+    if (!p) return true;
+    // Check for essential fields
+    return !p.city || !p.birth_date || !p.category_id;
+};
+
 const handleLogin = async () => {
     loading.value = true;
     error.value = '';
@@ -97,7 +104,13 @@ const handleLogin = async () => {
             email: loginForm.value.email, 
             password: loginForm.value.password 
         });
-        router.push('/dashboard');
+        
+        // Redirect based on role
+        if (auth.user?.role === 'provider') {
+            router.push('/dashboard-provider');
+        } else {
+            router.push('/dashboard');
+        }
     } catch (err) {
         const message = err.response?.data?.message;
         if (message === 'Votre compte a été désactivé par un administrateur.') {
@@ -121,7 +134,6 @@ const handleClientRegister = async () => {
             email: clientForm.value.email,
             password: clientForm.value.password,
             password_confirmation: clientForm.value.password_confirmation,
-            city: clientForm.value.city,
             role: 'client'
         });
         registrationSuccess.value = true;
@@ -142,11 +154,11 @@ const handleProviderRegister = async () => {
             email: providerForm.value.email,
             password: providerForm.value.password,
             password_confirmation: providerForm.value.password_confirmation,
-            city: providerForm.value.city,
             role: 'provider'
         });
         registrationSuccess.value = true;
-        setTimeout(() => router.push('/dashboard'), 1200);
+        // Redirect new providers directly to their dashboard
+        setTimeout(() => router.push('/dashboard-provider'), 1200);
     } catch (err) {
         error.value = getErrorMessage(err, 'auth.register_error');
     } finally {
@@ -178,32 +190,34 @@ const cities = [
     </div>
 
     <div class="relative z-10 w-full max-w-6xl">
-      <div class="grid lg:grid-cols-2 gap-12 items-center">
+      <div class="grid lg:grid-cols-2 gap-12 items-start">
         
         <!-- Left Side: Branding & Artisan Values -->
-        <div class="hidden lg:flex flex-col space-y-10 animate-fade-in px-8">
-           <div class="flex items-center space-x-12 relative">
-              <!-- Shared Logo Structure scaled up for Login -->
-              <div class="logo-container scale-[2.2] origin-left ml-4">
-                 <LanguageSwitcher class="absolute -top-6 -left-6 z-50 scale-50" />
-                 
-                 <img :src="valoraLogo" alt="VALORA Logo" class="logo-image" />
-                 <span class="text-3xl font-black tracking-tight logo-text logo-text-brown">
-                   VALORA
-                 </span>
+        <div class="hidden lg:flex flex-col items-start space-y-10 animate-fade-in px-8">
 
-                 <!-- Orbiting Icons attached to the shared container -->
-                 <div>
-                 </div>
-              </div>
-           </div>
+            <div class="space-y-12 w-full flex flex-col items-start">
+               <!-- Shared Logo Structure scaled up for Login -->
+               <div class="logo-container flex items-left scale-[2.5] origin-left mb-12">
+                  <LanguageSwitcher class="absolute -top-6 -left-4 z-50 scale-50" />
+                  
+                  <img :src="valoraLogo" alt="VALORA Logo" class="logo-image" />
+                  <span class="text-3xl font-black tracking-tight logo-text logo-text-brown">
+                    VALORA
+                  </span>
 
-            <div class="space-y-8">
+                  <!-- Orbiting Icons placeholder -->
+                  <div></div>
+               </div>
+
                <div class="inline-flex items-center space-x-3 px-6 py-3 bg-premium-yellow/10 border border-premium-yellow/20 text-premium-yellow rounded-full backdrop-blur-sm">
                   <span class="text-[10px] font-black uppercase tracking-[0.3em]">{{ $t('auth.vision_badge') }}</span>
                </div>
                
-                <h2 class="text-7xl font-black text-white tracking-tighter leading-[0.85]" v-html="$t('home.slogan')"></h2>
+                <h2 class="text-7xl font-black text-white tracking-tighter leading-[0.85]">
+                  {{ $t('home.slogan_part1') }}
+                  <span class="text-premium-yellow">{{ $t('home.slogan_highlight') }}</span>
+                  {{ $t('home.slogan_part2') }}
+                </h2>
 
                <div class="space-y-6 max-w-lg">
       
@@ -348,31 +362,6 @@ const cities = [
                                      <input v-model="clientForm.email" type="email" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl py-5 pl-14 pr-6 outline-none focus:ring-4 focus:ring-premium-blue/5 transition-all font-bold text-slate-700" :placeholder="$t('auth.email')">
                                      <Mail class="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-premium-blue transition-all" />
                                   </div>
-                                  <div class="relative group">
-                                     <div class="relative">
-                                         <input 
-                                             v-model="citySearch" 
-                                             type="text" 
-                                             :placeholder="clientForm.city || $t('auth.city')"
-                                             class="w-full bg-slate-50 border border-slate-200 rounded-2xl py-5 pl-14 pr-6 outline-none focus:ring-4 focus:ring-premium-blue/5 transition-all font-bold text-slate-700"
-                                         >
-                                         <MapPin class="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-premium-blue transition-all" />
-                                         
-                                         <!-- City suggestions -->
-                                         <div v-if="filteredCities.length > 0" class="absolute z-30 w-full mt-2 bg-white border border-slate-100 rounded-2xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-                                             <button 
-                                                 v-for="city in filteredCities" 
-                                                 :key="city"
-                                                 type="button"
-                                                 @click="selectCity(city, clientForm)"
-                                                 class="w-full px-5 py-3 text-left text-sm font-bold hover:bg-slate-50 transition-colors flex items-center justify-between group text-premium-blue"
-                                             >
-                                                 <span>{{ city }}</span>
-                                                 <MapPin class="w-4 h-4 text-slate-300 group-hover:text-premium-blue" />
-                                             </button>
-                                         </div>
-                                     </div>
-                                  </div>
                                   <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                      <div class="relative group">
                                         <input v-model="clientForm.password" :type="showPassword ? 'text' : 'password'" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl py-5 pl-14 pr-12 outline-none focus:ring-4 focus:ring-premium-blue/5 transition-all font-bold text-slate-700" :placeholder="$t('auth.password')">
@@ -413,31 +402,6 @@ const cities = [
                                     <div class="relative group">
                                         <input v-model="providerForm.email" type="email" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl py-5 pl-14 pr-6 outline-none focus:ring-4 focus:ring-premium-blue/5 transition-all font-bold text-slate-700" :placeholder="$t('auth.email')">
                                         <Mail class="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-premium-blue transition-all" />
-                                    </div>
-                                    <div class="relative group">
-                                        <div class="relative">
-                                            <input 
-                                                v-model="citySearch" 
-                                                type="text" 
-                                                :placeholder="providerForm.city || $t('auth.city')"
-                                                class="w-full bg-slate-50 border border-slate-200 rounded-2xl py-5 pl-14 pr-6 outline-none focus:ring-4 focus:ring-premium-blue/5 transition-all font-bold text-slate-700"
-                                            >
-                                            <MapPin class="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-premium-blue transition-all" />
-                                            
-                                            <!-- City suggestions -->
-                                            <div v-if="filteredCities.length > 0" class="absolute z-30 w-full mt-2 bg-white border border-slate-100 rounded-2xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-                                                <button 
-                                                    v-for="city in filteredCities" 
-                                                    :key="city"
-                                                    type="button"
-                                                    @click="selectCity(city, providerForm)"
-                                                    class="w-full px-5 py-3 text-left text-sm font-bold hover:bg-slate-50 transition-colors flex items-center justify-between group text-premium-blue"
-                                                >
-                                                    <span>{{ city }}</span>
-                                                    <MapPin class="w-4 h-4 text-slate-300 group-hover:text-premium-blue" />
-                                                </button>
-                                            </div>
-                                        </div>
                                     </div>
                                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div class="relative group">

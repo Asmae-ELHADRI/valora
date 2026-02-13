@@ -7,7 +7,7 @@ import {
   ChevronRight, X, Loader2, Info, User,
   MessageSquare, GraduationCap, Award, Send, CheckCircle, AlertCircle,
   ShieldAlert, Ban, ShieldCheck,
-  PenTool, Hammer, Paintbrush, Zap, Scissors, Sprout, Wrench, Utensils, Camera, Plus
+  PenTool, Hammer, Paintbrush, Zap, Scissors, Sprout, Wrench, Utensils, Camera
 } from 'lucide-vue-next';
 import { useRouter } from 'vue-router';
 
@@ -146,7 +146,7 @@ const submitInvitation = async () => {
     selectedOfferId.value = '';
     invitationMessage.value = '';
   } catch (err) {
-    alert(err.response?.data?.message || 'Erreur lors de l\'envoi');
+    alert(err.response?.data?.message || 'Erreur lors de l\'envois');
   } finally {
     inviting.value = false;
   }
@@ -194,19 +194,6 @@ const getBadgeClass = (level) => {
         default: return 'bg-gray-500 text-white shadow-lg shadow-gray-200';
     }
 };
-import { MOROCCAN_CITIES } from '../constants/cities';
-
-const citySearch = ref('');
-const filteredCities = computed(() => {
-    if (!citySearch.value) return [];
-    const search = citySearch.value.toLowerCase();
-    return MOROCCAN_CITIES.filter(city => city.toLowerCase().includes(search));
-});
-
-const selectCity = (city) => {
-    filters.value.location = city;
-    citySearch.value = '';
-};
 </script>
 
 <template>
@@ -218,7 +205,7 @@ const selectCity = (city) => {
 
     <!-- Search & Filter Bar -->
     <div class="bg-white p-4 rounded-3xl border border-gray-100 shadow-sm mb-8 space-y-4 md:space-y-0 md:flex md:items-center md:space-x-4">
-      <div class="relative flex-grow">
+      <div class="relative grow">
         <Search class="absolute left-4 top-3.5 w-5 h-5 text-gray-400" />
         <input 
           v-model="filters.keyword"
@@ -270,29 +257,9 @@ const selectCity = (city) => {
           <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Disponible le</label>
           <input v-model="filters.availability_date" type="date" class="w-full px-5 py-3.5 rounded-2xl border-none bg-white shadow-sm focus:ring-2 focus:ring-blue-500 outline-none text-sm font-bold text-gray-700">
         </div>
-        <div class="grow relative">
-          <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 pl-2">Localisation</label>
-          <div class="relative">
-            <input 
-                v-model="citySearch" 
-                type="text" 
-                :placeholder="filters.location || 'Ville...'" 
-                class="w-full px-5 py-3.5 rounded-2xl border-none bg-white shadow-sm focus:ring-2 focus:ring-blue-500 outline-none text-sm font-bold text-gray-700"
-            >
-            
-            <!-- City suggestions -->
-            <div v-if="filteredCities.length > 0" class="absolute z-50 w-full mt-2 bg-white border border-slate-100 rounded-2xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-                <button 
-                    v-for="city in filteredCities" 
-                    :key="city"
-                    @click="selectCity(city)"
-                    class="w-full px-5 py-3 text-left text-sm font-bold hover:bg-slate-50 transition-colors flex items-center justify-between group"
-                >
-                    <span>{{ city }}</span>
-                    <Plus class="w-4 h-4 text-slate-300 group-hover:text-slate-900" />
-                </button>
-            </div>
-          </div>
+        <div>
+          <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Localisation</label>
+          <input v-model="filters.location" type="text" placeholder="Ville..." class="w-full px-5 py-3.5 rounded-2xl border-none bg-white shadow-sm focus:ring-2 focus:ring-blue-500 outline-none text-sm font-bold text-gray-700">
         </div>
       </div>
 
@@ -377,19 +344,28 @@ const selectCity = (city) => {
             <MapPin class="w-4 h-4 mr-1.5" />
             {{ provider.address || 'Localisation non précisée' }}
           </div>
-          <button 
-            @click.stop="startConversation(provider.id)"
-            class="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition shadow-sm"
-            title="Contacter"
-          >
-            <MessageSquare class="w-5 h-5" />
-          </button>
+          <div class="flex items-center space-x-2">
+            <button 
+              @click.stop="selectedProvider = provider; showReportModal = true"
+              class="p-2.5 bg-orange-50 text-orange-600 rounded-xl hover:bg-orange-600 hover:text-white transition shadow-sm"
+              title="Signaler"
+            >
+              <ShieldAlert class="w-5 h-5" />
+            </button>
+            <button 
+              @click.stop="startConversation(provider.id)"
+              class="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition shadow-sm"
+              title="Contacter"
+            >
+              <MessageSquare class="w-5 h-5" />
+            </button>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- Provider Detail Modal -->
-    <div v-if="selectedProvider" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
+    <div v-if="selectedProvider" class="fixed inset-0 z-100 flex items-center justify-center p-4">
       <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" @click="closeProvider"></div>
       <div class="relative bg-white w-full max-w-3xl rounded-[40px] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300 max-h-[90vh] flex flex-col">
         <button @click="closeProvider" class="absolute top-6 right-6 p-2 rounded-2xl bg-gray-100 text-gray-500 hover:bg-red-50 hover:text-red-600 transition z-10">
@@ -399,7 +375,7 @@ const selectCity = (city) => {
         <div class="overflow-y-auto p-10">
           <div class="flex flex-col md:flex-row items-center md:items-start gap-8 mb-10">
             <!-- Avatar with Premium Orbit Border -->
-            <div class="relative w-40 h-40 flex-shrink-0 flex items-center justify-center">
+            <div class="relative w-40 h-40 shrink-0 flex items-center justify-center">
               <div class="absolute inset-0 border-4 border-dashed border-premium-yellow/30 rounded-full animate-spin-slow"></div>
               
               <!-- Orbiting Tools -->
@@ -424,7 +400,7 @@ const selectCity = (city) => {
               </div>
             </div>
             
-            <div class="flex-grow text-center md:text-left space-y-4">
+            <div class="grow text-center md:text-left space-y-4">
               <div>
                 <h2 class="text-4xl font-black text-gray-900 leading-tight">{{ selectedProvider.name }}</h2>
                 <div class="flex flex-wrap justify-center md:justify-start gap-2 mt-2">
@@ -558,7 +534,7 @@ const selectCity = (city) => {
           <button 
             v-if="auth.isClient"
             @click="openInviteModal"
-            class="flex-grow bg-blue-600 text-white py-5 px-8 rounded-3xl font-bold hover:bg-blue-700 shadow-xl shadow-blue-100 transition active:scale-[0.98] flex items-center justify-center space-x-3"
+            class="grow bg-blue-600 text-white py-5 px-8 rounded-3xl font-bold hover:bg-blue-700 shadow-xl shadow-blue-100 transition active:scale-[0.98] flex items-center justify-center space-x-3"
           >
             <Briefcase class="w-6 h-6" />
             <span>Proposer une mission</span>
@@ -566,7 +542,7 @@ const selectCity = (city) => {
           
           <button 
             @click="startConversation(selectedProvider.id)"
-            class="flex-grow bg-white text-blue-600 border-2 border-blue-50 py-5 px-8 rounded-3xl font-bold hover:bg-blue-50 transition active:scale-[0.98] flex items-center justify-center space-x-3"
+            class="grow bg-white text-blue-600 border-2 border-blue-50 py-5 px-8 rounded-3xl font-bold hover:bg-blue-50 transition active:scale-[0.98] flex items-center justify-center space-x-3"
           >
             <MessageSquare class="w-6 h-6" />
             <span>Contacter</span>
@@ -597,7 +573,7 @@ const selectCity = (city) => {
     </div>
 
     <!-- Invitation Modal -->
-    <div v-if="showInviteModal" class="fixed inset-0 z-[110] flex items-center justify-center p-4">
+    <div v-if="showInviteModal" class="fixed inset-0 z-110 flex items-center justify-center p-4">
       <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" @click="showInviteModal = false"></div>
       <div class="relative bg-white w-full max-w-lg rounded-[40px] shadow-2xl p-10 animate-in fade-in zoom-in duration-300">
         <button @click="showInviteModal = false" class="absolute top-6 right-6 p-2 rounded-2xl bg-gray-100 text-gray-500 hover:bg-red-50 hover:text-red-600 transition">
@@ -621,7 +597,7 @@ const selectCity = (city) => {
             </select>
           </div>
           <div v-else class="p-6 bg-yellow-50 rounded-2xl border border-yellow-100 flex items-start space-x-3">
-            <AlertCircle class="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+            <AlertCircle class="w-5 h-5 text-yellow-600 shrink-0 mt-0.5" />
             <p class="text-sm text-yellow-700 font-medium">Vous n'avez aucune offre ouverte. Veuillez <router-link to="/post-offer" class="underline font-bold">en créer une</router-link> avant d'inviter un prestataire.</p>
           </div>
 
@@ -650,7 +626,7 @@ const selectCity = (city) => {
     </div>
 
     <!-- Report Modal -->
-    <div v-if="showReportModal" class="fixed inset-0 z-[120] flex items-center justify-center p-4">
+    <div v-if="showReportModal" class="fixed inset-0 z-120 flex items-center justify-center p-4">
       <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" @click="showReportModal = false"></div>
       <div class="relative bg-white w-full max-w-lg rounded-[40px] shadow-2xl p-10 animate-in fade-in zoom-in duration-300">
         <div class="text-center mb-8">
@@ -676,15 +652,15 @@ const selectCity = (city) => {
             <textarea v-model="reportForm.description" rows="3" class="w-full px-5 py-4 rounded-2xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none font-medium text-gray-700"></textarea>
           </div>
           <div class="flex gap-4">
-            <button @click="showReportModal = false" class="flex-grow py-4 rounded-2xl font-bold border border-gray-200 text-gray-500 hover:bg-gray-50 transition">Annuler</button>
-            <button @click="submitReport" :disabled="reporting || !reportForm.reason" class="flex-grow py-4 rounded-2xl font-bold bg-orange-600 text-white hover:bg-orange-700 disabled:opacity-50 transition">Envoyer</button>
+            <button @click="showReportModal = false" class="grow py-4 rounded-2xl font-bold border border-gray-200 text-gray-500 hover:bg-gray-50 transition">Annuler</button>
+            <button @click="submitReport" :disabled="reporting || !reportForm.reason" class="grow py-4 rounded-2xl font-bold bg-orange-600 text-white hover:bg-orange-700 disabled:opacity-50 transition">Envoyer</button>
           </div>
         </div>
       </div>
     </div>
 
     <!-- Block Modal -->
-    <div v-if="showBlockModal" class="fixed inset-0 z-[120] flex items-center justify-center p-4">
+    <div v-if="showBlockModal" class="fixed inset-0 z-120 flex items-center justify-center p-4">
       <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" @click="showBlockModal = false"></div>
       <div class="relative bg-white w-full max-w-sm rounded-[40px] shadow-2xl p-10 animate-in fade-in zoom-in duration-300 text-center">
         <div class="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4 text-red-600">

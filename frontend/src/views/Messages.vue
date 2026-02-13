@@ -4,7 +4,7 @@ import { useAuthStore } from '../store/auth';
 import api from '../services/api';
 import echo from '../services/echo';
 import { useRoute } from 'vue-router';
-import { Send, User, MessageCircle, MoreVertical, Search, CheckCheck, ChevronLeft, CheckCircle, Paperclip, X, FileText, Loader2, Play, Mic, Ban, Trash2, StopCircle, Pause } from 'lucide-vue-next';
+import { Send, User, MessageCircle, MessageSquare, MoreVertical, Search, CheckCheck, ChevronLeft, CheckCircle, Paperclip, X, FileText, Loader2, Play, Mic, Ban, Trash2, StopCircle, Pause, Flag, ShieldAlert } from 'lucide-vue-next';
 
 const auth = useAuthStore();
 const route = useRoute();
@@ -35,6 +35,11 @@ const playingAudioId = ref(null);
 const audioElements = ref({}); // Map of audio elements refs
 const onlineUsers = ref([]);
 const currentTime = ref(Date.now());
+
+// Reporting State
+const showReportModal = ref(false);
+const reportReason = ref('');
+const isReporting = ref(false);
 
 const isOnline = (userId) => {
     return onlineUsers.value.some(u => u.id === userId);
@@ -142,6 +147,27 @@ const getBadgeClass = (level) => {
     }
 };
 
+const deleteMessage = async (msgId) => {
+    if (!confirm('Voulez-vous supprimer ce message ?')) return;
+    try {
+        await api.delete(`/api/messages/${msgId}`);
+        messages.value = messages.value.filter(m => m.id !== msgId);
+        
+        // Sync conversation preview if it was the last message
+        if (activeConversation.value?.last_message?.id === msgId) {
+            const nextLast = messages.value[messages.value.length - 1] || null;
+            activeConversation.value.last_message = nextLast;
+            const conv = conversations.value.find(c => c.user.id === activeConversation.value.user.id);
+            if (conv) {
+                conv.last_message = nextLast;
+                if (nextLast) conv.last_message_date = new Date(nextLast.created_at);
+            }
+        }
+    } catch (err) {
+        showErrorToast('Erreur lors de la suppression');
+    }
+};
+
 const selectConversation = async (conv) => {
     activeConversation.value = conv;
     conv.unread_count = 0; 
@@ -220,7 +246,7 @@ const cancelRecording = () => {
     if (mediaRecorder.value && isRecording.value) {
         mediaRecorder.value.stop(); // Will trigger onstop but we clear data after
         // We need to wait a tick for onstop to fire if we want to be clean, 
-        // but generally just resetting values is enough if we don't use the blob.
+        // but generally just resetting values is enough if we don't use the column.
     }
     
     isRecording.value = false;
@@ -293,6 +319,24 @@ const seekAudio = (msgId, event) => {
     if (!audio) return;
     const percent = event.target.value;
     audio.currentTime = (percent / 100) * audio.duration;
+};
+
+const submitReport = async () => {
+    if (!reportReason.value.trim()) return;
+    isReporting.value = true;
+    try {
+        await api.post('/api/report', {
+            reported_id: activeConversation.value.user.id,
+            reason: reportReason.value
+        });
+        showSuccessToast('Signalement envoyé avec succès');
+        showReportModal.value = false;
+        reportReason.value = '';
+    } catch (err) {
+        showErrorToast(err.response?.data?.message || 'Erreur lors de l\'envoi du signalement');
+    } finally {
+        isReporting.value = false;
+    }
 };
 
 const formatAudioTime = (seconds) => {
@@ -515,11 +559,12 @@ onMounted(() => {
 </script>
 
 <template>
+<div class="messages-page-wrapper">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 h-[calc(100vh-100px)] flex gap-6 overflow-hidden">
         <!-- Sidebar -->
         <div 
             v-show="showSidebar"
-            class="w-full md:w-1/3 bg-white border border-gray-100 rounded-[2rem] shadow-sm flex flex-col overflow-hidden transition-all duration-300"
+            class="w-full md:w-1/3 bg-white border border-gray-100 rounded-4xl shadow-sm flex flex-col overflow-hidden transition-all duration-300"
             :class="{ 'hidden md:flex': !showSidebar }"
         >
             <div class="p-6 border-b border-gray-50 bg-gray-50/50 flex justify-between items-center">
@@ -529,7 +574,7 @@ onMounted(() => {
                 </h2>
             </div>
             
-            <div class="flex-grow overflow-y-auto">
+            <div class="grow overflow-y-auto">
                 <div v-if="loading" class="p-10 flex justify-center">
                      <Loader2 class="w-8 h-8 text-blue-600 animate-spin" />
                 </div>
@@ -557,7 +602,7 @@ onMounted(() => {
                         </div>
                         <div class="flex justify-between items-center">
                             <p class="text-xs text-gray-400 truncate w-4/5">
-                                <span v-if="conv.last_message?.sender_id === auth.user.id">Vous: </span>
+                                <span v-if="conv.last_message?.sender_id === auth.user?.id">Vous: </span>
                                 {{ conv.last_message?.content || 'Début de conversation' }}
                             </p>
                             <span v-if="conv.unread_count > 0" class="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-lg shadow-red-100">
@@ -571,7 +616,7 @@ onMounted(() => {
 
         <!-- Chat Window -->
         <div 
-            class="flex-grow bg-white border border-gray-100 rounded-[2.5rem] shadow-sm flex flex-col overflow-hidden relative"
+            class="grow bg-white border border-gray-100 rounded-[2.5rem] shadow-sm flex flex-col overflow-hidden relative"
             :class="{ 'hidden md:flex': showSidebar, 'flex': !showSidebar }"
         >
             <template v-if="activeConversation">
@@ -604,13 +649,23 @@ onMounted(() => {
                           </div>
                      </div>
                     
-                    <button class="p-3 rounded-2xl text-gray-400 hover:bg-gray-50 transition">
-                        <MoreVertical class="w-5 h-5" />
-                    </button>
+                    <div class="flex items-center space-x-2">
+                        <button 
+                            @click="showReportModal = true"
+                            class="p-3 text-red-500 hover:bg-red-50 rounded-2xl transition group flex items-center space-x-2"
+                            title="Signaler cet utilisateur"
+                        >
+                            <ShieldAlert class="w-5 h-5 group-hover:scale-110 transition-transform" />
+                            <span class="text-xs font-black uppercase tracking-widest hidden sm:inline">Signaler</span>
+                        </button>
+                        <button class="p-3 rounded-2xl text-gray-400 hover:bg-gray-50 transition">
+                            <MoreVertical class="w-5 h-5" />
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Messages Area with Grouping -->
-                <div ref="messagesContainer" class="flex-grow overflow-y-auto p-8 space-y-8 bg-slate-50/50">
+                <div ref="messagesContainer" class="grow overflow-y-auto p-8 space-y-8 bg-slate-50/50">
                     <div v-for="group in groupedMessages" :key="group.date" class="space-y-6">
                         <!-- Date Separator -->
                         <div class="flex justify-center">
@@ -627,7 +682,7 @@ onMounted(() => {
                             class="flex"
                         >
                             <div 
-                                :class="msg.sender_id === auth.user.id 
+                                :class="msg.sender_id === auth.user?.id 
                                     ? 'bg-blue-600 text-white rounded-[20px] rounded-tr-none shadow-xl shadow-blue-100' 
                                     : 'bg-white text-gray-800 border border-gray-100 rounded-[20px] rounded-tl-none shadow-sm'"
                                 class="max-w-[80%] px-5 py-4 relative group transition-all hover:scale-[1.01]"
@@ -657,19 +712,19 @@ onMounted(() => {
                                     <!-- Audio Rendering -->
                                     <template v-else-if="msg.attachment_type === 'audio'">
                                         <div class="p-4 bg-opacity-10 rounded-2xl min-w-[260px] flex items-center gap-4 border"
-                                             :class="msg.sender_id === auth.user.id 
+                                             :class="msg.sender_id === auth.user?.id 
                                                 ? 'bg-blue-800 border-blue-500/30' 
                                                 : 'bg-gray-100 border-gray-200'"
                                         >
                                             <button @click="toggleAudio(msg.id)" 
                                                 class="w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 shadow-md transform hover:scale-105"
-                                                :class="msg.sender_id === auth.user.id ? 'bg-white text-blue-600' : 'bg-blue-600 text-white'"
+                                                :class="msg.sender_id === auth.user?.id ? 'bg-white text-blue-600' : 'bg-blue-600 text-white'"
                                             >
                                                 <Pause v-if="msg.isPlaying" class="w-5 h-5 fill-current" />
                                                 <Play v-else class="w-5 h-5 fill-current ml-1" />
                                             </button>
                                             
-                                            <div class="flex-grow space-y-2">
+                                            <div class="grow space-y-2">
                                                  <input 
                                                     type="range" 
                                                     min="0" 
@@ -678,11 +733,11 @@ onMounted(() => {
                                                     @input="seekAudio(msg.id, $event)"
                                                     class="w-full h-1.5 rounded-full appearance-none cursor-pointer"
                                                     :style="{ 
-                                                        background: `linear-gradient(to right, ${msg.sender_id === auth.user.id ? 'white' : '#2563eb'} 0%, ${msg.sender_id === auth.user.id ? 'white' : '#2563eb'} ${msg.progress || 0}%, ${msg.sender_id === auth.user.id ? 'rgba(255,255,255,0.3)' : '#e2e8f0'} ${msg.progress || 0}%, ${msg.sender_id === auth.user.id ? 'rgba(255,255,255,0.3)' : '#e2e8f0'} 100%)` 
+                                                        background: `linear-gradient(to right, ${msg.sender_id === auth.user?.id ? 'white' : '#2563eb'} 0%, ${msg.sender_id === auth.user?.id ? 'white' : '#2563eb'} ${msg.progress || 0}%, ${msg.sender_id === auth.user?.id ? 'rgba(255,255,255,0.3)' : '#e2e8f0'} ${msg.progress || 0}%, ${msg.sender_id === auth.user?.id ? 'rgba(255,255,255,0.3)' : '#e2e8f0'} 100%)` 
                                                     }"
                                                 />
                                                 <div class="flex justify-between text-[10px] font-bold uppercase tracking-wider"
-                                                     :class="msg.sender_id === auth.user.id ? 'text-blue-100' : 'text-gray-400'"
+                                                     :class="msg.sender_id === auth.user?.id ? 'text-blue-100' : 'text-gray-400'"
                                                 >
                                                     <span>{{ formatAudioTime(msg.currentTime) }}</span>
                                                     <span>{{ formatAudioTime(msg.duration) }}</span>
@@ -706,7 +761,7 @@ onMounted(() => {
                                             <div class="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-sm">
                                                 <FileText class="w-5 h-5 text-blue-600" />
                                             </div>
-                                            <div class="flex-grow min-w-0">
+                                            <div class="grow min-w-0">
                                                 <p class="text-xs font-bold text-gray-700 truncate">{{ msg.attachment_path.split('/').pop() }}</p>
                                                 <p class="text-[10px] text-gray-400 uppercase font-black">{{ msg.attachment_type || 'Fichier' }}</p>
                                             </div>
@@ -731,12 +786,20 @@ onMounted(() => {
                                 </div>
                                 <p v-if="msg.content" class="text-sm font-medium leading-relaxed">{{ msg.content }}</p>
                                 <div 
-                                    :class="msg.sender_id === auth.user.id ? 'text-blue-100' : 'text-gray-400'"
+                                    :class="msg.sender_id === auth.user?.id ? 'text-blue-100' : 'text-gray-400'"
                                     class="text-[9px] font-bold mt-2 flex items-center justify-end space-x-1 uppercase tracking-tighter"
                                 >
+                                    <button 
+                                        v-if="msg.sender_id === auth.user?.id && !msg.pending" 
+                                        @click="deleteMessage(msg.id)"
+                                        class="mr-auto opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:text-red-300"
+                                        title="Supprimer"
+                                    >
+                                        <Trash2 class="w-3 h-3" />
+                                    </button>
                                     <span v-if="msg.error" class="text-red-300 mr-2 font-black">Échec de l'envoi</span>
                                     <span>{{ formatTime(msg.created_at) }}</span>
-                                    <CheckCheck v-if="msg.sender_id === auth.user.id && !msg.pending && !msg.error" class="w-3 h-3" />
+                                    <CheckCheck v-if="msg.sender_id === auth.user?.id && !msg.pending && !msg.error" class="w-3 h-3" />
                                     <Loader2 v-if="msg.pending" class="w-3 h-3 animate-spin" />
                                 </div>
                             </div>
@@ -760,7 +823,7 @@ onMounted(() => {
                     </div>
                     <form @submit.prevent="sendMessage" class="flex items-center space-x-3">
                          <!-- Audio Recording Mode -->
-                        <div v-if="isRecording" class="flex-grow flex items-center px-2 py-2 rounded-2xl relative overflow-hidden transition-all duration-300">
+                        <div v-if="isRecording" class="grow flex items-center px-2 py-2 rounded-2xl relative overflow-hidden transition-all duration-300">
                              <!-- Glassmorphism Background -->
                             <div class="absolute inset-0 bg-red-500/10 backdrop-blur-md border border-red-500/20 rounded-2xl z-0"></div>
                             
@@ -789,11 +852,11 @@ onMounted(() => {
                         </div>
 
                         <!-- Audio Preview Mode -->
-                        <div v-else-if="audioBlob" class="flex-grow flex items-center px-4 py-3 rounded-2xl border border-blue-100 bg-blue-50">
-                             <div class="w-10 h-10 bg-white rounded-full flex items-center justify-center mr-3 shadow-sm">
-                                <Mic class="w-5 h-5 text-blue-500" />
-                             </div>
-                             <audio controls :src="audioPreviewUrl" class="flex-grow h-8 mr-4 custom-audio"></audio>
+                        <div v-else-if="audioBlob" class="grow flex items-center px-4 py-3 rounded-2xl border border-blue-100 bg-blue-50">
+                            <div class="w-10 h-10 bg-white rounded-full flex items-center justify-center mr-3 shadow-sm">
+                               <Mic class="w-5 h-5 text-blue-500" />
+                            </div>
+                            <audio controls :src="audioPreviewUrl" class="grow h-8 mr-4 custom-audio"></audio>
                              <button @click="cancelRecording" type="button" class="p-2 text-gray-400 hover:text-red-500 transition">
                                 <X class="w-5 h-5" />
                              </button>
@@ -819,7 +882,7 @@ onMounted(() => {
                                 v-model="newMessage"
                                 type="text" 
                                 placeholder="Tapez un message..." 
-                                class="flex-grow px-6 py-4 rounded-2xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition font-medium text-sm"
+                                class="grow px-6 py-4 rounded-2xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition font-medium text-sm"
                             >
                             
                             <!-- Record Button (Visible if no text) -->
@@ -845,8 +908,8 @@ onMounted(() => {
                 </div>
             </template>
             
-            <div v-else class="flex-grow flex flex-col items-center justify-center text-gray-400 p-10 bg-slate-50/50">
-                <div class="w-24 h-24 bg-white rounded-[2rem] shadow-sm border border-gray-100 flex items-center justify-center mb-6">
+            <div v-else class="grow flex flex-col items-center justify-center text-gray-400 p-10 bg-slate-50/50">
+                <div class="w-24 h-24 bg-white rounded-4xl shadow-sm border border-gray-100 flex items-center justify-center mb-6">
                     <MessageCircle class="w-10 h-10 text-blue-100" />
                 </div>
                 <h3 class="font-black text-gray-900 text-xl">Vos conversations</h3>
@@ -862,14 +925,14 @@ onMounted(() => {
                 'shadow-red-100 border-red-100': toastType === 'error',
                 'shadow-blue-100 border-blue-100': toastType === 'info'
              }"
-             class="fixed top-6 left-1/2 transform -translate-x-1/2 z-[200] flex items-center bg-white px-6 py-4 rounded-2xl shadow-2xl border min-w-[300px] max-w-[90vw]"
+             class="fixed top-6 left-1/2 transform -translate-x-1/2 z-200 flex items-center bg-white px-6 py-4 rounded-2xl shadow-2xl border min-w-[300px] max-w-[90vw]"
         >
             <div :class="{
                 'bg-green-100': toastType === 'success',
                 'bg-red-100': toastType === 'error',
                 'bg-blue-100': toastType === 'info'
             }"
-                 class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center mr-4">
+                 class="shrink-0 w-10 h-10 rounded-full flex items-center justify-center mr-4">
                 <CheckCircle v-if="toastType === 'success'" class="w-6 h-6 text-green-600" />
                 <X v-else-if="toastType === 'error'" class="w-6 h-6 text-red-600" />
                 <MessageSquare v-else class="w-6 h-6 text-blue-600" />
@@ -882,6 +945,52 @@ onMounted(() => {
             </div>
         </div>
     </Transition>
+
+    <!-- Report User Modal -->
+    <div v-if="showReportModal" class="fixed inset-0 z-100 flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" @click="showReportModal = false"></div>
+        <div class="relative bg-white w-full max-w-lg rounded-4xl shadow-2xl p-10 animate-in fade-in zoom-in duration-300">
+            <div class="flex items-center space-x-4 mb-8">
+                <div class="w-12 h-12 bg-red-100 rounded-2xl flex items-center justify-center text-red-600 shadow-sm shadow-red-50">
+                    <ShieldAlert class="w-6 h-6" />
+                </div>
+                <div>
+                    <h3 class="text-2xl font-black text-gray-900 leading-none">Signaler un utilisateur</h3>
+                    <p class="text-gray-500 text-sm font-medium mt-2">Signaler {{ activeConversation?.user?.name }} aux administrateurs.</p>
+                </div>
+            </div>
+
+            <div class="space-y-6">
+                <div class="space-y-3">
+                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Pourquoi signalez-vous cet utilisateur ?</label>
+                    <textarea 
+                        v-model="reportReason"
+                        rows="4"
+                        placeholder="Ex: Arnaque, comportement inapproprié, harcèlement..."
+                        class="w-full px-6 py-4 bg-gray-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-red-500 transition resize-none font-medium text-gray-900"
+                    ></textarea>
+                </div>
+
+                <div class="pt-4 flex gap-4">
+                    <button 
+                        @click="showReportModal = false" 
+                        class="grow py-4 rounded-2xl font-black text-gray-400 hover:bg-gray-50 transition uppercase text-xs tracking-widest"
+                    >
+                        Annuler
+                    </button>
+                    <button 
+                        @click="submitReport"
+                        :disabled="!reportReason.trim() || isReporting"
+                        class="grow py-4 rounded-2xl font-black bg-red-600 text-white hover:bg-red-700 shadow-xl shadow-red-100 transition active:scale-[0.98] flex items-center justify-center disabled:opacity-50 uppercase text-xs tracking-widest"
+                    >
+                        <Loader2 v-if="isReporting" class="w-5 h-5 animate-spin mr-2" />
+                        <span>Confirmer le signalement</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 </template>
 
 <style scoped>

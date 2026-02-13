@@ -18,16 +18,7 @@ import LanguageSwitcher from '../components/LanguageSwitcher.vue';
 const auth = useAuthStore();
 const router = useRouter();
 
-const artisans = ref([
-  { id: 1, name: 'asmae El Mansouri', category: 'plomberie', logo: 'https://i.pravatar.cc/150?u=1' },
-  { id: 2, name: 'ayub akil', category: 'design_interieur', logo: 'https://i.pravatar.cc/150?u=2' },
-  { id: 3, name: 'Karima Bennani', category: 'electricite', logo: 'https://i.pravatar.cc/150?u=3' },
-  { id: 4, name: 'Maroua salmi', category: 'jardinage', logo: 'https://i.pravatar.cc/150?u=4' },
-  { id: 5, name: 'Yassine Radi', category: 'peinture', logo: 'https://i.pravatar.cc/150?u=5' },
-  { id: 6, name: 'Leila Amrani', category: 'nettoyage', logo: 'https://i.pravatar.cc/150?u=6' },
-  { id: 7, name: 'doha bekhtaoui', category: 'maconnerie', logo: 'https://i.pravatar.cc/150?u=7' },
-  { id: 8, name: 'Fatima Zahra el houssaini', category: 'couture', logo: 'https://i.pravatar.cc/150?u=8' },
-]);
+const artisans = ref([]);
 
 const offers = ref([
   { id: 1, title: 'Rénovation Cuisine', category: 'btp', city: 'Casablanca', salary: '2500 MAD' },
@@ -57,7 +48,6 @@ const fetchLatestOffers = async () => {
   try {
     const response = await api.get('/api/offers');
     if (response.data.data) {
-      // Use real offers if available, otherwise keep defaults
       offers.value = response.data.data.slice(0, 3).map(o => ({
         id: o.id,
         title: o.title,
@@ -71,6 +61,24 @@ const fetchLatestOffers = async () => {
   }
 };
 
+const fetchArtisans = async () => {
+  try {
+    const response = await api.get('/api/provider');
+    if (response.data.data) {
+      artisans.value = response.data.data.slice(0, 4).map(u => ({
+        id: u.id,
+        name: u.first_name ? `${u.first_name} ${u.last_name}` : u.name,
+        category: u.prestataire?.categories?.[0]?.name || 'Service',
+        logo: u.prestataire?.photo 
+          ? (u.prestataire.photo.startsWith('http') ? u.prestataire.photo : `${api.defaults.baseURL}/storage/${u.prestataire.photo}`)
+          : `https://ui-avatars.com/api/?name=${u.name}&background=random`
+      }));
+    }
+  } catch (err) {
+    console.error('Erreur lors du chargement des artisans:', err);
+  }
+};
+
 const handleApply = (offerId) => {
   if (!auth.isAuthenticated) {
     router.push('/login');
@@ -80,9 +88,19 @@ const handleApply = (offerId) => {
   }
 };
 
+const getCategoryKey = (name) => {
+  if (!name) return 'service';
+  return name.toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // remove accents
+    .replace(/ & /g, '_')
+    .replace(/ /g, '_')
+    .replace(/[^a-z0-9_]/g, '');
+};
+
 onMounted(() => {
   isVisible.value = true;
   fetchLatestOffers();
+  fetchArtisans();
 });
 </script>
 
@@ -97,14 +115,6 @@ onMounted(() => {
         <div class="absolute bottom-[20%] right-[10%] w-[500px] h-[500px] bg-[#8B5E3C]/5 rounded-full blur-[120px]"></div>
       </div>
 
-      <!-- Navigation -->
-      <nav class="absolute top-0 left-0 w-full p-8 flex justify-between items-center z-30">
-        <div class="flex items-center space-x-2 bg-white/50 backdrop-blur-md px-4 py-2 rounded-full border border-white/50 shadow-sm">
-          <div class="w-2 h-2 bg-[#F4C430] rounded-full animate-pulse"></div>
-          <span class="text-[10px] font-black uppercase tracking-widest">{{ $t('home.hero_badge', 'LE TALENT À PORTÉE DE MAIN') }}</span>
-        </div>
-        <LanguageSwitcher />
-      </nav>
 
       <!-- Centerpiece Section -->
       <div class="relative z-10 flex flex-col items-center justify-center w-full max-w-4xl pt-20">
@@ -123,7 +133,11 @@ onMounted(() => {
 
         <!-- Slogan (Now Directly Below Logo) -->
         <div class="mt-4 text-center px-3 transition-all duration-1000 delay-500 transform" :class="isVisible ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'">
-          <h2 class="text-2xl md:text-5xl font-black text-[#1A2B4C] leading-tight whitespace-nowrap" v-html="$t('home.slogan')"></h2>
+          <h2 class="text-2xl md:text-5xl font-black text-[#1A2B4C] leading-tight">
+            "{{ $t('home.slogan_part1') }} 
+            <span class="text-[#8B5E3C] italic font-playfair lowercase">{{ $t('home.slogan_highlight') }}</span> 
+            {{ $t('home.slogan_part2') }}"
+          </h2>
         </div>
       </div>
 
@@ -163,7 +177,9 @@ onMounted(() => {
             </div>
             <div>
               <h3 class="text-xl font-bold tracking-tight">{{ artisan.name }}</h3>
-              <p class="text-[#8B5E3C] group-hover:text-[#F4C430] font-black uppercase text-[10px] tracking-widest mt-1">{{ $t('categories.' + artisan.category) }}</p>
+              <p class="text-[#8B5E3C] group-hover:text-[#F4C430] font-black uppercase text-[10px] tracking-widest mt-1">
+                {{ $t('categories.' + getCategoryKey(artisan.category)) }}
+              </p>
             </div>
             <div class="w-12 h-1 bg-[#1A2B4C] group-hover:bg-[#F4C430] rounded-full transition-all group-hover:w-24"></div>
           </div>
@@ -227,7 +243,7 @@ onMounted(() => {
                   <Briefcase class="w-8 h-8 text-[#1A2B4C]" />
                 </div>
                 <div class="bg-[#FAF9F6] px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest text-slate-400 group-hover:bg-[#1A2B4C] group-hover:text-white transition-all">
-                  {{ $t('categories.' + offer.category) }}
+                  {{ $t('categories.' + getCategoryKey(offer.category)) }}
                 </div>
               </div>
               <div class="space-y-3">

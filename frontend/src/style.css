@@ -1,13 +1,42 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: var(--primary);
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-premium-blue: var(--premium-blue);
-  --color-premium-brown: var(--premium-brown);
-  --color-premium-yellow: var(--premium-yellow);
-  --color-premium-bg: var(--premium-bg);
+  --color-primary: #2563eb;
+  --color-background: #ffffff;
+  --color-foreground: #020817;
+  --color-premium-blue: #0f172a;
+  --color-premium-brown: #92400e;
+  --color-premium-yellow: #facc15;
+  --color-premium-bg: #f8fafc;
+
+  /* Animations */
+  --animate-spin-slow: spin 8s linear infinite;
+  --animate-fade-in: fade-in 0.8s ease-out forwards;
+  --animate-slide-up: slide-up 0.8s ease-out forwards;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @layer base {
@@ -25,7 +54,6 @@
     --background: #020817;
     --foreground: #ffffff;
   }
-
 
   body {
     @apply bg-background text-foreground antialiased;
@@ -71,14 +99,14 @@
     position: relative;
     display: inline-block;
     letter-spacing: 0.02em;
-    font-family: 'Playfair Display', serif;
+    font-family: "Playfair Display", serif;
     font-weight: 900;
   }
 
   .logo-text-brown {
     transition: color 0.5s ease;
     color: #ffffff;
-    text-shadow: 
+    text-shadow:
       2px 2px 0px #92400e,
       0 0 15px rgba(250, 204, 21, 0.3);
   }
@@ -90,7 +118,7 @@
 
   .logo-container:hover .logo-text-brown {
     color: #facc15;
-    text-shadow: 
+    text-shadow:
       2px 2px 0px #0f172a,
       0 0 25px rgba(250, 204, 21, 0.5);
   }

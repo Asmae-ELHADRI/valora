@@ -122,6 +122,13 @@ class ServiceRequestController extends Controller
             'status' => 'pending',
         ]);
 
+        // Notify Offer Owner
+        $offer->user->notify(new \App\Notifications\ServiceRequestNotification(
+            $serviceRequest, 
+            'Nouvelle candidature', 
+            "{$user->name} a postulé à votre offre \"{$offer->title}\"."
+        ));
+
         return response()->json([
             'message' => 'Candidature envoyée avec succès',
             'data' => $serviceRequest
@@ -158,6 +165,13 @@ class ServiceRequestController extends Controller
             'message' => $request->message,
             'status' => 'pending',
         ]);
+
+        // Notify Provider
+        $provider->notify(new \App\Notifications\ServiceRequestNotification(
+            $serviceRequest, 
+            'Nouvelle invitation', 
+            "{$user->name} vous a invité pour l'offre \"{$offer->title}\"."
+        ));
 
         return response()->json([
             'message' => 'Invitation envoyée avec succès',
@@ -198,6 +212,27 @@ class ServiceRequestController extends Controller
         $this->authorize('updateStatus', [$serviceRequest, $request->status]);
 
         $serviceRequest->update(['status' => $request->status]);
+
+        // Notify the other party about status change
+        $notifiedUser = ($request->user()->id === $serviceRequest->user_id) 
+            ? $serviceRequest->serviceOffer->user // If provider updates, notify client
+            : $serviceRequest->provider; // If client updates, notify provider
+
+        if ($notifiedUser) {
+            $statusLabels = [
+                'accepted' => 'acceptée',
+                'rejected' => 'refusée',
+                'completed' => 'terminée',
+                'cancelled' => 'annulée',
+            ];
+            $label = $statusLabels[$request->status] ?? $request->status;
+            
+            $notifiedUser->notify(new \App\Notifications\ServiceRequestNotification(
+                $serviceRequest,
+                'Mise à jour de mission',
+                "La mission \"{$serviceRequest->serviceOffer->title}\" a été {$label}."
+            ));
+        }
 
         // Side effects
         if ($request->status === 'accepted') {

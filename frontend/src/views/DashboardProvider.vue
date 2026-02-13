@@ -1,19 +1,68 @@
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue';
 import { useAuthStore } from '../store/auth';
+import { useRouter } from 'vue-router';
 import api from '../services/api';
-import { Search, FileText, Star, TrendingUp, Clock, CheckCircle, XCircle, MapPin, Loader2, User, Settings, LogOut, Power, MessageCircle, ShieldCheck, Award, Plus } from 'lucide-vue-next';
+import { Search, FileText, Star, TrendingUp, Clock, CheckCircle, Check, XCircle, MapPin, Loader2, User, Settings, LogOut, Power, MessageCircle, ShieldCheck, Award, Plus, ArrowRight, ChevronDown, Eye, EyeOff, Briefcase, Calendar, LifeBuoy, Smartphone, Mail, Fingerprint, X, PenTool, ChevronLeft, ChevronRight, Zap, Trophy, Coins, Users } from 'lucide-vue-next';
 import PhotoUploader from '../components/PhotoUploader.vue';
 import AvailabilityScheduler from '../components/AvailabilityScheduler.vue';
 
 const auth = useAuthStore();
+const router = useRouter();
 const applications = ref([]);
 const reviewsData = ref({ reviews: [], average_rating: 0, total_reviews: 0 });
 const categories = ref([]);
 const loading = ref(true);
 const activeTab = ref('overview');
 const saving = ref(false);
+const success = ref(null);
+const error = ref(null);
+const cvMode = ref(false); // Toggle between Edit and CV View
 const categorySearch = ref('');
+const currentStep = ref(1);
+
+const nextStep = () => {
+    if (currentStep.value < 3) currentStep.value++;
+};
+
+const prevStep = () => {
+    if (currentStep.value > 1) currentStep.value--;
+};
+
+const moroccanCities = [
+    'Agadir', 'Al Hoceima', 'Béni Mellal', 'Berkane', 'Berrechid', 'Casablanca', 
+    'Chefchaouen', 'Dakhla', 'El Jadida', 'Errachidia', 'Essaouira', 'Fès', 
+    'Fquih Ben Salah', 'Guelmim', 'Ifrane', 'Kénitra', 'Khemisset', 'Khénifra', 
+    'Khouribga', 'Ksar El Kebir', 'Larache', 'Marrakech', 'Meknès', 'Mohammédia', 
+    'Nador', 'Ouarzazate', 'Oujda', 'Rabat', 'Safi', 'Saidía', 'Salé', 'Settat', 
+    'Sidi Ifni', 'Sidi Kacem', 'Sidi Slimane', 'Tanger', 'Tan-Tan', 'Taroudant', 
+    'Taza', 'Tétouan', 'Tiznit'
+];
+
+const showCityDropdown = ref(false);
+const cityQuery = ref('');
+const filteredCities = computed(() => {
+    if (!cityQuery.value) return moroccanCities;
+    return moroccanCities.filter(city => 
+        city.toLowerCase().includes(cityQuery.value.toLowerCase())
+    );
+});
+
+const selectCity = (city) => {
+    profileForm.value.city = city;
+    showCityDropdown.value = false;
+    cityQuery.value = '';
+};
+
+// Fermer le dropdown au clic extérieur
+onMounted(() => {
+    window.addEventListener('click', (e) => {
+        const dropdown = document.getElementById('city-dropdown-container');
+        if (dropdown && !dropdown.contains(e.target)) {
+            showCityDropdown.value = false;
+        }
+    });
+});
 
 // Grouper les catégories par domaine
 const categoryGroups = {
@@ -71,7 +120,7 @@ const filteredCategoryGroups = computed(() => {
 });
 
 const selectedCategoriesCount = computed(() => {
-    return profileForm.value.category_ids.length;
+    return profileForm.value.category_ids?.length || 0;
 });
 
 const hasDiploma = ref('');
@@ -97,6 +146,8 @@ const profileForm = ref({
   experience: '',
   diplomas: '',
   hourly_rate: '',
+  category_ids: [],
+  is_visible: true,
   availabilities: {},
   description: [] // Detailed experiences list
 });
@@ -183,6 +234,12 @@ onMounted(async () => {
       await auth.fetchUser();
   }
   initProfileForm();
+  
+  // Auto-switch to CV mode if profile is sufficiently completed
+  if (profileCompletion.value >= 80) {
+      cvMode.value = true;
+  }
+  
   loading.value = false;
 });
 
@@ -193,6 +250,8 @@ watch(() => auth.user, () => {
 
 const saveProfile = async () => {
   saving.value = true;
+  success.value = null;
+  error.value = null;
   try {
     const dataToSend = {
         ...profileForm.value,
@@ -204,10 +263,16 @@ const saveProfile = async () => {
     // Save availability
     await api.post('/api/provider/availability', { availabilities: profileForm.value.availabilities });
     
-    alert('Profil mis à jour avec succès');
+    success.value = "Profil mis à jour avec succès !";
+    setTimeout(() => { success.value = null; }, 4000);
+    
+    // Switch to CV View automatically
+    cvMode.value = true;
+    currentStep.value = 1;
   } catch (err) {
     console.error(err);
-    alert('Erreur lors de la mise à jour du profil');
+    error.value = "Erreur lors de la mise à jour du profil.";
+    setTimeout(() => { error.value = null; }, 4000);
   } finally {
     saving.value = false;
   }
@@ -252,20 +317,45 @@ const deleteAccount = async () => {
 // Existing Stats & Helpers
 const profileCompletion = computed(() => {
     const fields = [
-        auth.user?.first_name,
-        auth.user?.last_name,
-        auth.user?.phone,
-        auth.user?.address,
-        auth.user?.prestataire?.birth_date,
-        auth.user?.prestataire?.cin,
-        auth.user?.prestataire?.city,
-        auth.user?.prestataire?.hourly_rate,
-        auth.user?.prestataire?.photo,
-        auth.user?.prestataire?.skills,
-        auth.user?.prestataire?.categories?.length > 0
+        profileForm.value.first_name,
+        profileForm.value.last_name,
+        profileForm.value.phone,
+        profileForm.value.address,
+        profileForm.value.birth_date,
+        profileForm.value.cin,
+        profileForm.value.city,
+        profileForm.value.hourly_rate,
+        auth.user?.prestataire?.photo_url,
+        profileForm.value.skills,
+        profileForm.value.category_ids?.length > 0
     ];
     const completedFields = fields.filter(f => f && (Array.isArray(f) ? f.length > 0 : true));
     return Math.round((completedFields.length / fields.length) * 100);
+});
+
+const currentBadge = computed(() => {
+    const count = auth.user?.prestataire?.missions_count || 0;
+    if (count >= 20) {
+        return { 
+            name: 'Premium', color: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-200', icon: Zap 
+        };
+    } else if (count >= 5) {
+        return { 
+            name: 'Or', color: 'text-yellow-600', bg: 'bg-yellow-50', border: 'border-yellow-200', icon: Star 
+        };
+    } else {
+        return { 
+            name: 'Bronze', color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200', icon: ShieldCheck 
+        };
+    }
+});
+
+const currentCategoryNames = computed(() => {
+    return auth.user?.prestataire?.categories?.map(c => c.name).join(', ') || 'Artisan';
+});
+
+const userFullName = computed(() => {
+  return `${profileForm.value.first_name} ${profileForm.value.last_name}`.trim() || auth.user?.name;
 });
 
 const activeMissions = computed(() => {
@@ -354,531 +444,1125 @@ const updateStatus = async (id, status) => {
     alert('Erreur lors de la mise à jour du statut');
   }
 };
+
+const orderedDays = computed(() => {
+    const dayKeys = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    const labels = {
+        monday: 'Lundi', tuesday: 'Mardi', wednesday: 'Mercredi', thursday: 'Jeudi',
+        friday: 'Vendredi', saturday: 'Samedi', sunday: 'Dimanche'
+    };
+    
+    return dayKeys.map(key => ({
+        key,
+        label: labels[key],
+        ...(profileForm.value.availabilities[key] || { active: false, start: '00:00', end: '00:00' })
+    }));
+});
 </script>
 
 <template>
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24">
-    <!-- Header: Bonjour + Profile Visibilty -->
-    <div class="flex justify-between items-center mb-6">
-        <div>
-            <h1 class="text-2xl font-black text-slate-900">Bonjour, {{ auth.user?.first_name || auth.user?.name }}</h1>
-            <div class="flex items-center space-x-2 mt-1">
-                <span v-if="visibility" class="flex items-center text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100 uppercase tracking-widest">
-                    <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full mr-1.5 animate-pulse"></span>
-                    Profil visible
-                </span>
-                 <span v-else class="flex items-center text-[10px] font-black text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-200 uppercase tracking-widest">
-                    <span class="w-1.5 h-1.5 bg-slate-400 rounded-full mr-1.5"></span>
-                    Invisible
-                </span>
-                <span v-if="nextLevel" class="text-[10px] text-slate-400 font-medium ml-2">Plus que {{ nextLevel.remaining }} pts pour le badge <span class="font-black text-slate-600">{{ nextLevel.name }}</span></span>
-            </div>
-        </div>
-        <div class="w-12 h-12 rounded-full bg-white shadow-xl flex items-center justify-center border-4 border-white overflow-hidden group hover:scale-110 transition-transform duration-500">
-             <img 
-               v-if="auth.user?.prestataire?.photo_url" 
-               :src="auth.user.prestataire.photo_url" 
-               class="w-full h-full object-cover"
-            />
-            <div v-else class="w-full h-full flex items-center justify-center text-slate-300">
-                <User class="w-6 h-6" />
-            </div>
-        </div>
-    </div>
-
-    <!-- Profile Completion Banner (Dark) -->
-    <div class="bg-[#1e293b] rounded-[2rem] p-6 text-white shadow-xl relative overflow-hidden mb-8">
-        <div class="relative z-10">
-            <h2 class="text-xl font-black mb-2">{{ $t('provider_dashboard.banner.title') }}</h2>
-            <p class="text-slate-300 text-xs mb-6 font-medium leading-relaxed max-w-[90%]">{{ $t('provider_dashboard.banner.desc') }}</p>
-            
-            <div class="flex items-center space-x-4 mb-6">
-                <div class="flex-1 bg-slate-700/50 rounded-full h-2">
-                    <div :style="{ width: profileCompletion + '%' }" class="bg-premium-yellow h-full rounded-full shadow-[0_0_10px_rgba(250,204,21,0.5)]"></div>
+  <div :class="cvMode ? 'max-w-[1500px]' : 'max-w-7xl'" class="mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-32 font-sans selection:bg-premium-yellow selection:text-slate-900 overflow-x-hidden transition-all duration-700">
+    <!-- Modern Notifications -->
+    <Transition name="fade">
+        <div v-if="success || error" class="fixed top-24 left-1/2 -translate-x-1/2 z-50 w-full max-w-md px-6 pointer-events-none">
+            <div :class="success ? 'bg-emerald-600 shadow-emerald-500/20' : 'bg-red-600 shadow-red-500/20'" class="p-4 rounded-4xl text-white shadow-2xl backdrop-blur-md flex items-center space-x-4 animate-in slide-in-from-top-10 duration-500 pointer-events-auto">
+                <div class="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">
+                    <CheckCircle v-if="success" class="w-6 h-6" />
+                    <XCircle v-else class="w-6 h-6" />
                 </div>
-                <span class="font-black text-premium-yellow text-sm">{{ profileCompletion }}%</span>
+                <p class="font-black text-xs uppercase tracking-widest leading-tight grow">{{ success || error }}</p>
+                <button @click="success = null; error = null" class="w-8 h-8 rounded-xl hover:bg-white/10 transition-colors flex items-center justify-center">
+                    <X class="w-4 h-4" />
+                </button>
             </div>
-
-            <button @click="activeTab = 'profile'" class="w-full bg-premium-yellow text-slate-900 py-3.5 rounded-xl font-black text-sm hover:bg-yellow-400 transition-colors shadow-lg shadow-yellow-500/20">
-                {{ $t('provider_dashboard.banner.cta') }}
-            </button>
         </div>
-        <!-- Decor -->
-         <div class="absolute top-0 right-0 w-32 h-32 bg-slate-800 rounded-full blur-[60px] opacity-50"></div>
-    </div>
+    </Transition>
 
-    <!-- Reputation Card -->
-    <div class="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 mb-8">
-        <h3 class="font-bold text-slate-900 text-sm mb-6">{{ $t('provider_dashboard.reputation.title') }}</h3>
+    <!-- Header: Premium Greetings -->
+    <div class="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+        <div class="space-y-2">
+            <div class="inline-flex items-center space-x-2 bg-premium-yellow/10 px-4 py-1.5 rounded-full border border-premium-yellow/20">
+                <div class="w-1.5 h-1.5 bg-premium-yellow rounded-full animate-pulse"></div>
+                <span class="text-[10px] font-black uppercase tracking-[0.2em] text-premium-brown">Espace Professionnel</span>
+            </div>
+            <h1 class="text-4xl md:text-6xl font-black text-slate-900 tracking-tighter">
+                Bonjour, <span class="text-premium-brown">{{ auth.user?.first_name || auth.user?.name }}</span>
+            </h1>
+            <div class="flex items-center space-x-3">
+                <div v-if="visibility" class="flex items-center px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full border border-emerald-100 text-[10px] font-black uppercase tracking-widest">
+                    <CheckCircle class="w-3 h-3 mr-1.5" />
+                    Profil en ligne
+                </div>
+                <div v-else class="flex items-center px-3 py-1 bg-slate-50 text-slate-400 rounded-full border border-slate-200 text-[10px] font-black uppercase tracking-widest">
+                    <XCircle class="w-3 h-3 mr-1.5" />
+                    Profil masqué
+                </div>
+                <div v-if="nextLevel" class="text-[10px] text-slate-400 font-bold">
+                    {{ nextLevel.remaining }} pts pour le badge <span class="text-slate-900">{{ nextLevel.name }}</span>
+                </div>
+            </div>
+        </div>
         
-        <div class="flex items-center gap-6">
-            <!-- Circular Progress -->
-            <div class="relative w-24 h-24 shrink-0">
-                <svg class="w-full h-full transform -rotate-90">
-                    <circle cx="48" cy="48" r="40" stroke="#f1f5f9" stroke-width="8" fill="transparent" />
-                    <circle 
-                        cx="48" cy="48" r="40" stroke="#3b82f6" stroke-width="8" fill="transparent" 
-                        :stroke-dasharray="251.2" 
-                        :stroke-dashoffset="251.2 - (Math.min(auth.user?.prestataire?.pro_score || 0, 300) / 300) * 251.2"
-                        stroke-linecap="round"
-                    />
-                </svg>
-                <div class="absolute inset-0 flex flex-col items-center justify-center">
-                    <span class="text-2xl font-black text-slate-900">{{ auth.user?.prestataire?.pro_score || 0 }}</span>
-                    <span class="text-[8px] font-black text-slate-400 uppercase">Pro Score</span>
+        <div class="relative group cursor-pointer" @click="activeTab = 'profile'">
+            <div class="w-20 h-20 md:w-24 md:h-24 rounded-[2.5rem] bg-white shadow-2xl border-4 border-white overflow-hidden transition-transform duration-500 group-hover:scale-105 group-hover:rotate-3">
+                <img 
+                   v-if="auth.user?.prestataire?.photo_url" 
+                   :src="auth.user.prestataire.photo_url" 
+                   class="w-full h-full object-cover"
+                />
+                <div v-else class="w-full h-full flex items-center justify-center text-slate-200 bg-slate-50">
+                    <User class="w-10 h-10" />
                 </div>
-                <!-- Small dot indicator -->
-                 <div class="absolute top-1 right-2 w-2 h-2 bg-blue-500 rounded-full border border-white"></div>
             </div>
-
-            <div class="flex flex-col gap-3 w-full">
-                 <div class="bg-[#FFF8F3] px-4 py-3 rounded-2xl border border-[#FFE8D6] flex justify-between items-center w-full">
-                    <span class="text-[9px] font-black text-[#9A3412] uppercase tracking-widest">{{ $t('provider_dashboard.reputation.missions') }}</span>
-                    <span class="text-sm font-black text-[#9A3412]">+{{ (auth.user?.prestataire?.completed_missions_count || 0) * 10 }} <span class="text-[9px]">pts</span></span>
-                </div>
-                <div class="bg-[#FFF9C4]/30 px-4 py-3 rounded-2xl border border-yellow-100 flex justify-between items-center w-full">
-                    <span class="text-[9px] font-black text-yellow-700 uppercase tracking-widest">{{ $t('provider_dashboard.reputation.quality') }}</span>
-                    <span class="text-sm font-black text-yellow-700">+{{ Math.round((auth.user?.prestataire?.rating || 0) * 20) }} <span class="text-[9px]">pts</span></span>
-                </div>
+            <div class="absolute -bottom-2 -right-2 bg-premium-yellow p-2.5 rounded-2xl shadow-xl transform rotate-12 group-hover:rotate-0 transition-all border-4 border-white">
+                <Settings class="w-4 h-4 text-slate-900" />
             </div>
         </div>
     </div>
 
-    <!-- Main Content Tabs -->
-    <div class="flex space-x-6 border-b border-gray-100 mb-8 overflow-x-auto scrollbar-hide pb-1">
-      <button @click="activeTab = 'overview'" :class="activeTab === 'overview' ? 'text-slate-900 border-premium-yellow' : 'text-slate-400 border-transparent'" class="pb-3 border-b-2 font-bold text-sm transition-colors whitespace-nowrap">Vue d'ensemble</button>
-      <button @click="activeTab = 'profile'" :class="activeTab === 'profile' ? 'text-slate-900 border-premium-yellow' : 'text-slate-400 border-transparent'" class="pb-3 border-b-2 font-bold text-sm transition-colors whitespace-nowrap">Mon Profil</button>
-      <button @click="activeTab = 'settings'" :class="activeTab === 'settings' ? 'text-slate-900 border-premium-yellow' : 'text-slate-400 border-transparent'" class="pb-3 border-b-2 font-bold text-sm transition-colors whitespace-nowrap">Paramètres</button>
-    </div>
-
-    <div v-show="activeTab === 'overview'">
-        <!-- Certification Card -->
-        <div v-if="auth.user?.prestataire?.is_certified" class="bg-gradient-to-br from-premium-blue to-slate-800 rounded-[2rem] p-8 mb-8 text-white shadow-2xl relative overflow-hidden group">
-            <div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-                <div class="flex items-center space-x-6">
-                    <div class="w-16 h-16 bg-premium-yellow rounded-2xl flex items-center justify-center shadow-lg shadow-yellow-500/20 transform group-hover:rotate-6 transition-transform">
-                        <ShieldCheck class="w-10 h-10 text-premium-blue" />
+    <!-- Main Grid Layout -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
+        
+        <!-- Sidebar: Stats & Progress -->
+        <div class="lg:col-span-4 space-y-8 sticky top-28">
+            <!-- Profile Completion Card (Wizard style) -->
+            <div class="bg-slate-900 rounded-[3rem] p-8 text-white shadow-2xl relative overflow-hidden group">
+                <div class="relative z-10 space-y-8">
+                    <div class="space-y-2">
+                        <h3 class="text-2xl font-black tracking-tight">Optimisez votre vitrine</h3>
+                        <p class="text-slate-400 text-xs font-medium leading-relaxed">
+                            Complétez votre profil pour apparaître en tête des résultats de recherche.
+                        </p>
                     </div>
-                    <div>
-                        <h2 class="text-2xl font-black tracking-tight">Prestataire Certifié <span class="text-premium-yellow">Valora</span></h2>
-                        <p class="text-slate-300 text-xs font-medium uppercase tracking-[0.2em] mt-1 italic">Engagement & Excellence Vérifiés</p>
-                    </div>
-                </div>
-                <router-link to="/certificate" class="bg-white text-premium-blue px-8 py-4 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-premium-yellow hover:scale-105 transition-all shadow-xl active:scale-95 text-center">
-                    Voir mon certificat
-                </router-link>
-            </div>
-            <!-- Decorative circle -->
-            <div class="absolute -bottom-20 -right-20 w-64 h-64 bg-premium-yellow/10 rounded-full blur-3xl"></div>
-            <div class="absolute top-2 right-4 opacity-10">
-                <Award class="w-32 h-32" />
-            </div>
-        </div>
 
-        <!-- Quick Stats -->
-        <div class="grid grid-cols-3 gap-3 mb-10">
-            <div class="bg-white p-4 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col items-center text-center">
-                <div class="w-8 h-8 rounded-full bg-purple-50 flex items-center justify-center mb-2">
-                    <FileText class="w-4 h-4 text-purple-600" />
-                </div>
-                <span class="text-[9px] text-slate-400 font-bold leading-tight mb-1">Total Candidatures</span>
-                <span class="text-xl font-black text-slate-900">{{ stats.total }}</span>
-            </div>
-            <div class="bg-white p-4 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col items-center text-center">
-                <div class="w-8 h-8 rounded-full bg-yellow-50 flex items-center justify-center mb-2">
-                    <Star class="w-4 h-4 text-yellow-600" />
-                </div>
-                <span class="text-[9px] text-slate-400 font-bold leading-tight mb-1">Note moyenne</span>
-                 <div class="flex flex-col">
-                    <span class="text-xl font-black text-slate-900">{{ reviewsData.average_rating }}</span>
-                    <span class="text-[8px] text-slate-300 font-bold">({{ reviewsData.total_reviews }} avis)</span>
-                 </div>
-            </div>
-            <div class="bg-white p-4 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col items-center text-center">
-                <div class="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center mb-2">
-                    <TrendingUp class="w-4 h-4 text-blue-600" />
-                </div>
-                <span class="text-[9px] text-slate-400 font-bold leading-tight mb-1">Missions réussies</span>
-                <span class="text-xl font-black text-slate-900">{{ stats.completed }}</span>
-            </div>
-        </div>
-
-        <!-- Missions en cours -->
-        <div class="mb-10">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="font-black text-lg text-slate-900">Missions en cours</h3>
-                <span v-if="activeMissions.length > 0" class="bg-blue-100 text-blue-700 text-[9px] px-2 py-0.5 rounded font-black uppercase tracking-wider">{{ activeMissions.length }} Active</span>
-            </div>
-
-            <div v-if="activeMissions.length === 0" class="bg-white rounded-[2rem] p-8 text-center border border-dashed border-slate-200">
-                <p class="text-slate-400 text-sm font-medium">Aucune mission en cours</p>
-                <router-link to="/search" class="text-premium-yellow text-xs font-black mt-2 inline-block">TROUVER UNE MISSION</router-link>
-            </div>
-
-            <div v-else class="space-y-4">
-                <div v-for="mission in activeMissions" :key="mission.id" class="bg-white p-5 rounded-[2rem] border border-slate-100 shadow-sm">
-                    <div class="flex items-start gap-4 mb-4">
-                        <div class="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center shrink-0">
-                            <Briefcase class="w-6 h-6 text-blue-600" />
+                    <div class="space-y-4">
+                        <div class="flex justify-between items-end">
+                            <div class="space-y-1">
+                                <span class="text-[10px] font-black uppercase tracking-[0.2em] text-premium-yellow opacity-80">Score de complétion</span>
+                                <div class="text-[8px] text-slate-500 font-bold uppercase tracking-widest">Profil Public</div>
+                            </div>
+                            <div class="flex items-baseline space-x-1">
+                                <span class="text-4xl font-black text-white tracking-tighter">{{ profileCompletion }}</span>
+                                <span class="text-sm font-black text-premium-yellow">%</span>
+                            </div>
                         </div>
-                        <div>
-                            <h4 class="font-bold text-slate-900 text-sm leading-tight mb-1">{{ mission.service_offer?.title }}</h4>
-                            <p class="text-[10px] text-slate-400 font-medium">{{ mission.service_offer?.user?.name }}</p>
+                        <div class="h-4 bg-white/5 rounded-2xl overflow-hidden p-1 border border-white/5 shadow-inner">
+                            <div 
+                                class="h-full bg-linear-to-r from-premium-yellow via-yellow-400 to-yellow-500 rounded-xl shadow-[0_0_20px_rgba(250,204,21,0.3)] transition-all duration-1000 relative"
+                                :style="{ width: profileCompletion + '%' }"
+                            >
+                                <div class="absolute inset-0 bg-linear-to-b from-white/20 to-transparent"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Decor -->
+                <div class="absolute -top-20 -right-20 w-48 h-48 bg-premium-yellow/10 rounded-full blur-3xl"></div>
+                <div class="absolute bottom-10 left-4 opacity-5 pointer-events-none">
+                    <TrendingUp class="w-32 h-32" />
+                </div>
+            </div>
+
+            <!-- Pro Score Card -->
+            <div class="bg-white rounded-[3rem] p-8 shadow-sm border border-slate-100 relative group overflow-hidden">
+                <div class="flex items-center justify-between mb-8">
+                    <h3 class="font-black text-slate-900 text-sm uppercase tracking-widest">Reputation</h3>
+                    <Award class="w-5 h-5 text-premium-brown" />
+                </div>
+
+                <div class="flex items-center gap-8 mb-8">
+                    <div class="relative w-28 h-28 flex items-center justify-center">
+                        <svg class="w-full h-full transform -rotate-90">
+                            <circle cx="56" cy="56" r="50" stroke="#f1f5f9" stroke-width="8" fill="transparent" />
+                            <circle 
+                                cx="56" cy="56" r="50" stroke="#0f172a" stroke-width="10" fill="transparent" 
+                                :stroke-dasharray="314" 
+                                :stroke-dashoffset="314 - (Math.min(auth.user?.prestataire?.pro_score || 0, 300) / 300) * 314"
+                                stroke-linecap="round"
+                                class="transition-all duration-1000"
+                            />
+                        </svg>
+                        <div class="absolute inset-0 flex flex-col items-center justify-center">
+                            <span class="text-3xl font-black text-slate-900 tracking-tighter">{{ auth.user?.prestataire?.pro_score || 0 }}</span>
+                            <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest text-center leading-none">Pro<br>Score</span>
                         </div>
                     </div>
                     
-                    <!-- Progress Bar Mockup -->
-                    <div class="mb-4">
-                        <div class="flex justify-between text-[10px] mb-1">
-                            <span class="text-slate-400 font-medium">Progression</span>
-                            <span class="font-black text-slate-900">75%</span>
+                    <div class="space-y-4 flex-1">
+                        <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100 group-hover:border-premium-yellow transition-colors">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Missions</span>
+                                <span class="text-xs font-black text-slate-900">+{{ (auth.user?.prestataire?.completed_missions_count || 0) * 10 }}</span>
+                            </div>
+                            <div class="h-1 bg-slate-200 rounded-full">
+                                <div class="h-full bg-slate-900 rounded-full" :style="{ width: '60%' }"></div>
+                            </div>
                         </div>
-                        <div class="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                            <div class="h-full bg-premium-yellow rounded-full w-3/4"></div>
-                        </div>
-                    </div>
-
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center text-[10px] bg-slate-50 px-3 py-1.5 rounded-lg text-slate-500 font-bold">
-                            <Calendar class="w-3 h-3 mr-1.5 text-slate-400" />
-                            {{ formatDate(mission.service_offer?.desired_date) }}
-                        </div>
-                        <button class="bg-premium-yellow text-slate-900 px-5 py-2 rounded-xl text-xs font-black hover:bg-yellow-400 transition" @click="$router.push(`/mission/${mission.id}`)">
-                            Gérer
-                        </button>
-                    </div>
+                        <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100 group-hover:border-premium-yellow transition-colors">
+                             <div class="flex justify-between items-center mb-1">
+                                <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Qualité</span>
+                                <span class="text-xs font-black text-slate-900">+{{ Math.round((auth.user?.prestataire?.rating || 0) * 20) }}</span>
+                            </div>
+                            <div class="h-1 bg-slate-200 rounded-full">
+                                <div class="h-full bg-premium-yellow rounded-full" :style="{ width: '80%' }"></div>
+                            </div>
                 </div>
             </div>
-        </div>
-
-        <!-- Candidatures en attente (Yellow Border Style) -->
-        <div class="mb-10">
-            <h3 class="font-black text-lg text-slate-900 mb-4">Candidatures en attente</h3>
-            
-            <div v-if="pendingApplications.length === 0" class="text-center py-6">
-                <p class="text-slate-400 text-xs">Aucune candidature en attente</p>
-            </div>
-
-            <div v-else class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div v-for="app in pendingApplications" :key="app.id" class="bg-white p-5 rounded-[2rem] border-2 border-premium-yellow/50 hover:border-premium-yellow transition shadow-sm">
-                     <div class="flex justify-between items-start mb-2">
-                        <h4 class="font-bold text-slate-900 text-sm w-2/3 truncate">{{ app.service_offer?.title }}</h4>
-                        <!-- Hourglass placeholder icon for pending -->
-                        <Loader2 class="w-4 h-4 text-premium-yellow animate-spin-slow" />
-                     </div>
-                     <p class="text-[10px] text-slate-400 mb-4">{{ app.service_offer?.user?.name }} • Il y a 2 jours</p>
-                     
-                     <div class="flex justify-between items-center">
-                        <span class="text-[9px] font-black text-slate-400 bg-slate-50 px-2 py-1 rounded uppercase tracking-wider">En examen</span>
-                        <div class="w-6 h-6 rounded-full bg-yellow-50 flex items-center justify-center text-yellow-600">
-                           <Clock class="w-3 h-3" />
-                        </div>
-                     </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Historique (Green Check Style) -->
-        <div class="mb-10">
-            <h3 class="font-black text-lg text-slate-900 mb-4">Historique des missions</h3>
-            
-            <div class="space-y-3">
-                 <div v-for="app in activeMissions.filter(m => m.status === 'completed')" :key="app.id" class="bg-white p-4 rounded-[2rem] shadow-sm border border-slate-100 flex items-center justify-between">
-                    <div class="flex items-center gap-4">
-                        <div class="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center shrink-0">
-                            <CheckCircle class="w-5 h-5 text-green-500" />
-                        </div>
-                        <div>
-                            <h4 class="font-bold text-slate-900 text-sm leading-tight">{{ app.service_offer?.title }}</h4>
-                            <p class="text-[10px] text-slate-400">{{ app.service_offer?.user?.name }} • {{ formatDate(app.updated_at) }}</p>
-                        </div>
-                    </div>
-                    <span class="text-[8px] font-black bg-blue-50 text-blue-600 px-2 py-1 rounded uppercase">Terminé</span>
-                 </div>
-                 <!-- Fake history item if empty for visualization -->
-                 <div v-if="activeMissions.filter(m => m.status === 'completed').length === 0" class="bg-white p-4 rounded-[2rem] shadow-sm border border-slate-100 flex items-center justify-between opacity-60">
-                    <div class="flex items-center gap-4">
-                        <div class="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center shrink-0">
-                            <CheckCircle class="w-5 h-5 text-green-500" />
-                        </div>
-                        <div>
-                             <h4 class="font-bold text-slate-900 text-sm leading-tight">Audit SEO Mobile</h4>
-                             <p class="text-[10px] text-slate-400">Retail Group • Sept 2024</p>
-                        </div>
-                    </div>
-                    <span class="text-[8px] font-black bg-blue-50 text-blue-600 px-2 py-1 rounded uppercase">Terminé</span>
-                 </div>
-            </div>
-        </div>
-
-        <!-- Derniers avis clients (Dark Card) -->
-        <div class="bg-[#0f172a] rounded-[2rem] p-8 text-white shadow-xl">
-             <h3 class="font-black text-lg mb-6">Derniers avis clients</h3>
-             
-             <div v-if="reviewsData.reviews.length > 0">
-                 <div class="flex text-yellow-400 mb-3">
-                     <Star v-for="i in 5" :key="i" :class="i <= reviewsData.reviews[0].rating ? 'fill-current' : 'text-slate-600'" class="w-4 h-4" />
-                 </div>
-                 <p class="text-sm text-slate-300 italic font-medium leading-relaxed mb-6">"{{ reviewsData.reviews[0].comment }}"</p>
-                 <div class="flex items-center gap-3">
-                     <div class="w-10 h-10 rounded-full bg-[#fae8ff] flex items-center justify-center text-[#86198f] font-black text-xs">
-                         {{ reviewsData.reviews[0].reviewer?.name.substring(0,2).toUpperCase() }}
-                     </div>
-                     <div>
-                         <p class="font-bold text-sm">{{ reviewsData.reviews[0].reviewer?.name }}</p>
-                         <p class="text-[10px] text-slate-500 uppercase font-black">Client</p>
-                     </div>
-                 </div>
-             </div>
-             <div v-else>
-                 <div class="flex text-yellow-400 mb-3">
-                     <Star v-for="i in 5" :key="i" class="w-4 h-4 fill-current" />
-                 </div>
-                 <p class="text-sm text-slate-300 italic font-medium leading-relaxed mb-6">"Un travail d'une qualité exceptionnelle sur notre design system. Très réactif et force de proposition. Je recommande vivement !"</p>
-                 <div class="flex items-center gap-3">
-                     <div class="w-10 h-10 rounded-full bg-yellow-600/20 flex items-center justify-center text-yellow-500 font-black text-xs border border-yellow-600/30">
-                         JD
-                     </div>
-                     <div>
-                         <p class="font-bold text-sm">Jean Dupont</p>
-                         <p class="text-[10px] text-slate-500 uppercase font-black">CEO @ TechCorp</p>
-                     </div>
-                 </div>
-             </div>
         </div>
     </div>
+
+    <!-- Support Card -->
+    <div class="bg-indigo-600 p-8 rounded-[3rem] shadow-xl shadow-indigo-200 relative overflow-hidden group/support flex flex-col justify-between">
+        <div class="relative z-10 space-y-4">
+            <div class="w-12 h-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center">
+                <LifeBuoy class="w-6 h-6 text-white" />
+            </div>
+            <div class="space-y-1">
+                <h4 class="text-white font-black text-lg">{{ $t('common.support_title') }}</h4>
+                <p class="text-indigo-100 text-[10px] font-medium leading-relaxed">{{ $t('common.support_desc') }}</p>
+            </div>
+            <router-link to="/messages?userId=19" class="inline-flex items-center space-x-2 bg-white text-indigo-600 px-6 py-3 rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-premium-yellow hover:text-slate-900 transition-all shadow-lg active:scale-95">
+                <span>{{ $t('common.contact_admin') }}</span>
+                <ArrowRight class="w-4 h-4" />
+            </router-link>
+        </div>
+        <!-- Decor -->
+        <div class="absolute -bottom-10 -right-10 w-32 h-32 bg-white/10 rounded-full blur-2xl group-hover/support:scale-150 transition-transform duration-700"></div>
+    </div>
+</div>
+        <!-- Main Content Area -->
+        <div class="lg:col-span-8">
+
+            <!-- Navigation Tabs -->
+            <div class="flex items-center space-x-10 border-b border-slate-100 mb-10 pb-0.5 overflow-x-auto scrollbar-hide">
+                <button 
+                  v-for="tab in [
+                    { id: 'overview', label: 'Vue d\'ensemble' },
+                    { id: 'profile', label: 'Mon Profil & Vitrine' },
+                    { id: 'settings', label: 'Paramètres & Sécurité' }
+                  ]"
+                  :key="tab.id"
+                  @click="activeTab = tab.id"
+                  class="pb-5 relative group transition-all"
+                  :class="activeTab === tab.id ? 'text-slate-900' : 'text-slate-400 hover:text-slate-600'"
+                >
+                    <span class="text-sm font-black uppercase tracking-[0.2em]">{{ tab.label }}</span>
+                    <div class="absolute bottom-0 left-0 w-full h-1 bg-slate-900 rounded-full transition-all scale-x-0 group-hover:scale-x-50" :class="{ 'scale-x-100': activeTab === tab.id }"></div>
+                    <div v-if="tab.id === 'overview' && pendingApplications.length > 0" class="absolute -top-1 -right-4 w-4 h-4 bg-premium-yellow rounded-full flex items-center justify-center text-[8px] font-black text-slate-900 border-2 border-white animate-bounce-slow">
+                        {{ pendingApplications.length }}
+                    </div>
+                </button>
+            </div>
+
+            <!-- Content: Overview -->
+            <div v-if="activeTab === 'overview'" class="space-y-10 animate-in fade-in slide-in-from-bottom-5 duration-700">
+                <!-- Certification Status (If certified) -->
+                <div v-if="auth.user?.prestataire?.is_certified" class="bg-linear-to-br from-premium-blue to-slate-800 rounded-[3rem] p-10 text-white shadow-2xl relative overflow-hidden group">
+                    <div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
+                        <div class="flex items-center space-x-8">
+                            <div class="w-20 h-20 bg-premium-yellow rounded-3xl flex items-center justify-center shadow-2xl shadow-yellow-500/20 transform group-hover:rotate-6 transition-transform">
+                                <ShieldCheck class="w-12 h-12 text-premium-blue" />
+                            </div>
+                            <div class="space-y-2">
+                                <h2 class="text-3xl font-black tracking-tighter">Artisan Certifié <span class="text-premium-yellow">Valora</span></h2>
+                                <p class="text-slate-400 text-xs font-black uppercase tracking-[0.2em] italic flex items-center">
+                                    <CheckCircle class="w-3.5 h-3.5 mr-2 text-premium-yellow" />
+                                    Identité & Compétences Validées
+                                </p>
+                            </div>
+                        </div>
+                        <router-link to="/certificate" class="bg-white text-slate-900 px-10 py-5 rounded-[2rem] font-black text-xs uppercase tracking-widest hover:bg-premium-yellow hover:scale-105 transition-all shadow-2xl active:scale-95 text-center">
+                            Voir mon certificat
+                        </router-link>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                    <div v-for="stat in [
+                        { icon: FileText, label: 'Applications', value: stats.total, color: 'text-purple-600', bg: 'bg-purple-50' },
+                        { icon: Star, label: 'Note Moyenne', value: reviewsData.average_rating, color: 'text-amber-600', bg: 'bg-amber-50', sub: reviewsData.total_reviews + ' avis' },
+                        { icon: TrendingUp, label: 'Réussites', value: stats.completed, color: 'text-blue-600', bg: 'bg-blue-50' }
+                    ]" :key="stat.label" class="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm hover:shadow-xl transition-all duration-500 group">
+                        <div class="flex flex-col items-center text-center space-y-4">
+                            <div class="w-14 h-14 rounded-3xl flex items-center justify-center transition-transform group-hover:scale-110" :class="stat.bg">
+                                <component :is="stat.icon" class="w-7 h-7" :class="stat.color" />
+                            </div>
+                            <div>
+                                <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{{ stat.label }}</h4>
+                                <div class="text-3xl font-black text-slate-900 tracking-tighter">{{ stat.value }}</div>
+                                <p v-if="stat.sub" class="text-[9px] text-slate-400 font-bold mt-1 uppercase tracking-widest">{{ stat.sub }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Active Missions -->
+                <div class="space-y-6">
+                    <div class="flex items-center justify-between px-4">
+                        <h3 class="text-xl font-black text-slate-900 tracking-tight">Missions Actives</h3>
+                        <router-link to="/search" class="text-[10px] font-black text-premium-brown uppercase tracking-widest hover:text-slate-900 transition-colors">Explorer plus <ArrowRight class="inline w-3 h-3 ml-1" /></router-link>
+                    </div>
+
+                    <div v-if="activeMissions.length === 0" class="bg-white rounded-[3rem] p-16 text-center border-2 border-dashed border-slate-100 group hover:border-premium-yellow transition-colors cursor-pointer" @click="$router.push('/search')">
+                        <div class="max-w-xs mx-auto space-y-6">
+                            <div class="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto transition-transform group-hover:scale-110 group-hover:bg-premium-yellow/10">
+                                <Search class="w-8 h-8 text-slate-300 group-hover:text-premium-yellow" />
+                            </div>
+                            <p class="text-slate-400 text-sm font-medium">Vous n'avez aucune mission en cours. Commencez à postuler pour booster votre activité !</p>
+                            <span class="inline-block bg-slate-900 text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl">Rechercher des missions</span>
+                        </div>
+                    </div>
+
+                    <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div v-for="mission in activeMissions" :key="mission.id" class="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 group">
+                            <div class="space-y-6">
+                                <div class="flex justify-between items-start">
+                                    <div class="flex items-center space-x-4">
+                                        <div class="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center group-hover:bg-premium-yellow/20 transition-colors">
+                                            <Briefcase class="w-6 h-6 text-blue-600 group-hover:text-slate-900" />
+                                        </div>
+                                        <div>
+                                            <h4 class="font-black text-slate-900 text-sm leading-tight group-hover:text-premium-brown transition-colors">{{ mission.service_offer?.title }}</h4>
+                                            <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{{ mission.service_offer?.user?.name }}</p>
+                                        </div>
+                                    </div>
+                                    <div class="bg-emerald-50 text-emerald-600 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest">Active</div>
+                                </div>
+                                
+                                <div class="bg-slate-50 p-4 rounded-2xl space-y-3">
+                                    <div class="flex justify-between items-center text-[10px] font-bold text-slate-500">
+                                        <span>Progression</span>
+                                        <span class="text-slate-900">En cours</span>
+                                    </div>
+                                    <div class="h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                                        <div class="h-full bg-linear-to-r from-blue-500 to-blue-400 rounded-full w-2/3 shadow-sm"></div>
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center space-x-1.5 bg-slate-50 px-3 py-1.5 rounded-xl text-[10px] font-black text-slate-500">
+                                        <MapPin class="w-3 h-3" />
+                                        <span>{{ mission.service_offer?.city || 'Maroc' }}</span>
+                                    </div>
+                                    <button class="bg-slate-900 text-white px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-premium-yellow hover:text-slate-900 transition-all shadow-lg active:scale-95">
+                                        Détails
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Feedback -->
+                <div class="bg-slate-900 rounded-[3.5rem] p-10 text-white relative overflow-hidden group shadow-2xl shadow-slate-900/40">
+                    <div class="relative z-10 flex flex-col md:flex-row gap-10">
+                        <div class="md:w-1/3 space-y-4">
+                            <h3 class="text-2xl font-black tracking-tight">Derniers Avis</h3>
+                            <div class="flex items-center space-x-2">
+                                <div class="flex text-premium-yellow">
+                                    <Star v-for="i in 5" :key="i" class="w-5 h-5 fill-current" />
+                                </div>
+                                <span class="text-3xl font-black">{{ reviewsData.average_rating }}</span>
+                            </div>
+                            <p class="text-slate-400 text-xs font-medium leading-relaxed">
+                                Votre réputation est votre meilleur atout. Continuez à fournir un service d'excellence.
+                            </p>
+                        </div>
+
+                        <div class="flex-1">
+                            <div v-if="reviewsData.reviews.length > 0" class="space-y-6">
+                                <div class="bg-white/5 backdrop-blur-md p-8 rounded-[2.5rem] border border-white/10 relative">
+                                    <p class="text-lg italic text-slate-200 font-medium leading-relaxed mb-8">
+                                        "{{ reviewsData.reviews[0].comment }}"
+                                    </p>
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center space-x-4">
+                                            <div class="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center text-premium-yellow font-black text-sm">
+                                                {{ reviewsData.reviews[0].reviewer?.name.substring(0,2).toUpperCase() }}
+                                            </div>
+                                            <div>
+                                                <h5 class="text-sm font-black">{{ reviewsData.reviews[0].reviewer?.name }}</h5>
+                                                <p class="text-[10px] text-slate-500 font-bold uppercase tracking-widest italic">Client vérifié</p>
+                                            </div>
+                                        </div>
+                                        <div class="bg-white/10 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                            {{ formatDate(reviewsData.reviews[0].created_at) }}
+                                        </div>
+                                    </div>
+                                    <MessageCircle class="absolute top-6 right-8 w-12 h-12 text-white/5" />
+                                </div>
+                            </div>
+                            <div v-else class="h-full flex items-center justify-center border-2 border-dashed border-white/10 rounded-[2.5rem] py-12">
+                                <p class="text-slate-500 font-black uppercase tracking-widest text-[10px]">Aucun avis pour le moment</p>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Decor -->
+                     <div class="absolute -bottom-24 -left-24 w-64 h-64 bg-premium-yellow/5 rounded-full blur-3xl"></div>
+                </div>
+            </div>
     
     <!-- Other Tabs (Profile, Settings) kept simple for now or reused from previous structure if needed -->
     <!-- ... same as before but wrapped in v-show ... -->
 
 
-    <!-- TAB: PROFILE -->
-    <div v-show="activeTab === 'profile'" class="grid grid-cols-1 md:grid-cols-3 gap-8">
-        <!-- Left Col: Photo & Basic Info -->
-        <div class="md:col-span-1 space-y-6">
-            <!-- Photo Card -->
-            <div class="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100">
-                <h3 class="font-bold text-slate-900 text-lg mb-8">{{ $t('provider_dashboard.profile.photo') }}</h3>
-                <PhotoUploader 
-                    :current-photo="auth.user?.prestataire?.photo_url" 
-                    @photo-updated="handlePhotoUpdate" 
-                />
-            </div>
-            
-            <!-- Contact Info Card -->
-            <div class="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100">
-                <h3 class="font-bold text-slate-900 text-lg mb-8">{{ $t('provider_dashboard.profile.contact_info') }}</h3>
-                <div class="space-y-5">
-                     <div>
-                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 pl-1">{{ $t('provider_dashboard.profile.firstname') }}</label>
-                         <input v-model="profileForm.first_name" type="text" class="w-full px-5 py-3.5 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 outline-none transition-all font-medium text-slate-900 placeholder:text-slate-400">
-                     </div>
-                     <div>
-                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 pl-1">{{ $t('provider_dashboard.profile.lastname') }}</label>
-                         <input v-model="profileForm.last_name" type="text" class="w-full px-5 py-3.5 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 outline-none transition-all font-medium text-slate-900 placeholder:text-slate-400">
-                     </div>
-                     <div>
-                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 pl-1">Date de naissance</label>
-                         <input v-model="profileForm.birth_date" type="date" class="w-full px-5 py-3.5 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 outline-none transition-all font-medium text-slate-900 placeholder:text-slate-400">
-                     </div>
-                     <div>
-                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 pl-1">CIN</label>
-                         <input v-model="profileForm.cin" type="text" class="w-full px-5 py-3.5 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 outline-none transition-all font-medium text-slate-900 placeholder:text-slate-400">
-                     </div>
-                     <div>
-                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 pl-1">{{ $t('provider_dashboard.profile.phone') }}</label>
-                         <input v-model="profileForm.phone" type="text" class="w-full px-5 py-3.5 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 outline-none transition-all font-medium text-slate-900 placeholder:text-slate-400">
-                     </div>
-                     <div>
-                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 pl-1">Ville</label>
-                         <input v-model="profileForm.city" type="text" class="w-full px-5 py-3.5 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 outline-none transition-all font-medium text-slate-900 placeholder:text-slate-400">
-                     </div>
-                     <div>
-                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 pl-1">{{ $t('provider_dashboard.profile.address') }}</label>
-                         <input v-model="profileForm.address" type="text" class="w-full px-5 py-3.5 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 outline-none transition-all font-medium text-slate-900 placeholder:text-slate-400">
-                     </div>
+
+            <!-- TAB: PROFILE -->
+            <div v-show="activeTab === 'profile'" class="space-y-10 animate-in fade-in slide-in-from-bottom-5 duration-700">
+                <!-- CV / Edit Toggle -->
+                <div class="flex items-center justify-between bg-white p-4 rounded-3xl border border-slate-100 shadow-sm">
+                    <div class="flex items-center space-x-4 pl-4">
+                        <div class="p-2 bg-premium-yellow/10 rounded-xl">
+                            <Eye v-if="cvMode" class="w-5 h-5 text-premium-brown" />
+                            <PenTool v-else class="w-5 h-5 text-premium-brown" />
+                        </div>
+                        <h3 class="text-sm font-black text-slate-900 uppercase tracking-widest">
+                            {{ cvMode ? 'Aperçu de votre CV' : 'Modifier ma vitrine' }}
+                        </h3>
+                    </div>
+                    <button 
+                        @click="cvMode = !cvMode"
+                        class="flex items-center space-x-3 px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95"
+                        :class="cvMode ? 'bg-slate-900 text-white shadow-xl shadow-slate-900/20' : 'bg-premium-yellow text-slate-900 shadow-xl shadow-yellow-500/10 hover:bg-premium-brown hover:text-white'"
+                    >
+                        <span>{{ cvMode ? 'Mode Édition' : 'Aperçu CV' }}</span>
+                        <ArrowRight v-if="!cvMode" class="w-4 h-4" />
+                        <Settings v-else class="w-4 h-4" />
+                    </button>
                 </div>
-            </div>
-        </div>
 
-        <!-- Right Col: Professional Info & Availability -->
-        <div class="md:col-span-2 space-y-6">
-             <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                <h3 class="font-bold text-gray-900 mb-6">{{ $t('provider_dashboard.profile.pro_info') }}</h3>
-                
-                <div class="space-y-6">
-                    <div>
-                        <div class="flex items-center justify-between mb-4">
-                          <label class="block text-sm font-medium text-gray-700">{{ $t('provider_dashboard.profile.categories') }}</label>
-                          <span v-if="selectedCategoriesCount > 0" class="px-3 py-1 bg-premium-bg text-premium-brown text-xs rounded-full font-bold border border-premium-brown/20">
-                            {{ selectedCategoriesCount }} sélectionnée{{ selectedCategoriesCount > 1 ? 's' : '' }}
-                          </span>
-                        </div>
-                        
-                        <!-- Search Bar -->
-                        <div class="relative mb-4">
-                          <Search class="absolute left-3 top-3.5 w-4 h-4 text-gray-400" />
-                          <input 
-                            v-model="categorySearch" 
-                            type="text" 
-                            :placeholder="$t('provider_dashboard.profile.search_category')"
-                            class="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-premium-brown/20 focus:border-premium-brown outline-none transition text-sm"
-                          >
-                        </div>
-
-                        <!-- Grouped Categories -->
-                        <div class="space-y-6 max-h-96 overflow-y-auto pr-2">
-                          <div v-for="group in filteredCategoryGroups" :key="group.name" class="space-y-3">
-                            <h4 class="text-xs font-black text-premium-brown uppercase tracking-wider sticky top-0 bg-white py-2">
-                              {{ group.name }}
-                            </h4>
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                              <label 
-                                v-for="cat in group.categories" 
-                                :key="cat.id"
-                                :class="profileForm.category_ids.includes(cat.id) ? 'border-premium-brown bg-premium-bg' : 'border-gray-50'"
-                                class="flex items-center space-x-3 p-4 rounded-xl border-2 cursor-pointer transition-all hover:bg-premium-bg/50"
-                              >
-                                <input 
-                                  type="checkbox" 
-                                  :value="cat.id" 
-                                  v-model="profileForm.category_ids"
-                                  class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                >
-                                <span class="text-sm font-medium text-gray-700">{{ cat.name }}</span>
-                              </label>
-                            </div>
-                          </div>
-                          
-                          <div v-if="filteredCategoryGroups.length === 0" class="text-center py-8">
-                            <p class="text-gray-400 text-sm">{{ $t('provider_dashboard.profile.no_category') }}</p>
-                          </div>
-                        </div>
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">{{ $t('provider_dashboard.profile.skills') }}</label>
-                         <input v-model="profileForm.skills" type="text" class="w-full px-5 py-3 rounded-xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-premium-brown/20 focus:border-premium-brown outline-none transition-all" placeholder="Ex: Plomberie, Électricité, Jardinage...">
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Prestation salarial (Tarif MAD/H)</label>
-                         <input v-model="profileForm.hourly_rate" type="number" step="0.01" class="w-full px-5 py-3 rounded-xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-premium-brown/20 focus:border-premium-brown outline-none transition-all" placeholder="Ex: 150.00">
-                    </div>
-                </div>
-             </div>
-
-             <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                <h3 class="font-bold text-gray-900 mb-6">{{ $t('provider_dashboard.profile.experience_diplomas') }}</h3>
-                <div class="space-y-6">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">{{ $t('provider_dashboard.profile.experience') }}</label>
-                        <select v-model="profileForm.experience" class="w-full px-5 py-3 rounded-xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-premium-brown/20 focus:border-premium-brown outline-none transition-all font-medium text-gray-700 appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22m6%208%204%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-size-[1.25rem_1.25rem] bg-position-[right_1.25rem_center] bg-no-repeat mb-6">
-                            <option value="">Sélectionnez votre expérience</option>
-                            <option value="Débutant">Débutant</option>
-                            <option value="Entre 1 an et 2 ans">Entre 1 an et 2 ans</option>
-                            <option value="Plus de 4 ans">Plus de 4 ans</option>
-                        </select>
-
-                        <!-- Detailed Experiences List -->
-                        <div class="mt-8">
-                            <div class="flex items-center justify-between mb-4">
-                                <label class="block text-sm font-bold text-slate-700 uppercase tracking-wider">Vos expériences détaillées</label>
-                                <button 
-                                    @click="addDetailedExperience" 
-                                    type="button"
-                                    class="flex items-center space-x-1.5 px-3 py-1.5 bg-premium-bg text-premium-brown rounded-lg hover:bg-premium-brown/10 transition-colors text-xs font-bold"
-                                >
-                                    <Plus class="w-3.5 h-3.5" />
-                                    <span>Nouveau</span>
+                <!-- CV MODE VIEW (Refined Premium Design) -->
+                <div v-if="cvMode" class="space-y-10 xl:space-y-6 xl:scale-[0.98] xl:origin-top animate-in fade-in zoom-in-95 duration-500 pb-20 transition-all duration-700">
+                    
+                    <!-- Hero CV Card -->
+                    <div class="bg-white rounded-[4rem] shadow-2xl shadow-slate-200/50 border border-slate-100 overflow-hidden relative">
+                        <!-- Cover with Actions -->
+                        <div class="h-60 xl:h-48 bg-slate-900 relative overflow-hidden transition-all duration-700">
+                            <div class="absolute inset-0 bg-linear-to-r from-slate-900 via-slate-800 to-slate-900"></div>
+                            <div class="absolute top-0 right-0 w-96 h-96 bg-premium-yellow/10 rounded-full blur-3xl -mr-20 -mt-20"></div>
+                            <div class="absolute bottom-0 left-0 w-64 h-64 bg-premium-brown/20 rounded-full blur-3xl -ml-10 -mb-10"></div>
+                            
+                            <!-- Quick Management Actions -->
+                            <div class="absolute top-8 right-10 flex items-center space-x-4 z-20">
+                                <button @click="cvMode = false" class="bg-white/10 hover:bg-white/20 backdrop-blur-md text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-white/10 transition-all flex items-center space-x-2 group">
+                                    <PenTool class="w-4 h-4 text-premium-yellow group-hover:rotate-12 transition-transform" />
+                                    <span>Modifier</span>
+                                </button>
+                                <button @click="deleteAccount" class="bg-red-500/20 hover:bg-red-500/40 backdrop-blur-md text-red-100 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-red-500/20 transition-all flex items-center space-x-2 group">
+                                    <XCircle class="w-4 h-4 group-hover:scale-110 transition-transform" />
+                                    <span>Supprimer</span>
                                 </button>
                             </div>
 
-                            <div class="space-y-3">
-                                <div v-for="(exp, index) in profileForm.description" :key="index" class="flex gap-2 group animate-in slide-in-from-left-2 duration-200">
-                                    <div class="flex-1 relative">
-                                        <input 
-                                            v-model="profileForm.description[index]" 
-                                            type="text" 
-                                            class="w-full px-5 py-3 rounded-xl border border-gray-100 bg-white focus:ring-2 focus:ring-premium-brown/20 focus:border-premium-brown outline-none transition-all text-sm pr-10"
-                                            placeholder="Ex: 2 ans chez Entreprise X..."
-                                        >
+                            <!-- Decorative Badge Section -->
+                            <div class="absolute bottom-6 left-10 z-20 hidden md:block">
+                                <div class="px-4 py-2 bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 flex items-center space-x-3">
+                                    <div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                                    <span class="text-[9px] font-black text-white uppercase tracking-widest">Compte Vérifié & Actif</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="px-10 md:px-20 pb-16 xl:pb-10">
+                            <div class="flex flex-col md:flex-row gap-12 items-start -mt-24 relative z-10">
+                                <!-- Avatar Orb -->
+                                <div class="relative group/avatar">
+                                    <div class="w-48 h-48 xl:w-40 xl:h-40 rounded-[3.5rem] xl:rounded-[3rem] bg-slate-50 border-[10px] xl:border-[8px] border-white shadow-2xl overflow-hidden flex items-center justify-center relative z-10 transform group-hover/avatar:scale-105 transition-all duration-500">
+                                        <img v-if="auth.user?.prestataire?.photo_url" :src="auth.user.prestataire.photo_url" class="w-full h-full object-cover">
+                                        <User v-else class="w-20 h-20 text-slate-200" />
                                     </div>
-                                    <button 
-                                        @click="removeDetailedExperience(index)" 
-                                        type="button"
-                                        class="p-3 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                                    >
-                                        <XCircle class="w-5 h-5" />
-                                    </button>
+                                    <div class="absolute -bottom-4 -right-4 p-3 rounded-2xl shadow-2xl border-4 border-white z-20 flex items-center justify-center ring-8 ring-white/30" :class="currentBadge.bg" :title="`Badge ${currentBadge.name}`">
+                                        <component :is="currentBadge.icon" class="w-8 h-8" :class="currentBadge.color" />
+                                    </div>
                                 </div>
                                 
-                                <div v-if="profileForm.description.length === 0" class="text-center py-6 bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
-                                    <p class="text-xs text-gray-400">Cliquez sur "Nouveau" pour lister vos expériences spécifiques</p>
+                                <div class="md:pt-28 xl:pt-20 space-y-4 grow">
+                                    <div class="space-y-2">
+                                        <div class="flex flex-col md:flex-row md:items-center gap-3 md:gap-6">
+                                            <h2 class="text-3xl sm:text-4xl md:text-5xl font-black text-slate-900 tracking-tighter">{{ userFullName }}</h2>
+                                            <div class="flex items-center">
+                                                <div class="px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-[0.2em] border shadow-sm backdrop-blur-md" :class="[currentBadge.bg, currentBadge.border, currentBadge.color]">
+                                                    {{ currentBadge.name }}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="flex flex-wrap gap-x-6 gap-y-3 items-center text-sm font-bold text-slate-500">
+                                            <span class="flex items-center text-premium-brown bg-premium-yellow/5 px-3 py-1 rounded-lg border border-premium-yellow/10">
+                                                <Briefcase class="w-4 h-4 mr-2" />
+                                                {{ currentCategoryNames }}
+                                            </span>
+                                            <div class="flex items-center space-x-2">
+                                                <MapPin class="w-4 h-4 text-slate-400" />
+                                                <span>{{ profileForm.city || 'Maroc' }}</span>
+                                            </div>
+                                            <div class="flex items-center space-x-2">
+                                                <Star class="w-4 h-4 text-yellow-400 fill-current" />
+                                                <span class="text-slate-900">4.9</span>
+                                                <span class="text-[10px] text-slate-400 font-medium">Note moyenne</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="flex flex-wrap gap-2.5 pt-4">
+                                        <div v-for="skill in (profileForm.skills ? profileForm.skills.split(',') : [])" :key="skill" class="group/skill bg-slate-50 px-5 py-3 rounded-2xl text-[10px] font-bold uppercase tracking-widest text-slate-700 border border-slate-100 hover:bg-white hover:shadow-xl hover:shadow-premium-yellow/5 hover:border-premium-yellow/20 hover:-translate-y-1 transition-all duration-300 flex items-center space-x-2.5">
+                                            <div class="w-1.5 h-1.5 rounded-full bg-premium-yellow group-hover/skill:scale-150 transition-transform shadow-sm shadow-premium-yellow/50"></div>
+                                            <span>{{ skill.trim() }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="md:pt-28 xl:pt-20 shrink-0 flex flex-col items-end gap-5">
+                                    <div class="bg-slate-50/50 p-6 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-4 min-w-[200px] hover:shadow-xl transition-all duration-500 group/rate">
+                                        <div class="text-right space-y-1">
+                                            <div class="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 group-hover/rate:text-premium-brown transition-colors">Taux Horaire</div>
+                                            <div class="flex items-baseline justify-end space-x-1">
+                                                <span class="text-4xl font-black text-slate-900 font-mono tracking-tighter">{{ profileForm.hourly_rate }}</span>
+                                                <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">DH/h</span>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="h-px bg-slate-100 w-full"></div>
+
+                                        <div class="flex items-center justify-end space-x-3">
+                                            <div class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(16,185,129,0.5)]"></div>
+                                            <span class="text-[9px] font-black uppercase tracking-[0.15em] text-emerald-600">Disponibilité Validée</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Main View Content Grid (Fully Responsive Optimization) -->
+                            <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 xl:gap-20 mt-16 xl:mt-10">
+                                <!-- Left Section: BIO & EXP -->
+                                <div class="lg:col-span-7 xl:col-span-8 space-y-16 xl:space-y-10">
+                                    <!-- Biographie Section -->
+                                    <div class="space-y-6">
+                                        <h4 class="text-xs font-black text-slate-900 uppercase tracking-[0.3em] flex items-center">
+                                            <Fingerprint class="w-5 h-5 mr-3 text-premium-brown" />
+                                            Parcours & Valeurs
+                                        </h4>
+                                        <p class="text-slate-600 font-medium leading-[2] text-lg max-w-3xl whitespace-pre-line">
+                                            {{ profileForm.skills || "Aucune biographie détaillée n'a été configurée pour le moment." }}
+                                        </p>
+                                    </div>
+
+                                    <!-- Expériences Progressions -->
+                                    <div class="space-y-10">
+                                        <div class="flex items-center justify-between">
+                                            <h4 class="text-xs font-black text-slate-900 uppercase tracking-[0.3em] flex items-center">
+                                                <div class="w-10 h-10 bg-premium-yellow/10 rounded-xl flex items-center justify-center mr-4">
+                                                    <Trophy class="w-5 h-5 text-premium-brown" />
+                                                </div>
+                                                Expérience Professionnelle
+                                            </h4>
+                                            <span class="bg-slate-50 text-slate-400 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border border-slate-100">{{ profileForm.experience }}</span>
+                                        </div>
+                                        
+                                        <div class="space-y-8 pl-6 border-l-2 border-slate-100 relative ml-5">
+                                            <div v-for="(exp, idx) in profileForm.description" :key="idx" class="relative group">
+                                                <!-- Pulse Point on Timeline -->
+                                                <div class="absolute -left-[35px] top-8 w-5 h-5 rounded-full bg-white border-4 border-slate-200 transition-all group-hover:border-premium-yellow group-hover:scale-125 z-10 flex items-center justify-center">
+                                                    <div class="w-1.5 h-1.5 rounded-full bg-slate-400 group-hover:bg-premium-yellow shadow-sm"></div>
+                                                </div>
+
+                                                 <div class="p-6 sm:p-8 xl:p-6 bg-white rounded-[2.5rem] border border-slate-100 group-hover:shadow-2xl group-hover:shadow-slate-200/50 group-hover:border-premium-yellow/20 transition-all duration-500 relative overflow-hidden">
+                                                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+                                                        <div class="space-y-1">
+                                                            <div class="flex items-center space-x-3">
+                                                                <span class="text-[9px] font-black text-premium-brown uppercase tracking-[0.2em] bg-premium-yellow/10 px-2 py-0.5 rounded-md">Réalisation {{ idx + 1 }}</span>
+                                                            </div>
+                                                            <div class="text-xl font-black text-slate-900 tracking-tight leading-tight group-hover:text-premium-brown transition-colors">
+                                                                {{ exp.split('@')[0].trim() }}
+                                                            </div>
+                                                        </div>
+                                                        <div v-if="exp.includes('@')" class="shrink-0">
+                                                            <div class="bg-slate-900 text-white px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-slate-900/10 flex items-center space-x-2">
+                                                                <Calendar class="w-3 h-3 text-premium-yellow" />
+                                                                <span>{{ exp.split('@')[1].trim() }}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <p class="text-slate-500 font-medium leading-relaxed text-sm">
+                                                        {{ exp.split('@').length > 2 ? exp.split('@')[2].trim() : exp.split('@')[0].trim() }}
+                                                    </p>
+
+                                                    <!-- Background Glow -->
+                                                    <div class="absolute -bottom-10 -right-10 w-32 h-32 bg-premium-yellow/5 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700"></div>
+                                                </div>
+                                            </div>
+                                            <div v-if="profileForm.description.length === 0" class="p-16 bg-slate-50/50 rounded-[3rem] text-slate-400 font-medium text-sm border-2 border-dashed border-slate-100 text-center flex flex-col items-center space-y-6 group cursor-pointer hover:border-premium-yellow/20 transition-all" @click="activeTab = 'profile'; cvMode = false; currentStep = 2">
+                                                <div class="w-20 h-20 bg-white rounded-3xl flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
+                                                    <Plus class="w-10 h-10 text-slate-200" />
+                                                </div>
+                                                <div class="space-y-2">
+                                                    <p class="font-black text-slate-900 uppercase tracking-widest text-[10px]">Aucune réalisation listée</p>
+                                                    <p class="text-xs">Décrivez vos missions passées pour rassurer vos futurs clients.</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                </div>
+                                
+                                <!-- Right Section: Details & Availabilities -->
+                                <div class="lg:col-span-5 xl:col-span-4 space-y-12 xl:space-y-8">
+                                    <!-- Diplômes Grid-style (Moved for balance) -->
+                                    <div class="space-y-6">
+                                        <h4 class="text-xs font-black text-slate-900 uppercase tracking-[0.3em] flex items-center">
+                                            <Award class="w-5 h-5 mr-3 text-premium-brown" />
+                                            Garanties & Certifications
+                                        </h4>
+                                        <div class="bg-slate-900 p-8 xl:p-6 rounded-[3rem] border border-white/5 flex flex-col gap-6 xl:gap-4 shadow-2xl relative overflow-hidden group">
+                                            <div class="flex items-center space-x-4 relative z-10">
+                                                <div class="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center">
+                                                    <ShieldCheck class="w-6 h-6 text-premium-yellow" />
+                                                </div>
+                                                <div>
+                                                    <div class="text-xs font-black text-white uppercase tracking-widest">{{ profileForm.diplomas || 'Non spécifié' }}</div>
+                                                    <div class="text-[8px] font-black text-premium-yellow uppercase tracking-widest mt-1">Artisan Vérifié</div>
+                                                </div>
+                                            </div>
+                                            <p class="text-[10px] text-slate-400 leading-relaxed font-medium relative z-10">
+                                                Certification officielle garantissant l'expertise et le savoir-faire professionnel pour chaque intervention.
+                                            </p>
+                                            <!-- Decor -->
+                                            <div class="absolute -bottom-10 -right-10 w-32 h-32 bg-premium-yellow/5 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700"></div>
+                                        </div>
+                                    </div>
+                                    <!-- Contact Info Card -->
+                                    <div class="space-y-6">
+                                        <h4 class="text-xs font-black text-slate-900 uppercase tracking-[0.3em]">Coordonnées Privées</h4>
+                                        <div class="bg-white p-8 xl:p-6 rounded-[3rem] shadow-xl border border-slate-100 space-y-8 xl:space-y-5 relative overflow-hidden group">
+                                            <div class="flex items-center space-x-5 group/item">
+                                                <div class="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center border border-slate-100 group-hover/item:border-premium-yellow/30 group-hover/item:bg-white transition-all duration-300">
+                                                    <Smartphone class="w-5 h-5 text-premium-brown group-hover/item:scale-110 transition-transform" />
+                                                </div>
+                                                <div class="space-y-0.5">
+                                                    <div class="text-[9px] uppercase tracking-widest text-slate-400 font-black">Téléphone</div>
+                                                    <div class="text-sm font-black text-slate-900">{{ profileForm.phone || 'Non configuré' }}</div>
+                                                </div>
+                                            </div>
+                                            <div class="flex items-center space-x-5 group/item">
+                                                <div class="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center border border-slate-100 group-hover/item:border-premium-yellow/30 group-hover/item:bg-white transition-all duration-300">
+                                                    <Mail class="w-5 h-5 text-premium-brown group-hover/item:scale-110 transition-transform" />
+                                                </div>
+                                                <div class="space-y-0.5 whitespace-nowrap overflow-hidden pr-4">
+                                                    <div class="text-[9px] uppercase tracking-widest text-slate-400 font-black">Email Professionnel</div>
+                                                    <div class="text-sm font-black text-slate-900 truncate">{{ auth.user?.email }}</div>
+                                                </div>
+                                            </div>
+                                            <div class="flex items-center space-x-5 group/item">
+                                                <div class="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center border border-slate-100 group-hover/item:border-premium-yellow/30 group-hover/item:bg-white transition-all duration-300">
+                                                    <Fingerprint class="w-5 h-5 text-premium-brown group-hover/item:scale-110 transition-transform" />
+                                                </div>
+                                                <div class="space-y-0.5">
+                                                    <div class="text-[9px] uppercase tracking-widest text-slate-400 font-black">N° Identité (CIN)</div>
+                                                    <div class="text-sm font-black text-slate-900">{{ profileForm.cin || 'Non spécifié' }}</div>
+                                                </div>
+                                            </div>
+                                            <div class="flex items-center space-x-5 group/item">
+                                                <div class="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center border border-slate-100 group-hover/item:border-premium-yellow/30 group-hover/item:bg-white transition-all duration-300">
+                                                    <MapPin class="w-5 h-5 text-premium-brown group-hover/item:scale-110 transition-transform" />
+                                                </div>
+                                                <div class="space-y-0.5">
+                                                    <div class="text-[9px] uppercase tracking-widest text-slate-400 font-black">Adresse Résidentielle</div>
+                                                    <div class="text-sm font-black text-slate-900 leading-tight">{{ profileForm.address || 'Non spécifiée' }}</div>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Subtle Decor -->
+                                            <div class="absolute -bottom-12 -right-12 w-32 h-32 bg-premium-yellow/5 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700"></div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Availabilities Grid -->
+                                    <div class="space-y-6">
+                                        <h4 class="text-xs font-black text-slate-900 uppercase tracking-[0.3em] flex items-center">
+                                            <Clock class="w-5 h-5 mr-3 text-premium-brown" />
+                                            Semaine de Travail
+                                        </h4>
+                                        <div class="grid grid-cols-1 xl:grid-cols-2 gap-3">
+                                            <div v-for="day in orderedDays" :key="day.key" 
+                                                 class="p-5 xl:p-4 rounded-[2rem] border transition-all flex items-center justify-between group/day hover:-translate-y-0.5 duration-300"
+                                                 :class="day.active ? 'bg-slate-900 border-slate-900 shadow-xl shadow-slate-900/10' : 'bg-slate-50 border-slate-100 opacity-60'"
+                                            >
+                                                <div class="flex items-center space-x-4">
+                                                    <div class="w-10 h-10 rounded-2xl flex items-center justify-center transition-all duration-500" :class="day.active ? 'bg-premium-yellow text-slate-900 rotate-3 shadow-lg shadow-yellow-500/20' : 'bg-white text-slate-300'">
+                                                        <Calendar class="w-5 h-5" />
+                                                    </div>
+                                                    <div>
+                                                        <span class="block text-[10px] font-black uppercase tracking-widest leading-none mb-1.5" :class="day.active ? 'text-premium-yellow' : 'text-slate-400'">{{ day.label }}</span>
+                                                        <div class="text-[11px] font-black tracking-tight" :class="day.active ? 'text-white' : 'text-slate-400'">
+                                                            {{ day.active ? (day.start === '00:00' && day.end === '00:00' ? 'Sur demande' : `De ${day.start} à ${day.end}`) : 'Fermé' }}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div v-if="day.active" class="flex items-center">
+                                                    <div class="w-1.5 h-1.5 rounded-full bg-premium-yellow shadow-sm shadow-premium-yellow/50 animate-pulse"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Quick Stats Column -->
+                                    <div class="p-8 bg-premium-yellow rounded-[3rem] shadow-2xl shadow-yellow-500/10 flex flex-col gap-6 relative overflow-hidden group">
+                                         <div class="relative z-10 flex items-center justify-between">
+                                             <div>
+                                                 <div class="text-4xl font-black text-slate-900">{{ auth.user?.prestataire?.missions_count || 0 }}</div>
+                                                 <div class="text-[10px] font-black uppercase tracking-widest text-slate-900/50">Missions Réussies</div>
+                                             </div>
+                                             <div class="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center">
+                                                 <TrendingUp class="w-8 h-8 text-slate-900" />
+                                             </div>
+                                         </div>
+                                         <div class="relative z-10 p-4 bg-black/5 rounded-2xl border border-black/5">
+                                             <p class="text-[9px] font-bold text-slate-900 leading-relaxed italic">
+                                                 "Votre engagement et la qualité de vos services font monter votre score de pro."
+                                             </p>
+                                         </div>
+                                         <!-- Decor -->
+                                         <div class="absolute -bottom-10 -right-10 w-40 h-40 bg-white/10 rounded-full group-hover:scale-150 transition-transform duration-700"></div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Diplôme ou Certificat ?</label>
-                        <select v-model="hasDiploma" class="w-full px-5 py-3 rounded-xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-premium-brown/20 focus:border-premium-brown outline-none transition-all font-medium text-gray-700 appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22m6%208%204%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-size-[1.25rem_1.25rem] bg-position-[right_1.25rem_center] bg-no-repeat mb-4">
-                            <option value="">Choisir...</option>
-                            <option value="Oui">Oui</option>
-                            <option value="Non">Non</option>
-                        </select>
+                </div>
 
-                        <div v-if="hasDiploma === 'Oui'" class="mt-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                             <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 pl-1">Précisez votre diplôme ou certificat</label>
-                             <textarea v-model="profileForm.diplomas" rows="3" class="w-full px-5 py-3 rounded-xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-premium-brown/20 focus:border-premium-brown outline-none transition-all" placeholder="Ex: CAP Plomberie, Certificat de formation..."></textarea>
+                <!-- EDIT MODE WIZARD -->
+                <div v-else class="space-y-10 animate-in fade-in duration-700">
+                    <!-- Progress Indicator -->
+                    <div class="max-w-3xl mx-auto space-y-4 mb-12">
+                        <div class="flex items-end justify-between px-2">
+                            <div class="space-y-1">
+                                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Étape {{ currentStep }} sur 3</p>
+                                <h3 class="text-xl font-black text-slate-900 tracking-tight">
+                                    {{ currentStep === 1 ? 'Identité Visuelle' : (currentStep === 2 ? 'Expertise & Expérience' : 'Vos Disponibilités') }}
+                                </h3>
+                            </div>
+                            <span class="text-lg font-black text-premium-yellow">{{ Math.round((currentStep / 3) * 100) }}%</span>
+                        </div>
+                        <div class="h-2 bg-slate-100 rounded-full overflow-hidden p-0.5">
+                            <div 
+                                class="h-full bg-premium-yellow rounded-full transition-all duration-700 ease-out shadow-lg"
+                                :style="{ width: `${(currentStep / 3) * 100}%` }"
+                            ></div>
+                        </div>
+                    </div>
+
+                    <!-- STEP 1: Identité Visuelle -->
+                    <div v-if="currentStep === 1" class="max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        <div class="bg-white p-12 rounded-[3.5rem] shadow-xl border border-slate-100 relative overflow-hidden">
+                            <!-- Background Decor -->
+                            <div class="absolute top-0 right-0 w-64 h-64 bg-premium-yellow/5 rounded-full blur-3xl -mr-32 -mt-32"></div>
+                            
+                            <div class="relative z-10 flex flex-col lg:flex-row gap-16">
+                                <!-- Photo & Brand Side -->
+                                <div class="lg:w-1/3 flex flex-col items-center space-y-8">
+                                    <div class="relative group/photo">
+                                        <div class="absolute -inset-4 bg-linear-to-tr from-premium-yellow/20 via-transparent to-premium-brown/20 rounded-[4rem] blur-2xl opacity-0 group-hover/photo:opacity-100 transition-opacity duration-700"></div>
+                                        <PhotoUploader 
+                                            :current-photo="auth.user?.prestataire?.photo_url" 
+                                            @photo-updated="handlePhotoUpdate" 
+                                            class="relative z-10"
+                                        />
+                                    </div>
+                                    <div class="bg-slate-50 p-8 rounded-[2.5rem] border border-slate-100 space-y-4 w-full">
+                                        <div class="flex items-center space-x-3 text-premium-brown">
+                                            <ShieldCheck class="w-5 h-5" />
+                                            <span class="text-[10px] font-black uppercase tracking-widest text-slate-900">Conseil Pro</span>
+                                        </div>
+                                        <p class="text-[11px] text-slate-500 leading-relaxed font-medium">
+                                            Un portrait soigné et professionnel multiplie par **3** vos chances d'être contacté par de nouveaux clients.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <!-- Form Fields Side -->
+                                <div class="flex-1 space-y-10">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center space-x-4">
+                                            <div class="w-1.5 h-10 bg-premium-yellow rounded-full"></div>
+                                            <div>
+                                                <h3 class="text-2xl font-black text-slate-900 tracking-tight">Identité Visuelle</h3>
+                                                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Étape cruciale de votre profil</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                                        <!-- Row 1: Identity -->
+                                        <div class="space-y-2 group">
+                                            <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2 group-focus-within:text-premium-brown transition-colors">Prénom</label>
+                                            <div class="relative">
+                                                <User class="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 group-focus-within:text-premium-yellow transition-colors" />
+                                                <input v-model="profileForm.first_name" type="text" class="w-full pl-14 pr-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-8 focus:ring-premium-yellow/5 focus:border-premium-yellow outline-none transition-all font-black text-slate-900 shadow-sm text-sm">
+                                            </div>
+                                        </div>
+                                        <div class="space-y-2 group">
+                                            <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2 group-focus-within:text-premium-brown transition-colors">Nom</label>
+                                            <div class="relative">
+                                                <Fingerprint class="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 group-focus-within:text-premium-yellow transition-colors" />
+                                                <input v-model="profileForm.last_name" type="text" class="w-full pl-14 pr-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-8 focus:ring-premium-yellow/5 focus:border-premium-yellow outline-none transition-all font-black text-slate-900 shadow-sm text-sm">
+                                            </div>
+                                        </div>
+
+                                        <!-- Row 2: Location & Birth -->
+                                        <div class="space-y-2 group">
+                                            <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Ville de résidence</label>
+                                            <div class="relative" id="city-dropdown-container">
+                                                <!-- Custom Select Trigger -->
+                                                <div 
+                                                    @click="showCityDropdown = !showCityDropdown"
+                                                    class="w-full pl-14 pr-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 focus-within:bg-white focus-within:ring-8 focus-within:ring-premium-yellow/5 focus-within:border-premium-yellow outline-none transition-all font-black text-slate-900 shadow-sm text-sm cursor-pointer flex items-center justify-between"
+                                                >
+                                                    <MapPin class="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 group-focus-within:text-premium-yellow transition-colors" />
+                                                    <span :class="profileForm.city ? 'text-slate-900' : 'text-slate-400'">
+                                                        {{ profileForm.city || 'Sélectionnez votre ville' }}
+                                                    </span>
+                                                    <ChevronDown 
+                                                        class="w-4 h-4 text-slate-400 transition-transform duration-300"
+                                                        :class="{ 'rotate-180': showCityDropdown }"
+                                                    />
+                                                </div>
+
+                                                <!-- Custom Dropdown Menu -->
+                                                <div 
+                                                    v-if="showCityDropdown"
+                                                    class="absolute top-full left-0 right-0 mt-2 bg-white rounded-3xl shadow-2xl border border-slate-100 z-[100] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300"
+                                                >
+                                                    <div class="p-4 border-b border-slate-50">
+                                                        <div class="relative">
+                                                            <Search class="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                                                            <input 
+                                                                v-model="cityQuery"
+                                                                type="text"
+                                                                placeholder="Rechercher une ville..."
+                                                                class="w-full pl-10 pr-4 py-3 bg-slate-50 rounded-xl text-xs font-bold text-slate-900 outline-none border border-transparent focus:border-premium-yellow/30 transition-all"
+                                                                @click.stop
+                                                            >
+                                                        </div>
+                                                    </div>
+                                                    <div class="max-h-60 overflow-y-auto custom-scrollbar">
+                                                        <div 
+                                                            v-for="city in filteredCities" 
+                                                            :key="city"
+                                                            @click="selectCity(city)"
+                                                            class="px-6 py-3.5 text-sm font-bold text-slate-600 hover:text-premium-brown hover:bg-premium-yellow/5 cursor-pointer transition-colors flex items-center justify-between group/item"
+                                                        >
+                                                            {{ city }}
+                                                            <Check v-if="profileForm.city === city" class="w-4 h-4 text-premium-yellow" />
+                                                        </div>
+                                                        <div v-if="filteredCities.length === 0" class="px-6 py-8 text-center">
+                                                            <p class="text-xs font-bold text-slate-400">Aucune ville trouvée</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="space-y-2 group">
+                                            <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Date de naissance</label>
+                                            <div class="relative">
+                                                <Calendar class="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 group-focus-within:text-premium-yellow transition-colors" />
+                                                <input v-model="profileForm.birth_date" type="date" class="w-full pl-14 pr-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-8 focus:ring-premium-yellow/5 focus:border-premium-yellow outline-none transition-all font-black text-slate-900 shadow-sm text-sm">
+                                            </div>
+                                        </div>
+
+                                        <!-- Row 3: ID & Phone -->
+                                        <div class="space-y-2 group">
+                                            <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">CIN</label>
+                                            <div class="relative">
+                                                <Award class="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 group-focus-within:text-premium-yellow transition-colors" />
+                                                <input v-model="profileForm.cin" type="text" class="w-full pl-14 pr-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-8 focus:ring-premium-yellow/5 focus:border-premium-yellow outline-none transition-all font-black text-slate-900 shadow-sm text-sm" placeholder="Ex: AB123456">
+                                            </div>
+                                        </div>
+                                        <div class="space-y-2 group">
+                                            <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Téléphone</label>
+                                            <div class="relative">
+                                                <Smartphone class="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 group-focus-within:text-premium-yellow transition-colors" />
+                                                <input v-model="profileForm.phone" type="text" class="w-full pl-14 pr-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-8 focus:ring-premium-yellow/5 focus:border-premium-yellow outline-none transition-all font-black text-slate-900 shadow-sm text-sm">
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Email (Locked) -->
+                                    <div class="pt-6 border-t border-slate-50">
+                                        <div class="flex items-center space-x-4 bg-slate-50/50 p-6 rounded-3xl border border-slate-100">
+                                            <div class="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm text-slate-300">
+                                                <Mail class="w-6 h-6" />
+                                            </div>
+                                            <div class="grow">
+                                                <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest">Compte vérifié</p>
+                                                <p class="text-sm font-black text-slate-700">{{ auth.user?.email }}</p>
+                                            </div>
+                                            <div class="p-2 bg-emerald-50 text-emerald-500 rounded-xl">
+                                                <CheckCircle class="w-5 h-5" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- STEP 2: Expertise & Expérience -->
+                    <div v-if="currentStep === 2" class="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                            <!-- Categories Card -->
+                            <div class="bg-white p-10 rounded-[3rem] shadow-xl border border-slate-100 flex flex-col h-[700px]">
+                                <div class="flex items-center justify-between mb-8">
+                                    <div class="flex items-center space-x-4">
+                                        <div class="w-12 h-12 bg-premium-yellow/10 rounded-2xl flex items-center justify-center border border-premium-yellow/20">
+                                            <Briefcase class="w-6 h-6 text-premium-brown" />
+                                        </div>
+                                        <div>
+                                            <h3 class="text-xl font-black text-slate-900 tracking-tight">Expertise Pro</h3>
+                                            <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mt-1">Choisissez vos spécialités</p>
+                                        </div>
+                                    </div>
+                                    <div v-if="selectedCategoriesCount > 0" class="flex flex-col items-end">
+                                        <span class="text-[10px] font-black bg-slate-900 text-white px-4 py-2 rounded-xl uppercase tracking-widest shadow-lg shadow-slate-900/10">{{ selectedCategoriesCount }} service{{ selectedCategoriesCount > 1 ? 's' : '' }}</span>
+                                    </div>
+                                </div>
+
+                                <div class="relative group mb-6">
+                                    <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                        <Search class="h-4 w-4 text-slate-300 group-focus-within:text-premium-yellow transition-colors" />
+                                    </div>
+                                    <input 
+                                        v-model="categorySearch" 
+                                        type="text" 
+                                        placeholder="Que savez-vous faire ?"
+                                        class="w-full pl-12 pr-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-8 focus:ring-premium-yellow/5 focus:border-premium-yellow outline-none transition-all font-bold text-xs shadow-inner"
+                                    >
+                                </div>
+
+                                <div class="flex-1 overflow-y-auto pr-2 space-y-8 scrollbar-hide py-2">
+                                    <div v-for="group in filteredCategoryGroups" :key="group.name" class="space-y-4">
+                                        <div class="flex items-center space-x-3 sticky top-0 bg-white/90 backdrop-blur-sm z-10 py-2">
+                                            <div class="h-px bg-slate-100 grow"></div>
+                                            <h4 class="text-[9px] font-black text-slate-400 uppercase tracking-[0.3em] px-3">{{ group.name }}</h4>
+                                            <div class="h-px bg-slate-100 grow"></div>
+                                        </div>
+                                        <div class="grid grid-cols-1 gap-2.5">
+                                            <label 
+                                                v-for="cat in group.categories" 
+                                                :key="cat.id"
+                                                class="flex items-center space-x-4 p-4 rounded-2xl border transition-all cursor-pointer group/cat relative overflow-hidden"
+                                                :class="profileForm.category_ids.includes(cat.id) ? 'bg-premium-yellow/5 border-premium-yellow/30 shadow-sm' : 'bg-slate-50 border-transparent hover:bg-slate-100 hover:border-slate-200'"
+                                            >
+                                                <div class="relative z-10 flex items-center justify-center w-5 h-5 rounded-md border-2 transition-all"
+                                                     :class="profileForm.category_ids.includes(cat.id) ? 'bg-premium-yellow border-premium-yellow scale-110 shadow-lg shadow-yellow-500/20' : 'bg-white border-slate-200 group-hover/cat:border-slate-300'"
+                                                >
+                                                    <Check v-if="profileForm.category_ids.includes(cat.id)" class="w-3.5 h-3.5 text-slate-900" />
+                                                </div>
+                                                <input type="checkbox" :value="cat.id" v-model="profileForm.category_ids" class="hidden">
+                                                <span class="relative z-10 text-[11px] font-bold text-slate-700 transition-colors group-hover/cat:text-slate-900">{{ cat.name }}</span>
+                                                
+                                                <!-- Subtle bg glow on hover -->
+                                                <div class="absolute right-0 top-0 w-32 h-full bg-linear-to-l from-white/20 to-transparent translate-x-32 group-hover/cat:translate-x-0 transition-transform duration-500"></div>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Experience & Bio Card -->
+                            <div class="bg-white p-10 rounded-[3rem] shadow-xl border border-slate-100 space-y-10 flex flex-col h-[700px]">
+                                <div class="flex items-center space-x-4">
+                                    <div class="w-12 h-12 bg-amber-50 rounded-2xl flex items-center justify-center border border-amber-100 shadow-sm">
+                                        <Trophy class="w-6 h-6 text-amber-500" />
+                                    </div>
+                                    <div>
+                                        <h3 class="text-xl font-black text-slate-900 tracking-tight">Parcours & Bio</h3>
+                                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mt-1">Racontez votre histoire</p>
+                                    </div>
+                                </div>
+
+                                <div class="space-y-8 flex-1 overflow-y-auto pr-2 scrollbar-hide">
+                                    <!-- Years of Experience Selector -->
+                                    <div class="space-y-4">
+                                        <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Expérience globale</label>
+                                        <div class="grid grid-cols-2 gap-3">
+                                            <button 
+                                                v-for="opt in [
+                                                    { value: 'Débutant', label: 'Débutant' },
+                                                    { value: 'Entre 1 an et 2 ans', label: '1 - 2 ans' },
+                                                    { value: '2 à 4 ans', label: '2 - 4 ans' },
+                                                    { value: 'Plus de 4 ans', label: 'Plus de 4 ans' }
+                                                ]"
+                                                :key="opt.value"
+                                                @click="profileForm.experience = opt.value"
+                                                class="px-4 py-5 rounded-[1.5rem] font-black text-[10px] uppercase tracking-wider transition-all relative overflow-hidden group/opt flex items-center justify-center text-center"
+                                                :class="profileForm.experience === opt.value ? 'bg-slate-900 text-white shadow-2xl scale-[1.02] z-10' : 'bg-slate-50 text-slate-500 border border-slate-100 hover:bg-white hover:shadow-lg'"
+                                            >
+                                                <span class="relative z-10">{{ opt.label }}</span>
+                                                <div v-if="profileForm.experience === opt.value" class="absolute inset-0 bg-linear-to-br from-white/10 to-transparent"></div>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Notable Experiences List -->
+                                    <div class="space-y-5 pt-4">
+                                        <div class="flex items-center justify-between px-2">
+                                            <div class="space-y-1">
+                                                <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Expériences marquantes</label>
+                                                <p class="text-[8px] text-slate-400 font-medium">Ajoutez vos références clés</p>
+                                            </div>
+                                            <button @click="addDetailedExperience" class="w-10 h-10 bg-slate-900 text-white rounded-2xl hover:bg-premium-yellow hover:text-slate-900 transition-all shadow-xl flex items-center justify-center active:scale-90">
+                                                <Plus class="w-5 h-5" />
+                                            </button>
+                                        </div>
+                                        <div class="space-y-3">
+                                            <div v-for="(exp, index) in profileForm.description" :key="index" class="relative group/item animate-in slide-in-from-right-2 duration-300">
+                                                <div class="absolute left-4 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-premium-yellow"></div>
+                                                <input 
+                                                    v-model="profileForm.description[index]" 
+                                                    type="text" 
+                                                    placeholder="Ex: Rénovation Maison Casablanca..." 
+                                                    class="w-full pl-10 pr-12 py-4 rounded-2xl border border-slate-100 bg-slate-50/50 focus:bg-white focus:ring-4 focus:ring-premium-yellow/10 focus:border-premium-yellow outline-none transition-all text-xs font-black text-slate-800 shadow-sm"
+                                                >
+                                                <button @click="removeDetailedExperience(index)" class="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all opacity-0 group-hover/item:opacity-100">
+                                                    <X class="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                            <div v-if="profileForm.description.length === 0" class="py-12 bg-slate-50/50 rounded-[2rem] border-2 border-dashed border-slate-100 flex flex-col items-center justify-center space-y-3 group cursor-pointer hover:border-premium-yellow/30 transition-colors" @click="addDetailedExperience">
+                                                <div class="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm text-slate-300 group-hover:scale-110 transition-transform">
+                                                    <Zap class="w-6 h-6" />
+                                                </div>
+                                                <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Aucune expérience ajoutée</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Bio Textarea -->
+                                    <div class="space-y-4 pt-4">
+                                        <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Bio Professionnelle</label>
+                                        <div class="relative group">
+                                            <textarea 
+                                                v-model="profileForm.skills" 
+                                                rows="4" 
+                                                placeholder="Partagez votre passion et votre rigueur..." 
+                                                class="w-full px-8 py-6 rounded-[2rem] border border-slate-100 bg-slate-50 focus:bg-white focus:ring-8 focus:ring-premium-yellow/5 focus:border-premium-yellow outline-none transition-all font-bold text-xs resize-none shadow-inner leading-relaxed"
+                                            ></textarea>
+                                            <div class="absolute bottom-4 right-6 text-[8px] font-black text-slate-300 uppercase tracking-widest">Conseil: Soyez précis</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- STEP 3: Disponibilités -->
+                    <div v-if="currentStep === 3" class="max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        <div class="bg-white p-10 rounded-4xl shadow-sm border border-slate-100 space-y-10">
+                            <div class="flex items-center space-x-4">
+                                <div class="w-1.5 h-8 bg-premium-yellow rounded-full"></div>
+                                <h3 class="text-xl font-black text-slate-900 tracking-tight">Vos Disponibilités</h3>
+                            </div>
+
+                            <AvailabilityScheduler 
+                                :initial-availability="profileForm.availabilities"
+                                @update="handleAvailabilityUpdate"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- WIZARD NAVIGATION -->
+                    <div class="max-w-4xl mx-auto flex items-center justify-between pt-10 border-t border-slate-100">
+                        <button 
+                            v-if="currentStep > 1"
+                            @click="prevStep" 
+                            class="flex items-center space-x-3 px-8 py-4 rounded-3xl border-2 border-slate-100 text-slate-900 font-black text-xs uppercase tracking-widest transition-all hover:border-slate-900 active:scale-95"
+                        >
+                            <ChevronLeft class="w-5 h-5" />
+                            <span>Précédent</span>
+                        </button>
+                        <div v-else></div>
+
+                        <div class="flex items-center space-x-4">
+                            <button 
+                                v-if="currentStep < 3"
+                                @click="nextStep" 
+                                class="flex items-center space-x-3 bg-premium-yellow text-slate-900 px-10 py-4 rounded-3xl font-black text-xs uppercase tracking-widest transition-all hover:bg-yellow-400 hover:shadow-xl active:scale-95"
+                            >
+                                <span>Suivant</span>
+                                <ChevronRight class="w-5 h-5" />
+                            </button>
+                            <button 
+                                v-else
+                                @click="saveProfile" 
+                                :disabled="saving"
+                                class="flex items-center space-x-3 bg-premium-yellow text-slate-900 px-10 py-4 rounded-3xl font-black text-xs uppercase tracking-widest transition-all hover:bg-yellow-400 hover:shadow-xl active:scale-95 disabled:opacity-50"
+                            >
+                                <Loader2 v-if="saving" class="w-5 h-5 animate-spin" />
+                                <Award v-else class="w-5 h-5" />
+                                <span>{{ saving ? 'Enregistrement...' : 'Terminer' }}</span>
+                            </button>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <AvailabilityScheduler 
-                :initial-availability="profileForm.availabilities"
-                @update="handleAvailabilityUpdate"
-            />
+            <!-- TAB: SETTINGS -->
+            <div v-show="activeTab === 'settings'" class="space-y-8 animate-in fade-in slide-in-from-bottom-5 duration-700 max-w-2xl mx-auto">
+                <div class="bg-white p-10 rounded-[3rem] shadow-sm border border-slate-100 space-y-8">
+                    <div class="flex items-center space-x-4">
+                        <div class="w-1.5 h-8 bg-blue-500 rounded-full"></div>
+                        <h3 class="text-xl font-black text-slate-900 tracking-tight">Sécurité & Visibilité</h3>
+                    </div>
 
-            <div class="flex justify-end">
-                <button 
-                    @click="saveProfile"
-                    :disabled="saving"
-                    class="bg-premium-brown text-white px-10 py-4 rounded-2xl font-black hover:bg-orange-900 transition-all flex items-center space-x-3 shadow-xl disabled:opacity-50 active:scale-95"
-                >
-                    <Loader2 v-if="saving" class="w-5 h-5 animate-spin" />
-                    <span>{{ saving ? $t('provider_dashboard.profile.saving') : $t('provider_dashboard.profile.save_changes') }}</span>
-                </button>
+                    <div class="flex items-center justify-between p-6 bg-slate-50 rounded-3xl border border-slate-100">
+                        <div class="space-y-1">
+                            <h4 class="text-sm font-black text-slate-900">Visibilité globale</h4>
+                            <p class="text-[10px] text-slate-500 font-medium">Si désactivé, vous ne recevrez plus de propositions.</p>
+                        </div>
+                        <button 
+                            @click="toggleVisibility"
+                            :class="visibility ? 'bg-slate-900 text-white shadow-xl shadow-slate-900/20' : 'bg-white text-slate-300 border border-slate-100'"
+                            class="px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 flex items-center space-x-2"
+                        >
+                            <Power class="w-3.5 h-3.5" />
+                            <span>{{ visibility ? 'Publié' : 'Brouillon' }}</span>
+                        </button>
+                    </div>
+
+                    <div class="p-6 bg-red-50 rounded-3xl border border-red-100 space-y-6">
+                        <div class="space-y-1">
+                            <h4 class="text-sm font-black text-red-900">Zone de danger</h4>
+                            <p class="text-[10px] text-red-600/60 font-medium">La suppression de votre compte est irréversible et effacera tout votre historique.</p>
+                        </div>
+                        <button @click="deleteAccount" class="w-full py-4 text-center border-2 border-red-200 text-red-600 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-red-600 hover:text-white hover:border-red-600 transition-all active:scale-95">
+                            Supprimer mon compte définitivement
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
-
-    <!-- TAB: SETTINGS -->
-    <div v-show="activeTab === 'settings'" class="max-w-2xl mx-auto space-y-6">
-         <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-             <div class="flex items-center justify-between">
-                 <div>
-                     <h3 class="font-bold text-gray-900">{{ $t('provider_dashboard.settings.profile_visibility') }}</h3>
-                     <p class="text-sm text-gray-500 mt-1">{{ $t('provider_dashboard.settings.visibility_desc') }}</p>
-                 </div>
-                 <button 
-                    @click="toggleVisibility"
-                    :class="visibility ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'"
-                    class="px-4 py-2 rounded-lg font-bold text-sm transition flex items-center space-x-2"
-                 >
-                    <Power class="w-4 h-4" />
-                    <span>{{ visibility ? $t('provider_dashboard.settings.visible') : $t('provider_dashboard.settings.hidden') }}</span>
-                 </button>
-             </div>
-         </div>
-
-         <div class="bg-red-50 p-6 rounded-2xl shadow-sm border border-red-100">
-             <h3 class="font-bold text-red-900 mb-2">{{ $t('provider_dashboard.settings.danger_zone') }}</h3>
-             <p class="text-sm text-red-700 mb-4">{{ $t('provider_dashboard.settings.delete_desc') }}</p>
-             <button @click="deleteAccount" class="border-2 border-red-200 text-red-600 hover:bg-red-100 px-4 py-2 rounded-lg font-bold text-sm transition">
-                {{ $t('provider_dashboard.settings.delete_account') }}
-             </button>
-         </div>
-    </div>
   </div>
 </template>
+
+<style scoped>
+.custom-scrollbar::-webkit-scrollbar {
+    width: 5px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #e2e8f0;
+    border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #cbd5e1;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+    display: none;
+}
+.scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+</style>

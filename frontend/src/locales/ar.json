@@ -18,6 +18,8 @@
     "footer_quote": "« في الجهد يكشف الإنسان عن نفسه »",
     "save": "حفظ",
     "cancel": "إلغاء",
+    "security": "الأمان",
+    "quality": "الجودة",
     "delete": "حذف",
     "edit": "تعديل",
     "close": "إغلاق",
@@ -26,7 +28,9 @@
   "home": {
     "hero_subtitle": "تثمين التميز الإنساني من خلال الجهد.",
     "hero_desc": "فالورا هي الكيمياء بين القيمة والجهد. هنا يتم الاحتفاء بموهبة الحرفي ويجد عمله الاعتراف الحقيقي. نحن نؤمن أن تقدير الإنسان يبدأ أولاً بتقدير تميزه.",
-    "slogan": "\"قدّر <span class=\"text-[#8B5E3C] italic font-playfair lowercase\">الجهد</span> الذي يكشف عن الإنسان\"",
+    "slogan_part1": "قدّر",
+    "slogan_highlight": "الجهد",
+    "slogan_part2": "الذي يكشف عن الإنسان",
     "hero_badge": "الموهبة في متناول يدك",
     "cta_start": "ابدأ الآن",
     "cta_explore": "استكشف الخدمات",
@@ -126,7 +130,15 @@
     "nettoyage": "تنظيف",
     "maconnerie": "بناء",
     "couture": "خياطة",
-    "design_interieur": "تصميم داخلي"
+    "design_interieur": "تصميم داخلي",
+    "jardinage_paysagisme": "بستنة وتنسيق حدائق",
+    "menage_nettoyage": "تنظيف ومنزل",
+    "garde_enfants": "رعاية أطفال",
+    "aide_domicile": "مساعدة منزلية",
+    "repassage": "كي ملابس",
+    "cuisine_domicile": "طبخ منزلي",
+    "construction_renovation": "بناء وترميم",
+    "services_domicile": "خدمات منزلية"
   },
   "search": {
     "title": "العثور على مهمة",
