@@ -18,16 +18,27 @@ import LanguageSwitcher from '../components/LanguageSwitcher.vue';
 const auth = useAuthStore();
 const router = useRouter();
 
-const artisans = ref([
-  { id: 1, name: 'asmae El Mansouri', category: 'plomberie', logo: 'https://i.pravatar.cc/150?u=1' },
-  { id: 2, name: 'ayub akil', category: 'design_interieur', logo: 'https://i.pravatar.cc/150?u=2' },
-  { id: 3, name: 'Karima Bennani', category: 'electricite', logo: 'https://i.pravatar.cc/150?u=3' },
-  { id: 4, name: 'Maroua salmi', category: 'jardinage', logo: 'https://i.pravatar.cc/150?u=4' },
-  { id: 5, name: 'Yassine Radi', category: 'peinture', logo: 'https://i.pravatar.cc/150?u=5' },
-  { id: 6, name: 'Leila Amrani', category: 'nettoyage', logo: 'https://i.pravatar.cc/150?u=6' },
-  { id: 7, name: 'doha bekhtaoui', category: 'maconnerie', logo: 'https://i.pravatar.cc/150?u=7' },
-  { id: 8, name: 'Fatima Zahra el houssaini', category: 'couture', logo: 'https://i.pravatar.cc/150?u=8' },
-]);
+const artisans = ref([]);
+
+const fetchArtisans = async () => {
+  try {
+    const response = await api.get('/api/provider?limit=4&sort_by=newest');
+    if (response.data.data) {
+      artisans.value = response.data.data.map(user => ({
+        id: user.id,
+        name: user.name,
+        category: user.prestataire?.categories?.[0]?.slug || 'general',
+        categoryDisplay: user.prestataire?.categories?.[0]?.name || 'Prestataire',
+        logo: user.prestataire?.photo_url || `https://ui-avatars.com/api/?name=${user.name}&background=random`,
+        rating: user.prestataire?.rating || '5.0',
+        city: user.prestataire?.city || 'Maroc',
+        description: user.prestataire?.description || 'Professionnel qualifié sur Valora.'
+      }));
+    }
+  } catch (err) {
+    console.error('Erreur chargement artisans:', err);
+  }
+};
 
 const offers = ref([
   { id: 1, title: 'Rénovation Cuisine', category: 'btp', city: 'Casablanca', salary: '2500 MAD' },
@@ -83,6 +94,7 @@ const handleApply = (offerId) => {
 onMounted(() => {
   isVisible.value = true;
   fetchLatestOffers();
+  fetchArtisans();
 });
 </script>
 
@@ -147,25 +159,45 @@ onMounted(() => {
           </p>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <div 
             v-for="artisan in artisans" 
             :key="artisan.id"
-            class="group bg-[#FAF9F6] p-8 rounded-[2.5rem] transition-all duration-500 hover:bg-[#1A2B4C] hover:text-white hover:-translate-y-4 hover:shadow-2xl shadow-sm border border-slate-100 cursor-pointer flex flex-col items-center text-center space-y-6"
+            class="group bg-white p-6 rounded-[2rem] hover:shadow-xl transition-all duration-500 border border-slate-100 flex flex-col relative overflow-hidden"
           >
-            <div class="relative">
-              <div class="w-24 h-24 rounded-full overflow-hidden border-4 border-white shadow-xl transition-transform duration-500 group-hover:scale-110">
-                <img :src="artisan.logo" :alt="artisan.name" class="w-full h-full object-cover">
-              </div>
-              <div class="absolute -bottom-2 -right-2 bg-[#F4C430] p-2 rounded-xl text-[#1A2B4C] shadow-lg transform rotate-12 group-hover:rotate-0 transition-all">
-                <Zap class="w-4 h-4 fill-current" />
-              </div>
+            <!-- Hover Gradient Background -->
+            <div class="absolute inset-0 bg-gradient-to-b from-transparent via-[#1A2B4C]/5 to-[#1A2B4C]/90 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+
+            <div class="flex items-start justify-between mb-4 relative z-10">
+                <div class="relative">
+                    <div class="w-20 h-20 rounded-2xl overflow-hidden shadow-md group-hover:scale-105 transition-transform duration-500 bg-slate-100">
+                        <img :src="artisan.logo" :alt="artisan.name" class="w-full h-full object-cover">
+                    </div>
+                    <div class="absolute -bottom-2 -right-2 bg-[#F4C430] text-[#1A2B4C] text-[10px] font-black px-2 py-1 rounded-lg shadow-sm flex items-center gap-1">
+                        <Star class="w-3 h-3 fill-current" />
+                        {{ artisan.rating }}
+                    </div>
+                </div>
+                <div class="bg-slate-50 px-3 py-1 rounded-full border border-slate-100 group-hover:bg-white/20 group-hover:text-white group-hover:border-white/20 transition-colors">
+                    <span class="text-[10px] font-black uppercase tracking-widest text-slate-400 group-hover:text-white">{{ artisan.categoryDisplay }}</span>
+                </div>
             </div>
-            <div>
-              <h3 class="text-xl font-bold tracking-tight">{{ artisan.name }}</h3>
-              <p class="text-[#8B5E3C] group-hover:text-[#F4C430] font-black uppercase text-[10px] tracking-widest mt-1">{{ $t('categories.' + artisan.category) }}</p>
+
+            <div class="relative z-10 mt-auto">
+                <h3 class="text-xl font-bold text-[#1A2B4C] group-hover:text-white transition-colors mb-1">{{ artisan.name }}</h3>
+                <div class="flex items-center gap-2 text-slate-400 group-hover:text-slate-300 text-xs font-medium mb-3">
+                    <MapPin class="w-3.5 h-3.5" />
+                    {{ artisan.city }}
+                </div>
+                
+                <p class="text-slate-500 text-sm line-clamp-2 mb-4 group-hover:text-slate-200 transition-colors">
+                    {{ artisan.description }}
+                </p>
+
+                <button class="w-full py-3 rounded-xl bg-[#FAF9F6] text-[#1A2B4C] font-bold text-xs uppercase tracking-widest hover:bg-[#F4C430] transition-colors shadow-sm group-hover:shadow-lg">
+                    Voir Profil
+                </button>
             </div>
-            <div class="w-12 h-1 bg-[#1A2B4C] group-hover:bg-[#F4C430] rounded-full transition-all group-hover:w-24"></div>
           </div>
         </div>
       </div>

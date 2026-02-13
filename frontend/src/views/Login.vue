@@ -1,9 +1,8 @@
 <script setup>
-import { ref, computed } from 'vue';
-import { useRouter } from 'vue-router';
+import { ref, computed, watch, onMounted } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '../store/auth';
 import api from '../services/api';
-import { onMounted } from 'vue';
 import { 
   Lock, Mail, Loader2, Search, Briefcase, User, MapPin, Camera, 
   Settings, Star, Sparkles, ArrowRight, Shield, Smartphone, PenTool,
@@ -12,6 +11,7 @@ import {
 } from 'lucide-vue-next';
 import valoraLogo from '../assets/v-logo.png';
 import artisanBg from '../assets/auth-right-bg.jpg';
+import LanguageSwitcher from '../components/LanguageSwitcher.vue';
 
 const orbitIcons = [
   Hammer, Wrench, Paintbrush, PenTool, Zap, Scissors, Sprout, Camera
@@ -21,6 +21,7 @@ const isVisible = ref(false);
 
 const auth = useAuthStore();
 const router = useRouter();
+const route = useRoute();
 
 // View State toggles
 const activeRole = ref('client'); // 'client' or 'provider'
@@ -39,6 +40,20 @@ const fetchCategories = async () => {
 onMounted(() => {
     fetchCategories();
     isVisible.value = true;
+    
+    // Check initial route
+    if (route.path === '/register') {
+        isLoginMode.value = false;
+    }
+});
+
+// Watch for route changes to update mode
+watch(() => route.path, (newPath) => {
+    if (newPath === '/register') {
+        isLoginMode.value = false;
+    } else if (newPath === '/login') {
+        isLoginMode.value = true;
+    }
 });
 
 // Error Handling
@@ -59,8 +74,7 @@ const clientForm = ref({
     prenom: '',
     email: '',
     password: '',
-    password_confirmation: '',
-    city: ''
+    password_confirmation: ''
 });
 
 // Provider Registration State
@@ -69,8 +83,7 @@ const providerForm = ref({
     prenom: '',
     email: '',
     password: '',
-    password_confirmation: '',
-    city: ''
+    password_confirmation: ''
 });
 
 const showPassword = ref(false);
@@ -97,7 +110,12 @@ const handleLogin = async () => {
             email: loginForm.value.email, 
             password: loginForm.value.password 
         });
-        router.push('/dashboard');
+        
+        if (auth.isAdmin) {
+            router.push('/admin/dashboard');
+        } else {
+            router.push('/dashboard');
+        }
     } catch (err) {
         const message = err.response?.data?.message;
         if (message === 'Votre compte a été désactivé par un administrateur.') {
@@ -121,7 +139,6 @@ const handleClientRegister = async () => {
             email: clientForm.value.email,
             password: clientForm.value.password,
             password_confirmation: clientForm.value.password_confirmation,
-            city: clientForm.value.city,
             role: 'client'
         });
         registrationSuccess.value = true;
@@ -142,7 +159,6 @@ const handleProviderRegister = async () => {
             email: providerForm.value.email,
             password: providerForm.value.password,
             password_confirmation: providerForm.value.password_confirmation,
-            city: providerForm.value.city,
             role: 'provider'
         });
         registrationSuccess.value = true;
@@ -154,16 +170,7 @@ const handleProviderRegister = async () => {
     }
 };
 
-const cities = [
-    "Casablanca", "Rabat", "Marrakech", "Fès", "Tanger", "Agadir", "Meknès", "Oujda", 
-    "Kenitra", "Tetouan", "Safi", "Temara", "Inezgane", "Mohammedia", "Laayoune", 
-    "Khouribga", "Beni Mellal", "El Jadida", "Taza", "Nador", "Settat", "Larache", 
-    "Ksar El Kebir", "Khemisset", "Guelmim", "Berrechid", "Wad Zem", "Fquih Ben Salah", 
-    "Taourirt", "Berkane", "Sidi Slimane", "Errachidia", "Sidi Kacem", "Khenifra", 
-    "Tifelt", "Essaouira", "Taroudant", "El Kelaa des Sraghna", "Ouarzazate", "Sefrou", 
-    "Souk El Arbaa", "Tan-Tan", "Ouazzane", "Guercif", "Dakhla", "Midelt", "Azrou", 
-    "Tinghir", "Chefchaouen", "Jerada", "Mrirt"
-].sort();
+
 </script>
 
 <template>
@@ -348,31 +355,7 @@ const cities = [
                                      <input v-model="clientForm.email" type="email" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl py-5 pl-14 pr-6 outline-none focus:ring-4 focus:ring-premium-blue/5 transition-all font-bold text-slate-700" :placeholder="$t('auth.email')">
                                      <Mail class="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-premium-blue transition-all" />
                                   </div>
-                                  <div class="relative group">
-                                     <div class="relative">
-                                         <input 
-                                             v-model="citySearch" 
-                                             type="text" 
-                                             :placeholder="clientForm.city || $t('auth.city')"
-                                             class="w-full bg-slate-50 border border-slate-200 rounded-2xl py-5 pl-14 pr-6 outline-none focus:ring-4 focus:ring-premium-blue/5 transition-all font-bold text-slate-700"
-                                         >
-                                         <MapPin class="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-premium-blue transition-all" />
-                                         
-                                         <!-- City suggestions -->
-                                         <div v-if="filteredCities.length > 0" class="absolute z-30 w-full mt-2 bg-white border border-slate-100 rounded-2xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-                                             <button 
-                                                 v-for="city in filteredCities" 
-                                                 :key="city"
-                                                 type="button"
-                                                 @click="selectCity(city, clientForm)"
-                                                 class="w-full px-5 py-3 text-left text-sm font-bold hover:bg-slate-50 transition-colors flex items-center justify-between group text-premium-blue"
-                                             >
-                                                 <span>{{ city }}</span>
-                                                 <MapPin class="w-4 h-4 text-slate-300 group-hover:text-premium-blue" />
-                                             </button>
-                                         </div>
-                                     </div>
-                                  </div>
+
                                   <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                      <div class="relative group">
                                         <input v-model="clientForm.password" :type="showPassword ? 'text' : 'password'" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl py-5 pl-14 pr-12 outline-none focus:ring-4 focus:ring-premium-blue/5 transition-all font-bold text-slate-700" :placeholder="$t('auth.password')">
@@ -414,31 +397,7 @@ const cities = [
                                         <input v-model="providerForm.email" type="email" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl py-5 pl-14 pr-6 outline-none focus:ring-4 focus:ring-premium-blue/5 transition-all font-bold text-slate-700" :placeholder="$t('auth.email')">
                                         <Mail class="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-premium-blue transition-all" />
                                     </div>
-                                    <div class="relative group">
-                                        <div class="relative">
-                                            <input 
-                                                v-model="citySearch" 
-                                                type="text" 
-                                                :placeholder="providerForm.city || $t('auth.city')"
-                                                class="w-full bg-slate-50 border border-slate-200 rounded-2xl py-5 pl-14 pr-6 outline-none focus:ring-4 focus:ring-premium-blue/5 transition-all font-bold text-slate-700"
-                                            >
-                                            <MapPin class="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-premium-blue transition-all" />
-                                            
-                                            <!-- City suggestions -->
-                                            <div v-if="filteredCities.length > 0" class="absolute z-30 w-full mt-2 bg-white border border-slate-100 rounded-2xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-                                                <button 
-                                                    v-for="city in filteredCities" 
-                                                    :key="city"
-                                                    type="button"
-                                                    @click="selectCity(city, providerForm)"
-                                                    class="w-full px-5 py-3 text-left text-sm font-bold hover:bg-slate-50 transition-colors flex items-center justify-between group text-premium-blue"
-                                                >
-                                                    <span>{{ city }}</span>
-                                                    <MapPin class="w-4 h-4 text-slate-300 group-hover:text-premium-blue" />
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
+
                                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div class="relative group">
                                             <input v-model="providerForm.password" :type="showPassword ? 'text' : 'password'" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl py-5 pl-14 pr-12 outline-none focus:ring-4 focus:ring-premium-blue/5 transition-all font-bold text-slate-700" :placeholder="$t('auth.password')">
@@ -471,7 +430,7 @@ const cities = [
                   <div class="space-y-10 pt-4">
                      <div class="flex items-center justify-center space-x-3 text-[11px] font-black uppercase tracking-[0.2em]">
                         <span class="text-slate-400">{{ isLoginMode ? $t('auth.no_account', 'Pas encore de compte ?') : $t('auth.already_account', 'Déjà inscrit ?') }}</span>
-                        <button @click="isLoginMode = !isLoginMode" class="text-premium-blue hover:text-premium-brown transition-colors underline underline-offset-8 decoration-2 decoration-premium-yellow/30">
+                        <button @click="isLoginMode ? router.push('/register') : router.push('/login')" class="text-premium-blue hover:text-premium-brown transition-colors underline underline-offset-8 decoration-2 decoration-premium-yellow/30">
                            {{ isLoginMode ? $t('auth.register_title') : $t('auth.login_title') }}
                         </button>
                      </div>

@@ -11,6 +11,10 @@ use App\Models\Permission;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
+use App\Models\Grade;
+use App\Services\GradeService;
+use Illuminate\Support\Facades\DB;
+use App\Models\Message;
 
 class AdminController extends Controller
 {
@@ -383,7 +387,22 @@ class AdminController extends Controller
             $query->where('status', $request->status);
         }
 
-        return $query->latest()->paginate(20);
+        if ($request->priority) {
+            $query->where('priority', $request->priority);
+        }
+
+        if ($request->search) {
+            $query->where(function($q) use ($request) {
+                $q->where('reason', 'like', "%{$request->search}%")
+                  ->orWhere('description', 'like', "%{$request->search}%")
+                  ->orWhereHas('reported', function($u) use ($request) {
+                      $u->where('name', 'like', "%{$request->search}%");
+                  });
+            });
+        }
+
+        $perPage = $request->input('per_page', 20);
+        return $query->latest()->paginate($perPage);
     }
 
     /**
@@ -542,5 +561,83 @@ class AdminController extends Controller
             'message' => 'Règle du badge mise à jour',
             'badge' => $badge
         ]);
+    }
+
+    // Grade Management
+    public function grades()
+    {
+        return response()->json(Grade::orderBy('missions_threshold')->get());
+    }
+
+    public function storeGrade(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'slug' => 'required|string|unique:grades,slug',
+            'missions_threshold' => 'required|integer',
+            'rating_threshold' => 'required|numeric',
+            'seniority_threshold_months' => 'required|integer',
+            'color' => 'nullable|string',
+            'bg_color' => 'nullable|string',
+        ]);
+
+        $grade = Grade::create($validated);
+        return response()->json($grade);
+    }
+
+    public function updateGrade(Request $request, $id)
+    {
+        $grade = Grade::findOrFail($id);
+        $grade->update($request->all());
+        return response()->json($grade);
+    }
+
+    public function destroyGrade($id)
+    {
+        Grade::findOrFail($id)->delete();
+        return response()->json(['message' => 'Grade deleted']);
+    }
+
+    // Recent Attributions (Mocked for now or fetched from logs)
+    public function attributions()
+    {
+        // In a real scenario, this would fetch from an 'attribution_logs' table
+        // For now, we return a mix of real data and mock data for UI demo
+        return response()->json([
+            [ 'id' => 1, 'user' => 'Marc Antoine', 'role' => 'Plombier', 'badge' => 'OR', 'date' => '12/10/23', 'type' => 'Automatique' ],
+            [ 'id' => 2, 'user' => 'Sophie L.', 'role' => 'Coiffeuse', 'badge' => 'ARGENT', 'date' => 'En attente', 'type' => 'Litige', 'error' => true ]
+        ]);
+    }
+
+    /**
+     * Get all conversations for admin.
+     */
+    public function conversations(Request $request)
+    {
+        $perPage = $request->input('per_page', 20);
+        $search = $request->input('search');
+
+        // Subquery to find the latest message ID for each unique pair
+        $subquery = Message::select(DB::raw('MAX(id) as id'))
+            ->groupBy(DB::raw('LEAST(sender_id, receiver_id)'), DB::raw('GREATEST(sender_id, receiver_id)'));
+
+        // Main query fetching the actual message rows
+        $query = Message::whereIn('id', $subquery)
+            ->with(['sender', 'receiver'])
+            ->orderBy('created_at', 'desc');
+
+        if ($search) {
+            $query->where(function($q) use ($search) {
+                $q->whereHas('sender', function($u) use ($search) {
+                    $u->where('name', 'like', "%{$search}%");
+                })->orWhereHas('receiver', function($u) use ($search) {
+                    $u->where('name', 'like', "%{$search}%");
+                });
+            });
+        }
+
+        $conversations = $query->paginate($perPage);
+
+        return response()->json($conversations);
     }
 }

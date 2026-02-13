@@ -176,6 +176,7 @@ class ProviderController extends Controller
             'experience' => $request->experience,
             'diplomas' => $request->diplomas,
             'category_id' => !empty($request->category_ids) ? $request->category_ids[0] : null,
+            'availabilities' => $request->availabilities,
         ]);
 
         if ($request->has('category_ids')) {

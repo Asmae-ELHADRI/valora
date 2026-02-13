@@ -9,7 +9,7 @@ import {
   CheckCircle, XCircle, Shield, ShieldAlert,
   Loader2, ArrowRight, User, Mail, ShieldCheck,
   AlertTriangle, Filter, LayoutGrid, List as ListIcon,
-  TrendingUp, Award, Save
+  TrendingUp, Award, Save, ChevronDown
 } from 'lucide-vue-next';
 import { Line } from 'vue-chartjs';
 import { 
@@ -833,17 +833,17 @@ const getRoleClass = (role) => {
 
           <div class="space-y-2">
             <label class="block text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Rôle</label>
-            <div class="grid grid-cols-3 gap-3">
-              <button 
-                type="button" 
-                v-for="role in roles" 
-                :key="role.id"
-                @click="userForm.role_id = role.id"
-                class="py-3 px-2 rounded-xl text-[10px] font-black uppercase tracking-widest border-2 transition"
-                :class="userForm.role_id === role.id ? 'bg-gray-900 border-gray-900 text-white' : 'bg-white border-gray-100 text-gray-400 hover:border-gray-200'"
+            <div class="relative">
+              <Briefcase class="absolute left-5 top-4 w-5 h-5 text-gray-400 pointer-events-none" />
+              <select 
+                v-model="userForm.role_id" 
+                required
+                class="w-full pl-14 pr-10 py-4 bg-gray-50 border-none rounded-2xl text-sm font-bold text-gray-700 focus:ring-2 focus:ring-blue-500 outline-none transition appearance-none cursor-pointer"
               >
-                {{ role.name }}
-              </button>
+                <option :value="null" disabled>Choisir un rôle...</option>
+                <option v-for="role in roles" :key="role.id" :value="role.id">{{ role.name }}</option>
+              </select>
+              <ChevronDown class="absolute right-5 top-4 w-5 h-5 text-gray-400 pointer-events-none" />
             </div>
           </div>
 

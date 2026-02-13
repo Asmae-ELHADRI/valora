@@ -65,6 +65,41 @@ const showSuccessToast = (message) => {
     }, 3000);
 };
 
+const showReportModal = ref(false);
+const reportForm = ref({
+    reason: 'Comportement inapproprié',
+    description: ''
+});
+const reportLoading = ref(false);
+const showMenu = ref(false);
+
+const openReportModal = () => {
+    showMenu.value = false;
+    showReportModal.value = true;
+};
+
+const submitReport = async () => {
+    if (!activeConversation.value) return;
+    reportLoading.value = true;
+    try {
+        await api.post('/api/report', {
+            reported_id: activeConversation.value.user.id,
+            reason: reportForm.value.reason,
+            description: reportForm.value.description
+        });
+        showSuccessToast('Utilisateur signalé et bloqué.');
+        showReportModal.value = false;
+        reportForm.value.description = '';
+        if (activeConversation.value) {
+            activeConversation.value.user.has_blocked = true;
+        }
+    } catch (err) {
+        showErrorToast(err.response?.data?.message || 'Erreur lors du signalement.');
+    } finally {
+        reportLoading.value = false;
+    }
+};
+
 const showErrorToast = (message) => {
     toastType.value = 'error';
     toastMessage.value = message;
@@ -429,6 +464,11 @@ const groupedMessages = computed(() => {
     return groups;
 });
 
+const isBlocked = computed(() => {
+    if (!activeConversation.value) return false;
+    return activeConversation.value.user.has_blocked || activeConversation.value.user.is_blocked_by;
+});
+
 const formatDateHeader = (dateStr) => {
     const today = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
     const yesterday = new Date(Date.now() - 86400000).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -604,9 +644,18 @@ onMounted(() => {
                           </div>
                      </div>
                     
-                    <button class="p-3 rounded-2xl text-gray-400 hover:bg-gray-50 transition">
-                        <MoreVertical class="w-5 h-5" />
-                    </button>
+                    <div class="relative">
+                        <button @click="showMenu = !showMenu" class="p-3 rounded-2xl text-gray-400 hover:bg-gray-50 transition">
+                            <MoreVertical class="w-5 h-5" />
+                        </button>
+                        <!-- Dropdown Menu -->
+                        <div v-if="showMenu" class="absolute right-0 top-full mt-2 w-48 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-50">
+                            <button @click="openReportModal" class="w-full text-left px-5 py-3 hover:bg-red-50 text-red-500 font-bold text-xs uppercase tracking-wider flex items-center transition-colors">
+                                <Ban class="w-4 h-4 mr-2" />
+                                Signaler
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Messages Area with Grouping -->
@@ -746,7 +795,14 @@ onMounted(() => {
 
                 <!-- Input Area -->
                 <div class="p-6 bg-white border-t border-gray-100">
-                    <div v-if="selectedFile" class="mb-4 relative inline-block">
+                    <div v-if="isBlocked" class="p-4 bg-gray-50 rounded-2xl text-center border border-gray-100">
+                        <p class="text-gray-500 font-bold text-sm flex items-center justify-center">
+                            <Ban class="w-5 h-5 mr-2 text-red-500" />
+                            Discussion bloquée. Vous ne pouvez plus échanger avec cet utilisateur.
+                        </p>
+                    </div>
+                    <div v-else>
+                        <div v-if="selectedFile" class="mb-4 relative inline-block">
                         <div class="relative rounded-2xl overflow-hidden h-24 w-24 border-2 border-blue-100 shadow-xl shadow-blue-50">
                             <img v-if="previewUrl" :src="previewUrl" class="w-full h-full object-cover">
                             <div v-else class="w-full h-full bg-blue-50 flex flex-col items-center justify-center p-2 text-center">
@@ -800,6 +856,7 @@ onMounted(() => {
                         </div>
 
                         <!-- Normal Input Mode -->
+
                         <template v-else>
                             <button 
                                 type="button"
@@ -842,6 +899,7 @@ onMounted(() => {
                             <Send v-else class="w-6 h-6" />
                         </button>
                     </form>
+                    </div>
                 </div>
             </template>
             
@@ -854,6 +912,46 @@ onMounted(() => {
             </div>
         </div>
     </div>
+
+            <!-- Report Modal -->
+        <div v-if="showReportModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" @click="showReportModal = false"></div>
+            <div class="relative bg-white w-full max-w-md rounded-[32px] shadow-2xl p-8 border border-slate-100 animate-in fade-in zoom-in duration-300">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-2xl font-black text-slate-900 flex items-center">
+                        <Ban class="w-6 h-6 mr-3 text-red-500" />
+                        Signaler
+                    </h3>
+                    <button @click="showReportModal = false" class="p-2 hover:bg-slate-50 rounded-full text-slate-400 hover:text-slate-600 transition">
+                        <X class="w-5 h-5" />
+                    </button>
+                </div>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">Motif du signalement</label>
+                        <select v-model="reportForm.reason" class="w-full px-4 py-3 bg-slate-50 rounded-xl border border-slate-200 focus:ring-2 focus:ring-red-500/20 outline-none text-slate-900 font-bold text-sm appearance-none">
+                            <option>Comportement inapproprié</option>
+                            <option>Spam ou fraude</option>
+                            <option>Harcèlement</option>
+                            <option>Autre problème</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">Description (Optionnel)</label>
+                        <textarea v-model="reportForm.description" rows="4" placeholder="Décrivez le problème..." class="w-full px-4 py-3 bg-slate-50 rounded-xl border border-slate-200 focus:ring-2 focus:ring-red-500/20 outline-none text-slate-900 font-medium text-sm resize-none"></textarea>
+                    </div>
+                </div>
+
+                <div class="flex space-x-4 mt-8">
+                    <button @click="showReportModal = false" class="flex-1 py-4 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition">Annuler</button>
+                    <button @click="submitReport" :disabled="reportLoading" class="flex-1 py-4 bg-red-500 text-white font-bold rounded-xl hover:bg-red-600 transition shadow-lg shadow-red-500/30 flex justify-center items-center">
+                        <Loader2 v-if="reportLoading" class="w-5 h-5 animate-spin mr-2" />
+                        Signaler
+                    </button>
+                </div>
+            </div>
+        </div>
 
     <Transition name="toast">
         <div v-if="showToast" 
