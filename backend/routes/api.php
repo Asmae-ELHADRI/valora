@@ -61,6 +61,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/profile', [\App\Http\Controllers\Api\ProviderController::class, 'updateProfile']);
         Route::put('/profile', [\App\Http\Controllers\Api\ProviderController::class, 'updateProfile']);
         Route::post('/photo', [\App\Http\Controllers\Api\ProviderController::class, 'uploadPhoto']);
+        Route::post('/cv', [\App\Http\Controllers\Api\ProviderController::class, 'uploadCv']);
         Route::post('/availability', [\App\Http\Controllers\Api\ProviderController::class, 'updateAvailability']);
         Route::post('/visibility', [\App\Http\Controllers\Api\ProviderController::class, 'toggleVisibility']);
         Route::get('/certificate', [\App\Http\Controllers\Api\CertificateController::class, 'show']);

@@ -3,7 +3,12 @@ import { ref, onMounted, computed, watch } from 'vue';
 import { useAuthStore } from '../store/auth';
 import { useRouter } from 'vue-router';
 import api from '../services/api';
-import { Search, FileText, Star, TrendingUp, Clock, CheckCircle, Check, XCircle, MapPin, Loader2, User, Settings, LogOut, Power, MessageCircle, ShieldCheck, Award, Plus, ArrowRight, ChevronDown, Eye, EyeOff, Briefcase, Calendar, LifeBuoy, Smartphone, Mail, Fingerprint, X, PenTool, ChevronLeft, ChevronRight, Zap, Trophy, Coins, Users } from 'lucide-vue-next';
+import { 
+  Search, FileText, Star, TrendingUp, Clock, CheckCircle, Check, XCircle, MapPin, Loader2, User, 
+  Settings, LogOut, Power, MessageCircle, ShieldCheck, Award, Plus, ArrowRight, Mail, Phone, 
+  Briefcase, Calendar, Camera, AlertCircle, Edit3, Save, X, Fingerprint, Coins, ChevronDown, 
+  LifeBuoy, Zap, Trophy, Users, ExternalLink, Download, UploadCloud, FileCheck 
+} from 'lucide-vue-next';
 import PhotoUploader from '../components/PhotoUploader.vue';
 import AvailabilityScheduler from '../components/AvailabilityScheduler.vue';
 
@@ -26,7 +31,10 @@ const nextStep = () => {
 };
 
 const prevStep = () => {
-    if (currentStep.value > 1) currentStep.value--;
+    if (currentStep.value > 1) {
+        currentStep.value--;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
 };
 
 const moroccanCities = [
@@ -103,19 +111,37 @@ const categoryGroups = {
 const filteredCategoryGroups = computed(() => {
     const searchLower = categorySearch.value.toLowerCase();
     const result = [];
+    const usedCategoryIds = new Set();
     
+    // Process defined groups
     for (const [groupName, categoryNames] of Object.entries(categoryGroups)) {
         const groupCategories = categories.value.filter(cat => 
             categoryNames.includes(cat.name) &&
             cat.name.toLowerCase().includes(searchLower)
         );
+        
         if (groupCategories.length > 0) {
+            groupCategories.forEach(c => usedCategoryIds.add(c.id));
             result.push({
                 name: groupName,
                 categories: groupCategories
             });
         }
     }
+
+    // specific fix for "mekanisyan" or other dynamic categories
+    const otherCategories = categories.value.filter(cat => 
+        !usedCategoryIds.has(cat.id) && 
+        cat.name.toLowerCase().includes(searchLower)
+    );
+
+    if (otherCategories.length > 0) {
+        result.push({
+            name: 'Autres Spécialités',
+            categories: otherCategories
+        });
+    }
+
     return result;
 });
 
@@ -149,15 +175,18 @@ const profileForm = ref({
   category_ids: [],
   is_visible: true,
   availabilities: {},
-  description: [] // Detailed experiences list
+
+  achievements: [], // Replaces description for array usage
+  description: '' // Bio
 });
 
 const addDetailedExperience = () => {
-    profileForm.value.description.push('');
+    if (!profileForm.value.achievements) profileForm.value.achievements = [];
+    profileForm.value.achievements.push('');
 };
 
 const removeDetailedExperience = (index) => {
-    profileForm.value.description.splice(index, 1);
+    profileForm.value.achievements.splice(index, 1);
 };
 
 const visibility = ref(true);
@@ -210,8 +239,11 @@ const initProfileForm = () => {
       diplomas: user.prestataire?.diplomas || '',
       hourly_rate: user.prestataire?.hourly_rate || '',
       category_ids: userCategoryIds,
+      category_ids: userCategoryIds,
       availabilities: user.prestataire?.availabilities || {},
-      description: user.prestataire?.description ? user.prestataire.description.split('|||') : []
+      description: user.prestataire?.description || '',
+      achievements: user.prestataire?.achievements || [],
+      skills: user.prestataire?.skills || ''
     };
     
     // Initialize hasDiploma state
@@ -248,34 +280,123 @@ watch(() => auth.user, () => {
   initProfileForm();
 }, { deep: true });
 
+const cvUploading = ref(false);
+const cvInput = ref(null);
+
+const handleCvUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Validation Basic
+    const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    if (!allowedTypes.includes(file.type)) {
+        error.value = "Format invalide. PDF ou DOCX uniquement.";
+        return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+        error.value = "Le fichier dépasse 5Mo.";
+        return;
+    }
+
+    cvUploading.value = true;
+    const formData = new FormData();
+    formData.append('cv', file);
+
+    try {
+        const response = await api.post('/api/provider/cv', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        
+        // Update local state
+        if (auth.user.prestataire) {
+            auth.user.prestataire.cv_url = response.data.cv_url;
+        }
+        success.value = "CV ajouté avec succès !";
+        setTimeout(() => success.value = null, 3000);
+    } catch (err) {
+        console.error(err);
+        error.value = "Erreur lors de l'envoi du CV.";
+    } finally {
+        cvUploading.value = false;
+        // Reset input
+        if (event.target) event.target.value = '';
+    }
+};
+
 const saveProfile = async () => {
-  saving.value = true;
-  success.value = null;
-  error.value = null;
-  try {
-    const dataToSend = {
-        ...profileForm.value,
-        description: profileForm.value.description.filter(e => e.trim() !== '').join('|||')
-    };
-    const response = await api.post('/api/provider/profile', dataToSend);
-    auth.user = response.data.user; // Update store
+    saving.value = true;
+    success.value = null;
+    error.value = null;
+    try {
+        const dataToSend = {
+            ...profileForm.value,
+            achievements: profileForm.value.achievements.filter(a => a && a.trim() !== ''),
+            description: profileForm.value.description 
+        };
+        const response = await api.post('/api/provider/profile', dataToSend);
+        auth.user = response.data.user; // Update store
+        
+        // Save availability
+        await api.post('/api/provider/availability', { availabilities: profileForm.value.availabilities });
+        
+        success.value = "Profil mis à jour avec succès !";
+        setTimeout(() => { success.value = null; }, 4000);
+        
+        // Switch to CV View automatically
+        cvMode.value = true;
+        currentStep.value = 1;
+    } catch (err) {
+        console.error(err);
+        const userInfo = `[User: #${auth.user?.id || '?'} - ${auth.user?.name || 'Inconnu'}]`;
+        let errorMsg = "Erreur lors de la mise à jour du profil.";
+        
+        if (err.response && err.response.data && err.response.data.errors) {
+            const firstError = Object.values(err.response.data.errors)[0][0];
+            errorMsg = `Erreur API : ${firstError}`;
+        } else if (err.response && err.response.data && err.response.data.message) {
+            errorMsg = `Erreur API : ${err.response.data.message}`;
+        }
+        
+        error.value = `${userInfo} ${errorMsg}`;
+        setTimeout(() => { error.value = null; }, 6000);
+    } finally {
+        saving.value = false;
+    }
+};
+
+const validateAndSubmit = () => {
+    const d = profileForm.value;
+    const requiredFields = [
+        { key: 'first_name', label: 'Prénom' },
+        { key: 'last_name', label: 'Nom' },
+        { key: 'phone', label: 'Téléphone' },
+        { key: 'city', label: 'Ville' },
+        { key: 'address', label: 'Adresse' },
+        { key: 'birth_date', label: 'Date de naissance' },
+        { key: 'cin', label: 'CIN' },
+        { key: 'description', label: 'Biographie' },
+        { key: 'experience', label: 'Années d\'expérience' },
+        { key: 'hourly_rate', label: 'Taux horaire' }
+    ];
+
+    const missing = requiredFields.filter(f => !d[f.key]);
+    const userInfo = `[User: #${auth.user?.id || '?'} - ${auth.user?.name || 'Inconnu'}]`;
     
-    // Save availability
-    await api.post('/api/provider/availability', { availabilities: profileForm.value.availabilities });
-    
-    success.value = "Profil mis à jour avec succès !";
-    setTimeout(() => { success.value = null; }, 4000);
-    
-    // Switch to CV View automatically
-    cvMode.value = true;
-    currentStep.value = 1;
-  } catch (err) {
-    console.error(err);
-    error.value = "Erreur lors de la mise à jour du profil.";
-    setTimeout(() => { error.value = null; }, 4000);
-  } finally {
-    saving.value = false;
-  }
+    if (missing.length > 0) {
+        error.value = `${userInfo} Veuillez remplir les champs obligatoires : ${missing.map(f => f.label).join(', ')}`;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        setTimeout(() => { error.value = null; }, 6000);
+        return;
+    }
+
+    if (!d.category_ids || d.category_ids.length === 0) {
+        error.value = `${userInfo} Veuillez sélectionner au moins un domaine d'expertise.`;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        setTimeout(() => { error.value = null; }, 6000);
+        return;
+    }
+
+    saveProfile();
 };
 
 const handlePhotoUpdate = (newUrl) => {
@@ -464,7 +585,7 @@ const orderedDays = computed(() => {
   <div :class="cvMode ? 'max-w-[1500px]' : 'max-w-7xl'" class="mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-32 font-sans selection:bg-premium-yellow selection:text-slate-900 overflow-x-hidden transition-all duration-700">
     <!-- Modern Notifications -->
     <Transition name="fade">
-        <div v-if="success || error" class="fixed top-24 left-1/2 -translate-x-1/2 z-50 w-full max-w-md px-6 pointer-events-none">
+        <div v-if="success || error" class="fixed top-24 left-1/2 -translate-x-1/2 z-[100] w-full max-w-md px-6 pointer-events-none">
             <div :class="success ? 'bg-emerald-600 shadow-emerald-500/20' : 'bg-red-600 shadow-red-500/20'" class="p-4 rounded-4xl text-white shadow-2xl backdrop-blur-md flex items-center space-x-4 animate-in slide-in-from-top-10 duration-500 pointer-events-auto">
                 <div class="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">
                     <CheckCircle v-if="success" class="w-6 h-6" />
@@ -621,7 +742,7 @@ const orderedDays = computed(() => {
                 <h4 class="text-white font-black text-lg">{{ $t('common.support_title') }}</h4>
                 <p class="text-indigo-100 text-[10px] font-medium leading-relaxed">{{ $t('common.support_desc') }}</p>
             </div>
-            <router-link to="/messages?userId=19" class="inline-flex items-center space-x-2 bg-white text-indigo-600 px-6 py-3 rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-premium-yellow hover:text-slate-900 transition-all shadow-lg active:scale-95">
+            <router-link to="/messages" class="inline-flex items-center space-x-2 bg-white text-indigo-600 px-6 py-3 rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-premium-yellow hover:text-slate-900 transition-all shadow-lg active:scale-95">
                 <span>{{ $t('common.contact_admin') }}</span>
                 <ArrowRight class="w-4 h-4" />
             </router-link>
@@ -638,17 +759,18 @@ const orderedDays = computed(() => {
                 <button 
                   v-for="tab in [
                     { id: 'overview', label: 'Vue d\'ensemble' },
+                    { id: 'missions', label: 'Mes Missions' },
                     { id: 'profile', label: 'Mon Profil & Vitrine' },
                     { id: 'settings', label: 'Paramètres & Sécurité' }
                   ]"
                   :key="tab.id"
                   @click="activeTab = tab.id"
-                  class="pb-5 relative group transition-all"
+                  class="pb-5 relative group transition-all shrink-0"
                   :class="activeTab === tab.id ? 'text-slate-900' : 'text-slate-400 hover:text-slate-600'"
                 >
                     <span class="text-sm font-black uppercase tracking-[0.2em]">{{ tab.label }}</span>
                     <div class="absolute bottom-0 left-0 w-full h-1 bg-slate-900 rounded-full transition-all scale-x-0 group-hover:scale-x-50" :class="{ 'scale-x-100': activeTab === tab.id }"></div>
-                    <div v-if="tab.id === 'overview' && pendingApplications.length > 0" class="absolute -top-1 -right-4 w-4 h-4 bg-premium-yellow rounded-full flex items-center justify-center text-[8px] font-black text-slate-900 border-2 border-white animate-bounce-slow">
+                    <div v-if="(tab.id === 'overview' || tab.id === 'missions') && pendingApplications.length > 0" class="absolute -top-1 -right-4 w-4 h-4 bg-premium-yellow rounded-full flex items-center justify-center text-[8px] font-black text-slate-900 border-2 border-white animate-bounce-slow">
                         {{ pendingApplications.length }}
                     </div>
                 </button>
@@ -744,7 +866,7 @@ const orderedDays = computed(() => {
                                         <MapPin class="w-3 h-3" />
                                         <span>{{ mission.service_offer?.city || 'Maroc' }}</span>
                                     </div>
-                                    <button class="bg-slate-900 text-white px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-premium-yellow hover:text-slate-900 transition-all shadow-lg active:scale-95">
+                                    <button @click="activeTab = 'missions'" class="bg-slate-900 text-white px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-premium-yellow hover:text-slate-900 transition-all shadow-lg active:scale-95">
                                         Détails
                                     </button>
                                 </div>
@@ -801,6 +923,83 @@ const orderedDays = computed(() => {
                      <div class="absolute -bottom-24 -left-24 w-64 h-64 bg-premium-yellow/5 rounded-full blur-3xl"></div>
                 </div>
             </div>
+
+            <!-- TAB: MISSIONS (New) -->
+            <div v-show="activeTab === 'missions'" class="space-y-8 animate-in fade-in slide-in-from-bottom-5 duration-700">
+                <div class="bg-white rounded-[3rem] p-10 shadow-sm border border-slate-100">
+                    <h3 class="text-xl font-black text-slate-900 tracking-tight mb-8 flex items-center">
+                        <Briefcase class="w-6 h-6 mr-3 text-premium-brown" />
+                        Toutes vos missions
+                    </h3>
+
+                    <div v-if="loading" class="text-center py-20">
+                         <Loader2 class="w-10 h-10 animate-spin text-premium-yellow mx-auto" />
+                    </div>
+
+                    <div v-else-if="applications.length === 0" class="text-center py-20 border-2 border-dashed border-slate-100 rounded-[2.5rem]">
+                        <p class="text-slate-400 font-bold">Aucune candidature ou mission trouvée.</p>
+                        <router-link to="/search" class="mt-4 inline-block bg-slate-900 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-premium-yellow hover:text-slate-900 shadow-xl transition-all">
+                            Trouver des missions
+                        </router-link>
+                    </div>
+
+                    <div v-else class="space-y-6">
+                         <div v-for="app in applications" :key="app.id" class="p-6 bg-slate-50 rounded-[2.5rem] border border-slate-100 md:flex md:items-center md:justify-between group hover:bg-white hover:shadow-xl hover:border-premium-yellow/20 transition-all duration-300">
+                            <div class="space-y-2 md:w-1/3">
+                                <div class="flex items-center space-x-3">
+                                    <div class="p-3 bg-white rounded-xl shadow-sm">
+                                        <Briefcase class="w-5 h-5 text-slate-700" />
+                                    </div>
+                                    <div>
+                                        <h4 class="font-black text-slate-900 leading-tight">{{ app.service_offer?.title }}</h4>
+                                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{{ app.service_offer?.city }} • {{ formatDate(app.created_at) }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-4 md:mt-0 md:w-1/4 flex items-center space-x-3">
+                                <div class="w-10 h-10 bg-slate-200 rounded-full flex items-center justify-center font-bold text-slate-600 text-xs">
+                                    {{ app.service_offer?.user?.name.substring(0,2).toUpperCase() }}
+                                </div>
+                                <div class="text-sm font-bold text-slate-700">{{ app.service_offer?.user?.name }}</div>
+                            </div>
+
+                            <div class="mt-4 md:mt-0 flex items-center justify-between md:justify-end gap-4 md:w-1/3">
+                                <div :class="getStatusClass(app.status)" class="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border">
+                                    {{ getStatusLabel(app.status) }}
+                                </div>
+                                
+                                <div class="flex space-x-2">
+                                    <button 
+                                        v-if="app.status === 'pending' && app.created_by_id !== auth.user?.id" 
+                                        @click="updateStatus(app.id, 'accepted')"
+                                        class="p-2 bg-emerald-100 text-emerald-600 rounded-xl hover:bg-emerald-200 transition-colors"
+                                        title="Accepter"
+                                    >
+                                        <Check class="w-5 h-5" />
+                                    </button>
+                                    <button 
+                                        v-if="app.status === 'pending' && app.created_by_id !== auth.user?.id" 
+                                        @click="updateStatus(app.id, 'rejected')"
+                                        class="p-2 bg-red-100 text-red-600 rounded-xl hover:bg-red-200 transition-colors"
+                                        title="Refuser"
+                                    >
+                                        <X class="w-5 h-5" />
+                                    </button>
+                                     <button 
+                                        v-if="app.status === 'accepted'" 
+                                        @click="updateStatus(app.id, 'completed')"
+                                        class="p-2 bg-blue-100 text-blue-600 rounded-xl hover:bg-blue-200 transition-colors"
+                                        title="Marquer comme terminé"
+                                    >
+                                        <CheckCircle class="w-5 h-5" />
+                                    </button>
+                                </div>
+                            </div>
+                         </div>
+                    </div>
+                </div>
+            </div>
     
     <!-- Other Tabs (Profile, Settings) kept simple for now or reused from previous structure if needed -->
     <!-- ... same as before but wrapped in v-show ... -->
@@ -844,6 +1043,16 @@ const orderedDays = computed(() => {
                             
                             <!-- Quick Management Actions -->
                             <div class="absolute top-8 right-10 flex items-center space-x-4 z-20">
+                                <a 
+                                    v-if="auth.user?.prestataire?.cv_url" 
+                                    :href="auth.user.prestataire.cv_url" 
+                                    target="_blank" 
+                                    download
+                                    class="bg-white/10 hover:bg-white/20 backdrop-blur-md text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-white/10 transition-all flex items-center space-x-2 group"
+                                >
+                                    <Download class="w-4 h-4 text-premium-yellow group-hover:translate-y-0.5 transition-transform" />
+                                    <span>Télécharger CV</span>
+                                </a>
                                 <button @click="cvMode = false" class="bg-white/10 hover:bg-white/20 backdrop-blur-md text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-white/10 transition-all flex items-center space-x-2 group">
                                     <PenTool class="w-4 h-4 text-premium-yellow group-hover:rotate-12 transition-transform" />
                                     <span>Modifier</span>
@@ -863,22 +1072,22 @@ const orderedDays = computed(() => {
                             </div>
                         </div>
                         
-                        <div class="px-10 md:px-20 pb-16 xl:pb-10">
-                            <div class="flex flex-col md:flex-row gap-12 items-start -mt-24 relative z-10">
+                        <div class="px-6 md:px-12 xl:px-16 pb-16 xl:pb-12">
+                            <div class="flex flex-col lg:flex-row gap-8 xl:gap-12 items-start -mt-20 xl:-mt-24 relative z-10">
                                 <!-- Avatar Orb -->
                                 <div class="relative group/avatar">
                                     <div class="w-48 h-48 xl:w-40 xl:h-40 rounded-[3.5rem] xl:rounded-[3rem] bg-slate-50 border-[10px] xl:border-[8px] border-white shadow-2xl overflow-hidden flex items-center justify-center relative z-10 transform group-hover/avatar:scale-105 transition-all duration-500">
                                         <img v-if="auth.user?.prestataire?.photo_url" :src="auth.user.prestataire.photo_url" class="w-full h-full object-cover">
                                         <User v-else class="w-20 h-20 text-slate-200" />
                                     </div>
-                                    <div class="absolute -bottom-4 -right-4 p-3 rounded-2xl shadow-2xl border-4 border-white z-20 flex items-center justify-center ring-8 ring-white/30" :class="currentBadge.bg" :title="`Badge ${currentBadge.name}`">
+                                    <div class="absolute -bottom-4 -right-4 p-3 rounded-2xl shadow-2xl border-4 border-white z-20 flex items-center justify-center ring-4 ring-white/30" :class="currentBadge.bg" :title="`Badge ${currentBadge.name}`">
                                         <component :is="currentBadge.icon" class="w-8 h-8" :class="currentBadge.color" />
                                     </div>
                                 </div>
                                 
                                 <div class="md:pt-28 xl:pt-20 space-y-4 grow">
-                                    <div class="space-y-2">
-                                        <div class="flex flex-col md:flex-row md:items-center gap-3 md:gap-6">
+                                    <div class="space-y-4">
+                                        <div class="flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-6">
                                             <h2 class="text-3xl sm:text-4xl md:text-5xl font-black text-slate-900 tracking-tighter">{{ userFullName }}</h2>
                                             <div class="flex items-center">
                                                 <div class="px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-[0.2em] border shadow-sm backdrop-blur-md" :class="[currentBadge.bg, currentBadge.border, currentBadge.color]">
@@ -932,9 +1141,9 @@ const orderedDays = computed(() => {
                             </div>
 
                             <!-- Main View Content Grid (Fully Responsive Optimization) -->
-                            <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 xl:gap-20 mt-16 xl:mt-10">
+                            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 xl:gap-16 mt-12 xl:mt-16">
                                 <!-- Left Section: BIO & EXP -->
-                                <div class="lg:col-span-7 xl:col-span-8 space-y-16 xl:space-y-10">
+                                <div class="lg:col-span-8 space-y-12 xl:space-y-10">
                                     <!-- Biographie Section -->
                                     <div class="space-y-6">
                                         <h4 class="text-xs font-black text-slate-900 uppercase tracking-[0.3em] flex items-center">
@@ -942,7 +1151,7 @@ const orderedDays = computed(() => {
                                             Parcours & Valeurs
                                         </h4>
                                         <p class="text-slate-600 font-medium leading-[2] text-lg max-w-3xl whitespace-pre-line">
-                                            {{ profileForm.skills || "Aucune biographie détaillée n'a été configurée pour le moment." }}
+                                            {{ profileForm.description || "Aucune biographie détaillée n'a été configurée pour le moment." }}
                                         </p>
                                     </div>
 
@@ -959,7 +1168,7 @@ const orderedDays = computed(() => {
                                         </div>
                                         
                                         <div class="space-y-8 pl-6 border-l-2 border-slate-100 relative ml-5">
-                                            <div v-for="(exp, idx) in profileForm.description" :key="idx" class="relative group">
+                                            <div v-for="(exp, idx) in (profileForm.achievements || [])" :key="idx" class="relative group">
                                                 <!-- Pulse Point on Timeline -->
                                                 <div class="absolute -left-[35px] top-8 w-5 h-5 rounded-full bg-white border-4 border-slate-200 transition-all group-hover:border-premium-yellow group-hover:scale-125 z-10 flex items-center justify-center">
                                                     <div class="w-1.5 h-1.5 rounded-full bg-slate-400 group-hover:bg-premium-yellow shadow-sm"></div>
@@ -990,7 +1199,7 @@ const orderedDays = computed(() => {
                                                     <div class="absolute -bottom-10 -right-10 w-32 h-32 bg-premium-yellow/5 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700"></div>
                                                 </div>
                                             </div>
-                                            <div v-if="profileForm.description.length === 0" class="p-16 bg-slate-50/50 rounded-[3rem] text-slate-400 font-medium text-sm border-2 border-dashed border-slate-100 text-center flex flex-col items-center space-y-6 group cursor-pointer hover:border-premium-yellow/20 transition-all" @click="activeTab = 'profile'; cvMode = false; currentStep = 2">
+                                            <div v-if="!profileForm.achievements || profileForm.achievements.length === 0" class="p-16 bg-slate-50/50 rounded-[3rem] text-slate-400 font-medium text-sm border-2 border-dashed border-slate-100 text-center flex flex-col items-center space-y-6 group cursor-pointer hover:border-premium-yellow/20 transition-all" @click="activeTab = 'profile'; cvMode = false; currentStep = 2">
                                                 <div class="w-20 h-20 bg-white rounded-3xl flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
                                                     <Plus class="w-10 h-10 text-slate-200" />
                                                 </div>
@@ -1005,7 +1214,7 @@ const orderedDays = computed(() => {
                                 </div>
                                 
                                 <!-- Right Section: Details & Availabilities -->
-                                <div class="lg:col-span-5 xl:col-span-4 space-y-12 xl:space-y-8">
+                                <div class="lg:col-span-4 space-y-8">
                                     <!-- Diplômes Grid-style (Moved for balance) -->
                                     <div class="space-y-6">
                                         <h4 class="text-xs font-black text-slate-900 uppercase tracking-[0.3em] flex items-center">
@@ -1046,9 +1255,9 @@ const orderedDays = computed(() => {
                                                 <div class="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center border border-slate-100 group-hover/item:border-premium-yellow/30 group-hover/item:bg-white transition-all duration-300">
                                                     <Mail class="w-5 h-5 text-premium-brown group-hover/item:scale-110 transition-transform" />
                                                 </div>
-                                                <div class="space-y-0.5 whitespace-nowrap overflow-hidden pr-4">
+                                                <div class="space-y-0.5 pr-4 min-w-0 flex-1">
                                                     <div class="text-[9px] uppercase tracking-widest text-slate-400 font-black">Email Professionnel</div>
-                                                    <div class="text-sm font-black text-slate-900 truncate">{{ auth.user?.email }}</div>
+                                                    <div class="text-sm font-black text-slate-900 break-words leading-tight">{{ auth.user?.email }}</div>
                                                 </div>
                                             </div>
                                             <div class="flex items-center space-x-5 group/item">
@@ -1167,6 +1376,47 @@ const orderedDays = computed(() => {
                                             class="relative z-10"
                                         />
                                     </div>
+                                    
+                                    <!-- CV Upload Section -->
+                                    <div class="bg-white p-8 rounded-[2.5rem] border border-slate-100 space-y-4 w-full relative overflow-hidden group/cv">
+                                        <div class="absolute top-0 right-0 w-32 h-32 bg-blue-50/50 rounded-full blur-2xl -mr-16 -mt-16 transition-all group-hover/cv:bg-blue-100/50"></div>
+                                        
+                                        <div class="flex items-center justify-between relative z-10">
+                                            <div class="flex items-center space-x-3">
+                                                <div class="w-10 h-10 rounded-2xl flex items-center justify-center transition-colors" :class="auth.user?.prestataire?.cv_url ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-400'">
+                                                    <FileCheck v-if="auth.user?.prestataire?.cv_url" class="w-5 h-5" />
+                                                    <FileText v-else class="w-5 h-5" />
+                                                </div>
+                                                <div>
+                                                    <h4 class="text-xs font-black text-slate-900 uppercase tracking-wider">Votre CV</h4>
+                                                    <p class="text-[9px] font-bold text-slate-400" v-if="auth.user?.prestataire?.cv_url">Document ajouté</p>
+                                                    <p class="text-[9px] font-bold text-slate-400" v-else>Format PDF, DOCX (Max 5Mo)</p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="relative z-10">
+                                            <input 
+                                                type="file" 
+                                                ref="cvInput" 
+                                                class="hidden" 
+                                                accept=".pdf,.doc,.docx"
+                                                @change="handleCvUpload"
+                                            >
+                                            <button 
+                                                @click="$refs.cvInput.click()" 
+                                                :disabled="cvUploading"
+                                                class="w-full py-3 px-4 rounded-xl border-2 border-dashed border-slate-200 hover:border-premium-yellow hover:bg-premium-yellow/5 active:scale-95 transition-all flex items-center justify-center space-x-2 group/btn"
+                                            >
+                                                <Loader2 v-if="cvUploading" class="w-4 h-4 animate-spin text-slate-400" />
+                                                <UploadCloud v-else class="w-4 h-4 text-slate-400 group-hover/btn:text-premium-yellow transition-colors" />
+                                                <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest group-hover/btn:text-slate-900 transition-colors">
+                                                    {{ cvUploading ? 'Envoi...' : (auth.user?.prestataire?.cv_url ? 'Remplacer le CV' : 'Ajouter un CV') }}
+                                                </span>
+                                            </button>
+                                        </div>
+                                    </div>
+
                                     <div class="bg-slate-50 p-8 rounded-[2.5rem] border border-slate-100 space-y-4 w-full">
                                         <div class="flex items-center space-x-3 text-premium-brown">
                                             <ShieldCheck class="w-5 h-5" />
@@ -1258,6 +1508,13 @@ const orderedDays = computed(() => {
                                                         </div>
                                                     </div>
                                                 </div>
+                                            </div>
+                                        </div>
+                                        <div class="space-y-2 group">
+                                            <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Adresse Complète</label>
+                                            <div class="relative">
+                                                <MapPin class="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 group-focus-within:text-premium-yellow transition-colors" />
+                                                <input v-model="profileForm.address" type="text" class="w-full pl-14 pr-6 py-4 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-8 focus:ring-premium-yellow/5 focus:border-premium-yellow outline-none transition-all font-black text-slate-900 shadow-sm text-sm" placeholder="Ex: 123 Bd Zerktouni, Maarif">
                                             </div>
                                         </div>
                                         <div class="space-y-2 group">
@@ -1414,10 +1671,10 @@ const orderedDays = computed(() => {
                                             </button>
                                         </div>
                                         <div class="space-y-3">
-                                            <div v-for="(exp, index) in profileForm.description" :key="index" class="relative group/item animate-in slide-in-from-right-2 duration-300">
+                                            <div v-for="(exp, index) in profileForm.achievements" :key="index" class="relative group/item animate-in slide-in-from-right-2 duration-300">
                                                 <div class="absolute left-4 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-premium-yellow"></div>
                                                 <input 
-                                                    v-model="profileForm.description[index]" 
+                                                    v-model="profileForm.achievements[index]" 
                                                     type="text" 
                                                     placeholder="Ex: Rénovation Maison Casablanca..." 
                                                     class="w-full pl-10 pr-12 py-4 rounded-2xl border border-slate-100 bg-slate-50/50 focus:bg-white focus:ring-4 focus:ring-premium-yellow/10 focus:border-premium-yellow outline-none transition-all text-xs font-black text-slate-800 shadow-sm"
@@ -1426,7 +1683,7 @@ const orderedDays = computed(() => {
                                                     <X class="w-4 h-4" />
                                                 </button>
                                             </div>
-                                            <div v-if="profileForm.description.length === 0" class="py-12 bg-slate-50/50 rounded-[2rem] border-2 border-dashed border-slate-100 flex flex-col items-center justify-center space-y-3 group cursor-pointer hover:border-premium-yellow/30 transition-colors" @click="addDetailedExperience">
+                                            <div v-if="profileForm.achievements.length === 0" class="py-12 bg-slate-50/50 rounded-[2rem] border-2 border-dashed border-slate-100 flex flex-col items-center justify-center space-y-3 group cursor-pointer hover:border-premium-yellow/30 transition-colors" @click="addDetailedExperience">
                                                 <div class="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm text-slate-300 group-hover:scale-110 transition-transform">
                                                     <Zap class="w-6 h-6" />
                                                 </div>
@@ -1434,18 +1691,85 @@ const orderedDays = computed(() => {
                                             </div>
                                         </div>
                                     </div>
+                                    
+                                     <!-- Skills Input -->
+                                    <div class="space-y-4 pt-4">
+                                        <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Compétences Clés (séparées par des virgules)</label>
+                                        <div class="relative group">
+                                            <div class="absolute inset-y-0 left-0 pl-6 flex items-center pointer-events-none">
+                                                <Zap class="h-5 w-5 text-slate-300 transition-colors group-focus-within:text-premium-yellow" />
+                                            </div>
+                                            <input 
+                                                v-model="profileForm.skills" 
+                                                type="text" 
+                                                placeholder="Ex: Plomberie, Soudure, Dépannage urgence..." 
+                                                class="w-full pl-14 pr-8 py-5 rounded-[2rem] border border-slate-100 bg-slate-50 focus:bg-white focus:ring-8 focus:ring-premium-yellow/5 focus:border-premium-yellow outline-none transition-all font-bold text-xs shadow-inner"
+                                            >
+                                        </div>
+                                    </div>
 
-                                    <!-- Bio Textarea -->
+                                    <!-- Hourly Rate Input -->
+                                    <div class="space-y-4 pt-4">
+                                        <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Taux Horaire (DH/h)</label>
+                                        <div class="relative group">
+                                            <div class="absolute inset-y-0 left-0 pl-6 flex items-center pointer-events-none">
+                                                <Coins class="h-5 w-5 text-slate-300 transition-colors group-focus-within:text-premium-yellow" />
+                                            </div>
+                                            <input 
+                                                v-model="profileForm.hourly_rate" 
+                                                type="number" 
+                                                placeholder="Ex: 150" 
+                                                class="w-full pl-14 pr-8 py-5 rounded-[2rem] border border-slate-100 bg-slate-50 focus:bg-white focus:ring-8 focus:ring-premium-yellow/5 focus:border-premium-yellow outline-none transition-all font-bold text-xs shadow-inner"
+                                            >
+                                        </div>
+                                    </div>
+
                                     <div class="space-y-4 pt-4">
                                         <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Bio Professionnelle</label>
                                         <div class="relative group">
                                             <textarea 
-                                                v-model="profileForm.skills" 
+                                                v-model="profileForm.description" 
                                                 rows="4" 
                                                 placeholder="Partagez votre passion et votre rigueur..." 
                                                 class="w-full px-8 py-6 rounded-[2rem] border border-slate-100 bg-slate-50 focus:bg-white focus:ring-8 focus:ring-premium-yellow/5 focus:border-premium-yellow outline-none transition-all font-bold text-xs resize-none shadow-inner leading-relaxed"
                                             ></textarea>
                                             <div class="absolute bottom-4 right-6 text-[8px] font-black text-slate-300 uppercase tracking-widest">Conseil: Soyez précis</div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Diplomas / Certifications -->
+                                    <div class="space-y-4 pt-4 border-t border-slate-50 mt-4">
+                                        <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Avez-vous des diplômes ou certifications ?</label>
+                                        <div class="flex items-center space-x-6">
+                                            <label class="flex items-center space-x-3 cursor-pointer group">
+                                                <div class="relative">
+                                                    <input type="radio" v-model="hasDiploma" value="Oui" class="peer sr-only">
+                                                    <div class="w-6 h-6 rounded-full border-2 border-slate-200 peer-checked:border-premium-yellow peer-checked:bg-premium-yellow transition-all"></div>
+                                                    <div class="absolute inset-0 flex items-center justify-center transform scale-0 peer-checked:scale-100 transition-transform">
+                                                        <div class="w-2 h-2 bg-slate-900 rounded-full"></div>
+                                                    </div>
+                                                </div>
+                                                <span class="text-xs font-bold text-slate-600 group-hover:text-slate-900 transition-colors">Oui, j'en ai</span>
+                                            </label>
+                                            <label class="flex items-center space-x-3 cursor-pointer group">
+                                                <div class="relative">
+                                                    <input type="radio" v-model="hasDiploma" value="Non" class="peer sr-only">
+                                                    <div class="w-6 h-6 rounded-full border-2 border-slate-200 peer-checked:border-slate-900 peer-checked:bg-slate-900 transition-all"></div>
+                                                </div>
+                                                <span class="text-xs font-bold text-slate-600 group-hover:text-slate-900 transition-colors">Non, pas pour l'instant</span>
+                                            </label>
+                                        </div>
+
+                                        <div v-if="hasDiploma === 'Oui'" class="relative group animate-in fade-in slide-in-from-top-2 duration-300">
+                                            <div class="absolute inset-y-0 left-0 pl-6 flex items-center pointer-events-none">
+                                                <Award class="h-5 w-5 text-slate-300 transition-colors group-focus-within:text-premium-yellow" />
+                                            </div>
+                                            <input 
+                                                v-model="profileForm.diplomas" 
+                                                type="text" 
+                                                placeholder="Ex: CAP Plomberie, Certificat Élec..." 
+                                                class="w-full pl-14 pr-8 py-5 rounded-[2rem] border border-slate-100 bg-slate-50 focus:bg-white focus:ring-8 focus:ring-premium-yellow/5 focus:border-premium-yellow outline-none transition-all font-bold text-xs shadow-inner"
+                                            >
                                         </div>
                                     </div>
                                 </div>
@@ -1469,11 +1793,12 @@ const orderedDays = computed(() => {
                     </div>
 
                     <!-- WIZARD NAVIGATION -->
-                    <div class="max-w-4xl mx-auto flex items-center justify-between pt-10 border-t border-slate-100">
+                    <div class="max-w-4xl mx-auto flex items-center justify-between pt-10 border-t border-slate-100 relative z-20">
                         <button 
                             v-if="currentStep > 1"
+                            type="button"
                             @click="prevStep" 
-                            class="flex items-center space-x-3 px-8 py-4 rounded-3xl border-2 border-slate-100 text-slate-900 font-black text-xs uppercase tracking-widest transition-all hover:border-slate-900 active:scale-95"
+                            class="flex items-center space-x-3 px-8 py-4 rounded-3xl border-2 border-slate-100 text-slate-900 font-black text-xs uppercase tracking-widest transition-all hover:border-slate-900 active:scale-95 cursor-pointer bg-white"
                         >
                             <ChevronLeft class="w-5 h-5" />
                             <span>Précédent</span>
@@ -1483,6 +1808,7 @@ const orderedDays = computed(() => {
                         <div class="flex items-center space-x-4">
                             <button 
                                 v-if="currentStep < 3"
+                                type="button"
                                 @click="nextStep" 
                                 class="flex items-center space-x-3 bg-premium-yellow text-slate-900 px-10 py-4 rounded-3xl font-black text-xs uppercase tracking-widest transition-all hover:bg-yellow-400 hover:shadow-xl active:scale-95"
                             >
@@ -1491,7 +1817,8 @@ const orderedDays = computed(() => {
                             </button>
                             <button 
                                 v-else
-                                @click="saveProfile" 
+                                type="button"
+                                @click="validateAndSubmit"  
                                 :disabled="saving"
                                 class="flex items-center space-x-3 bg-premium-yellow text-slate-900 px-10 py-4 rounded-3xl font-black text-xs uppercase tracking-widest transition-all hover:bg-yellow-400 hover:shadow-xl active:scale-95 disabled:opacity-50"
                             >

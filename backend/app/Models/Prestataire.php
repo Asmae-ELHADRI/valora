@@ -16,13 +16,12 @@ class Prestataire extends Model
         'user_id',
         'grade_id', // Added
         'missions_count', // Added
-        'cin',
-        'birth_date',
-        'city',
+        'photo', 'cv_url', 'cin', 'birth_date', 'certified_at', 'details', 'city',
         'hourly_rate',
         'category_id',
         'skills',
         'description',
+        'achievements', // Added
         'experience',
         'diplomas',
         'availabilities',
@@ -37,6 +36,7 @@ class Prestataire extends Model
     protected $casts = [
         'birth_date' => 'date',
         'availabilities' => 'array',
+        'achievements' => 'array', // Added
         'is_available' => 'boolean',
         'is_visible' => 'boolean',
         'is_completed' => 'boolean',

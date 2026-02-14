@@ -29,11 +29,12 @@
     <!-- Grid of Days -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
       <div v-for="day in days" :key="day.key" 
-        class="group relative bg-white rounded-[2.5rem] p-8 border border-slate-100 transition-all duration-500 hover:shadow-2xl hover:shadow-slate-200/50 flex flex-col justify-between min-h-[220px] overflow-hidden"
-        :class="availability[day.key].active ? 'ring-2 ring-premium-yellow shadow-xl' : 'bg-slate-50/30 opacity-80'"
+        class="group relative bg-white rounded-[2.5rem] p-8 border border-slate-100 transition-all duration-500 hover:shadow-2xl hover:shadow-slate-200/50 flex flex-col justify-between min-h-[220px] overflow-hidden cursor-pointer"
+        :class="availability[day.key].active ? 'ring-2 ring-premium-yellow shadow-xl' : 'bg-slate-50/50 hover:bg-white'"
+        @click="availability[day.key].active = !availability[day.key].active; emitChange()"
       >
         <!-- Background Accent for Active Days -->
-        <div v-if="availability[day.key].active" class="absolute -top-10 -right-10 w-24 h-24 bg-premium-yellow/5 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700"></div>
+        <div v-if="availability[day.key].active" class="absolute -top-10 -right-10 w-24 h-24 bg-premium-yellow/5 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700 pointer-events-none"></div>
 
         <div class="relative z-10 flex justify-between items-start mb-8">
             <div class="space-y-2">
@@ -55,7 +56,7 @@
 
             <!-- Custom Toggle -->
             <button 
-                @click="availability[day.key].active = !availability[day.key].active; emitChange()"
+                @click.stop="availability[day.key].active = !availability[day.key].active; emitChange()"
                 class="relative inline-flex h-7 w-12 items-center rounded-full transition-all duration-500 focus:outline-none ring-offset-2 focus:ring-2 focus:ring-premium-yellow"
                 :class="availability[day.key].active ? 'bg-premium-yellow shadow-lg shadow-yellow-500/20' : 'bg-slate-200'"
             >

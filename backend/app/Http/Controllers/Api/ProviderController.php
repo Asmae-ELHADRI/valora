@@ -144,6 +144,8 @@ class ProviderController extends Controller
             'address' => 'nullable|string',
             'skills' => 'nullable|string',
             'description' => 'nullable|string',
+            'achievements' => 'nullable|array', // Added
+            'achievements.*' => 'string',       // Added
             'experience' => 'nullable|string',
             'diplomas' => 'nullable|string',
             'category_ids' => 'nullable|array',
@@ -174,6 +176,7 @@ class ProviderController extends Controller
             'hourly_rate' => $request->hourly_rate,
             'skills' => $request->skills,
             'description' => $request->description,
+            'achievements' => $request->achievements, // Added
             'experience' => $request->experience,
             'diplomas' => $request->diplomas,
             'category_id' => !empty($request->category_ids) ? $request->category_ids[0] : null,
@@ -214,6 +217,42 @@ class ProviderController extends Controller
         return response()->json([
             'message' => 'Photo de profil mise à jour',
             'photo_url' => Storage::url($prestataire->photo),
+        ]);
+    }
+
+    public function uploadCv(Request $request)
+    {
+        $request->validate([
+            'cv' => 'required|file|mimes:pdf,doc,docx|max:5120', // 5MB Max
+        ]);
+
+        $user = $request->user();
+        $prestataire = $user->prestataire;
+
+        if ($request->hasFile('cv')) {
+            if (!$prestataire) {
+                $prestataire = Prestataire::create(['user_id' => $user->id]);
+            }
+            if ($prestataire->cv_url) {
+                // Remove old CV if exists (optional, or keep history)
+                // Storage::delete($prestataire->cv_url); 
+                // Note: cv_url might be a full URL if external, but verify storage path.
+                // Assuming it stores relative path in DB like photos.
+                $oldPath = str_replace('/storage/', '', parse_url($prestataire->cv_url, PHP_URL_PATH) ?? '');
+                if ($oldPath && Storage::disk('public')->exists($oldPath)) {
+                     Storage::disk('public')->delete($oldPath);
+                }
+            }
+            
+            $path = $request->file('cv')->store('resumes', 'public');
+            $fullUrl = url(Storage::url($path));
+            
+            $prestataire->update(['cv_url' => $fullUrl]);
+        }
+
+        return response()->json([
+            'message' => 'CV téléchargé avec succès',
+            'cv_url' => $fullUrl,
         ]);
     }
 

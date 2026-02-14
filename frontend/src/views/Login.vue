@@ -113,6 +113,7 @@ const isProfileIncomplete = (user) => {
 const handleLogin = async () => {
     loading.value = true;
     error.value = '';
+    const emailContext = `[Login: ${loginForm.value.email}]`;
     try {
         await auth.login({ 
             email: loginForm.value.email, 
@@ -129,13 +130,18 @@ const handleLogin = async () => {
         }
     } catch (err) {
         const message = err.response?.data?.message;
+        let finalMsg = '';
         if (message === 'Votre compte a été désactivé par un administrateur.') {
-            error.value = 'auth.account_disabled';
+            finalMsg = 'auth.account_disabled';
         } else if (err.response?.status === 422 || err.response?.status === 401) {
-            error.value = 'auth.invalid_credentials';
+            finalMsg = 'auth.invalid_credentials';
         } else {
-            error.value = getErrorMessage(err, 'auth.invalid_credentials');
+            finalMsg = getErrorMessage(err, 'auth.invalid_credentials');
         }
+        // If it's a translation key, we might ideally translate it first, 
+        // but for now we prepend the context. If it is a raw string, it works too.
+        // We will display the context in the UI.
+        error.value = `${emailContext} ${finalMsg}`; 
     } finally {
         loading.value = false;
     }
@@ -144,6 +150,7 @@ const handleLogin = async () => {
 const handleClientRegister = async () => {
     loading.value = true;
     error.value = '';
+    const context = `[Register Client: ${clientForm.value.email}]`;
     try {
         await auth.register({
             name: `${clientForm.value.prenom} ${clientForm.value.nom}`,
@@ -155,7 +162,7 @@ const handleClientRegister = async () => {
         registrationSuccess.value = true;
         setTimeout(() => router.push('/dashboard'), 1200);
     } catch (err) {
-        error.value = getErrorMessage(err, 'auth.register_error');
+        error.value = `${context} ${getErrorMessage(err, 'auth.register_error')}`;
     } finally {
         loading.value = false;
     }
@@ -164,6 +171,7 @@ const handleClientRegister = async () => {
 const handleProviderRegister = async () => {
     loading.value = true;
     error.value = '';
+    const context = `[Register Provider: ${providerForm.value.email}]`;
     try {
         await auth.register({
             name: `${providerForm.value.prenom} ${providerForm.value.nom}`,
@@ -176,7 +184,7 @@ const handleProviderRegister = async () => {
         // Redirect new providers directly to their dashboard
         setTimeout(() => router.push('/dashboard-provider'), 1200);
     } catch (err) {
-        error.value = getErrorMessage(err, 'auth.register_error');
+        error.value = `${context} ${getErrorMessage(err, 'auth.register_error')}`;
     } finally {
         loading.value = false;
     }

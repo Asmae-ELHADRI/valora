@@ -33,13 +33,13 @@ const routes = [
     {
         path: '/dashboard-provider',
         name: 'DashboardProvider',
-        component: () => import('../views/DashboardPrestataire.vue'),
+        component: () => import('../views/DashboardProvider.vue'),
         meta: { requiresAuth: true, role: 'provider' }
     },
     {
         path: '/dashboard-prestataire',
         name: 'DashboardPrestataire',
-        component: () => import('../views/DashboardPrestataire.vue'),
+        component: () => import('../views/DashboardProvider.vue'),
         meta: { requiresAuth: true, role: ['provider', 'prestataire'] }
     },
     {
@@ -54,7 +54,12 @@ const routes = [
         component: () => import('../views/Search.vue'),
         meta: { requiresAuth: true }
     },
-
+    {
+        path: '/profile',
+        name: 'Profile',
+        component: () => import('../views/Profile.vue'),
+        meta: { requiresAuth: true }
+    },
     {
         path: '/messages',
         name: 'Messages',
