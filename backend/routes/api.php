@@ -80,6 +80,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware(['admin'])->prefix('admin')->group(function () {
         Route::get('/stats', [\App\Http\Controllers\Api\AdminController::class, 'stats']);
         Route::get('/conversations', [\App\Http\Controllers\Api\AdminController::class, 'conversations']);
+        Route::get('/conversations/messages', [\App\Http\Controllers\Api\AdminController::class, 'conversationMessages']);
         Route::get('/users', [\App\Http\Controllers\Api\AdminController::class, 'index']);
         Route::post('/users', [\App\Http\Controllers\Api\AdminController::class, 'store']);
         Route::put('/users/{id}', [\App\Http\Controllers\Api\AdminController::class, 'update']);
