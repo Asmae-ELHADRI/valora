@@ -15,7 +15,7 @@ const routes = [
     {
         path: '/register',
         name: 'Register',
-        component: () => import('../views/Register.vue')
+        component: () => import('../views/Login.vue')
     },
     {
         path: '/auth/callback',
@@ -28,23 +28,19 @@ const routes = [
         component: () => import('../views/Dashboard.vue'),
         meta: { requiresAuth: true }
     },
-    {
-        path: '/dashboard-admin',
-        name: 'DashboardAdmin',
-        component: () => import('../views/DashboardAdmin.vue'),
-        meta: { requiresAuth: true, role: 'admin' }
-    },
+    // DashboardAdmin route removed
+
     {
         path: '/dashboard-provider',
         name: 'DashboardProvider',
-        component: () => import('../views/DashboardProvider.vue'),
+        component: () => import('../views/DashboardPrestataire.vue'),
         meta: { requiresAuth: true, role: 'provider' }
     },
     {
         path: '/dashboard-prestataire',
         name: 'DashboardPrestataire',
         component: () => import('../views/DashboardPrestataire.vue'),
-        meta: { requiresAuth: true, role: 'provider' }
+        meta: { requiresAuth: true, role: ['provider', 'prestataire'] }
     },
     {
         path: '/dashboard-client',
@@ -106,6 +102,43 @@ const routes = [
         name: 'Certificate',
         component: () => import('../views/Certificate.vue'),
         meta: { requiresAuth: true, role: 'provider' }
+    },
+    {
+        path: '/admin',
+        component: () => import('../views/admin/AdminLayout.vue'),
+        meta: { requiresAuth: true, role: 'admin' },
+        children: [
+            {
+                path: 'dashboard',
+                name: 'AdminDashboard',
+                component: () => import('../views/admin/AdminDashboard.vue')
+            },
+            {
+                path: 'moderation',
+                name: 'AdminModeration',
+                component: () => import('../views/admin/AdminModeration.vue')
+            },
+            {
+                path: 'governance',
+                name: 'AdminGovernance',
+                component: () => import('../views/admin/AdminGovernance.vue')
+            },
+            {
+                path: 'conversations',
+                name: 'AdminConversations',
+                component: () => import('../views/admin/AdminConversations.vue')
+            },
+            {
+                path: 'users',
+                name: 'AdminUsers',
+                component: () => import('../views/admin/AdminUsers.vue')
+            },
+            {
+                path: 'settings',
+                name: 'AdminSettings',
+                component: () => import('../views/admin/AdminSettings.vue')
+            }
+        ]
     }
 ]
 
@@ -125,8 +158,21 @@ router.beforeEach(async (to, from, next) => {
         next('/login')
     } else if (to.meta.guestOnly && auth.isAuthenticated) {
         next('/dashboard')
-    } else if (to.meta.role && auth.user?.role !== to.meta.role) {
-        next('/dashboard')
+    } else if (to.meta.role) {
+        const requiredRole = to.meta.role;
+        const userRole = auth.user?.role;
+
+        if (Array.isArray(requiredRole)) {
+            if (!requiredRole.includes(userRole)) {
+                next('/dashboard');
+            } else {
+                next();
+            }
+        } else if (userRole !== requiredRole) {
+            next('/dashboard');
+        } else {
+            next();
+        }
     } else {
         next()
     }

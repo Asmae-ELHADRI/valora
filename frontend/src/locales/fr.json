@@ -352,5 +352,20 @@
       "delete_account": "Supprimer mon compte",
       "delete_desc": "Cette action est irréversible. Toutes vos données seront effacées."
     }
+  },
+  "admin": {
+    "dashboard": "Tableau de bord",
+    "users": "Utilisateurs",
+    "revenue": "Revenus",
+    "new_users": "Nouveaux inscrits",
+    "reports": "Signalements",
+    "transactions": "Transactions Récentes",
+    "performance": "Performance",
+    "actions_required": "Actions Requises",
+    "approve": "Approuver",
+    "ignore": "Ignorer",
+    "ban": "Bannir",
+    "last_30_days": "30 derniers jours",
+    "vs_prev_month": "vs mois précédent"
   }
 }

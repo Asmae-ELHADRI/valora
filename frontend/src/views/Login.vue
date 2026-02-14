@@ -1,9 +1,8 @@
 <script setup>
-import { ref, computed } from 'vue';
-import { useRouter } from 'vue-router';
+import { ref, computed, watch, onMounted } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '../store/auth';
 import api from '../services/api';
-import { onMounted } from 'vue';
 import { 
   Lock, Mail, Loader2, Search, Briefcase, User, MapPin, Camera, 
   Settings, Star, Sparkles, ArrowRight, Shield, Smartphone, PenTool,
@@ -22,6 +21,7 @@ const isVisible = ref(false);
 
 const auth = useAuthStore();
 const router = useRouter();
+const route = useRoute();
 
 // View State toggles
 const activeRole = ref('client'); // 'client' or 'provider'
@@ -40,6 +40,20 @@ const fetchCategories = async () => {
 onMounted(() => {
     fetchCategories();
     isVisible.value = true;
+    
+    // Check initial route
+    if (route.path === '/register') {
+        isLoginMode.value = false;
+    }
+});
+
+// Watch for route changes to update mode
+watch(() => route.path, (newPath) => {
+    if (newPath === '/register') {
+        isLoginMode.value = false;
+    } else if (newPath === '/login') {
+        isLoginMode.value = true;
+    }
 });
 
 // Error Handling
@@ -106,7 +120,9 @@ const handleLogin = async () => {
         });
         
         // Redirect based on role
-        if (auth.user?.role === 'provider') {
+        if (auth.isAdmin) {
+            router.push('/admin/dashboard');
+        } else if (auth.user?.role === 'provider') {
             router.push('/dashboard-provider');
         } else {
             router.push('/dashboard');
@@ -166,16 +182,7 @@ const handleProviderRegister = async () => {
     }
 };
 
-const cities = [
-    "Casablanca", "Rabat", "Marrakech", "Fès", "Tanger", "Agadir", "Meknès", "Oujda", 
-    "Kenitra", "Tetouan", "Safi", "Temara", "Inezgane", "Mohammedia", "Laayoune", 
-    "Khouribga", "Beni Mellal", "El Jadida", "Taza", "Nador", "Settat", "Larache", 
-    "Ksar El Kebir", "Khemisset", "Guelmim", "Berrechid", "Wad Zem", "Fquih Ben Salah", 
-    "Taourirt", "Berkane", "Sidi Slimane", "Errachidia", "Sidi Kacem", "Khenifra", 
-    "Tifelt", "Essaouira", "Taroudant", "El Kelaa des Sraghna", "Ouarzazate", "Sefrou", 
-    "Souk El Arbaa", "Tan-Tan", "Ouazzane", "Guercif", "Dakhla", "Midelt", "Azrou", 
-    "Tinghir", "Chefchaouen", "Jerada", "Mrirt"
-].sort();
+
 </script>
 
 <template>
@@ -197,10 +204,13 @@ const cities = [
 
             <div class="space-y-12 w-full flex flex-col items-start">
                <!-- Shared Logo Structure scaled up for Login -->
-               <div class="logo-container flex items-left scale-[2.5] origin-left mb-12">
-                  <LanguageSwitcher class="absolute -top-6 -left-4 z-50 scale-50" />
-                  
-                  <img :src="valoraLogo" alt="VALORA Logo" class="logo-image" />
+               <div class="logo-container flex items-start scale-[2.5] origin-left mb-15 mt-10 gap-3">
+              
+                  <!-- Logo Icon Wrapper: Premium Animations & Transparent Border -->
+                  <div class="logo-image-wrapper w-[50px] h-[50px] rounded-full overflow-hidden flex items-center justify-center bg-white shrink-0 shadow-xl border-2 border-transparent animate-float shimmer-sweep group/logo">
+                    <img :src="valoraLogo" alt="VALORA Logo" class="w-full h-full object-cover scale-[1.4] transition-all duration-700 group-hover/logo:scale-[1.6]" />
+                  </div>
+
                   <span class="text-3xl font-black tracking-tight logo-text logo-text-brown">
                     VALORA
                   </span>
@@ -435,7 +445,7 @@ const cities = [
                   <div class="space-y-10 pt-4">
                      <div class="flex items-center justify-center space-x-3 text-[11px] font-black uppercase tracking-[0.2em]">
                         <span class="text-slate-400">{{ isLoginMode ? $t('auth.no_account', 'Pas encore de compte ?') : $t('auth.already_account', 'Déjà inscrit ?') }}</span>
-                        <button @click="isLoginMode = !isLoginMode" class="text-premium-blue hover:text-premium-brown transition-colors underline underline-offset-8 decoration-2 decoration-premium-yellow/30">
+                        <button @click="isLoginMode ? router.push('/register') : router.push('/login')" class="text-premium-blue hover:text-premium-brown transition-colors underline underline-offset-8 decoration-2 decoration-premium-yellow/30">
                            {{ isLoginMode ? $t('auth.register_title') : $t('auth.login_title') }}
                         </button>
                      </div>
@@ -573,6 +583,43 @@ const cities = [
 }
 .animate-yellow-shine {
   animation: yellow-shine 4s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-150%) skewX(-20deg); }
+  50% { transform: translateX(150%) skewX(-20deg); }
+  100% { transform: translateX(150%) skewX(-20deg); }
+}
+
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+.shimmer-sweep {
+  position: relative;
+  overflow: hidden;
+}
+
+.shimmer-sweep::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    to right,
+    transparent,
+    rgba(255, 255, 255, 0.4),
+    transparent
+  );
+  transform: translateX(-150%) skewX(-20deg);
+  animation: shimmer 4s infinite;
 }
 
 .bg-premium-blue { background-color: #0f172a; }

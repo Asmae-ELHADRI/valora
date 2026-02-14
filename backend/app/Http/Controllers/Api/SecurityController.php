@@ -16,7 +16,8 @@ class SecurityController extends Controller
     {
         $request->validate([
             'reported_id' => 'required|exists:users,id',
-            'reason' => 'required|string|max:1000',
+            'reason' => 'required|string|max:255',
+            'description' => 'nullable|string',
         ]);
 
         if ($request->reported_id == $request->user()->id) {
@@ -27,7 +28,15 @@ class SecurityController extends Controller
             'reporter_id' => $request->user()->id,
             'reported_id' => $request->reported_id,
             'reason' => $request->reason,
+            'description' => $request->description,
+            'priority' => 'medium', // Default priority for user reports
             'status' => 'pending',
+        ]);
+
+        // Automatically block the user
+        UserBlock::firstOrCreate([
+            'blocker_id' => $request->user()->id,
+            'blocked_id' => $request->reported_id,
         ]);
 
         return response()->json([

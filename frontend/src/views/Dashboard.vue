@@ -17,11 +17,11 @@ onMounted(async () => {
   }
 
   if (auth.isAdmin) {
-    router.push('/dashboard-admin');
-  } else if (auth.isProvider) {
-    router.push('/dashboard-provider');
+    router.push({ name: 'AdminDashboard' });
+  } else if (auth.user?.role === 'provider' || auth.user?.role === 'prestataire') {
+    router.push({ name: 'DashboardPrestataire' });
   } else {
-    router.push('/dashboard-client');
+    router.push({ name: 'DashboardClient' });
   }
 });
 </script>

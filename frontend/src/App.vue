@@ -173,11 +173,10 @@ onUnmounted(() => {
 <template>
   <div class="min-h-screen bg-gray-50 flex flex-col">
     <!-- Premium Navbar -->
-    <nav v-if="!['/login', '/register'].includes($route.path)" 
-         :class="[isScrolled ? 'navbar-scrolled' : 'navbar-transparent']"
+    <nav :class="[isScrolled ? 'navbar-transparent' : 'navbar-scrolled']"
          class="navbar-premium sticky top-0 z-50 transition-all duration-500">
       <!-- Gradient Background -->
-      <div class="navbar-gradient" :class="{ 'opacity-100': isScrolled, 'opacity-0': !isScrolled }"></div>
+      <div class="navbar-gradient" :class="{ 'opacity-100': !isScrolled, 'opacity-0': isScrolled }"></div>
       
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div class="flex justify-between h-20">
@@ -273,7 +272,7 @@ onUnmounted(() => {
               </div>
 
               <!-- Dashboard Icon -->
-              <router-link :to="auth.isProvider ? '/dashboard-provider' : (auth.isClient ? '/dashboard-client' : (auth.isAdmin ? '/dashboard-admin' : '/dashboard'))" class="nav-icon-btn">
+              <router-link :to="auth.isProvider ? '/dashboard-provider' : (auth.isClient ? '/dashboard-client' : (auth.isAdmin ? '/admin/dashboard' : '/dashboard'))" class="nav-icon-btn">
                 <UserIcon class="w-5 h-5" />
                 <span v-if="reqCount > 0" class="notification-badge bg-gradient-to-br from-orange-500 to-orange-600">
                   {{ reqCount }}
@@ -304,7 +303,7 @@ onUnmounted(() => {
     </main>
 
     <!-- Footer -->
-    <footer v-if="!['/login', '/register'].includes($route.path)" class="bg-white border-t border-gray-200 py-8">
+    <footer v-if="!['/login', '/register'].includes($route.path) && !$route.path.startsWith('/admin')" class="bg-white border-t border-gray-200 py-8">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-gray-500 text-sm">
         <p>© 2026 VALORA {{ $t('common.footer_quote') }}</p>
       </div>

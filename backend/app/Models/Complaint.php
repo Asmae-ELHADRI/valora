@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use App\Models\User;
 
 class Complaint extends Model
 {
@@ -13,6 +14,8 @@ class Complaint extends Model
         'reporter_id',
         'reported_id',
         'reason',
+        'description', // Ensure description is fillable
+        'priority',    // Add priority
         'status',
         'subject_id',
         'subject_type',

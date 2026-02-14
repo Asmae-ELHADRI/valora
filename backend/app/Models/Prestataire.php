@@ -6,12 +6,16 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use App\Models\SystemSetting;
 
+use App\Models\ServiceRequest;
+
 class Prestataire extends Model
 {
     use HasFactory;
 
     protected $fillable = [
         'user_id',
+        'grade_id', // Added
+        'missions_count', // Added
         'cin',
         'birth_date',
         'city',
@@ -38,7 +42,7 @@ class Prestataire extends Model
         'is_completed' => 'boolean',
     ];
 
-    protected $appends = ['photo_url', 'badge_level', 'completed_missions_count', 'pro_score', 'current_badges', 'is_certified'];
+    protected $appends = ['photo_url', 'current_grade', 'completed_missions_count', 'pro_score', 'is_certified'];
 
     public function user()
     {
@@ -49,27 +53,28 @@ class Prestataire extends Model
     {
         return $this->belongsTo(ServiceCategory::class);
     }
+    
+    // Valid New Relationship
+    public function grade()
+    {
+        return $this->belongsTo(Grade::class);
+    }
 
     public function categories()
     {
         return $this->belongsToMany(ServiceCategory::class, 'category_prestataire', 'prestataire_id', 'service_category_id');
     }
 
-    public function badges()
-    {
-        return $this->belongsToMany(Badge::class, 'prestataire_badge');
-    }
-
-    public function getCurrentBadgesAttribute()
-    {
-        return $this->badges->pluck('name');
-    }
-
     public function getCompletedMissionsCountAttribute()
     {
-        return ServiceRequest::where('user_id', $this->user_id)
+        return ServiceRequest::where('user_id', $this->user_id) 
             ->where('status', 'completed')
             ->count();
+    }
+    
+    public function getCurrentGradeAttribute()
+    {
+        return $this->grade ? $this->grade->name : 'Aucun';
     }
 
     public function getProScoreAttribute()
@@ -83,15 +88,9 @@ class Prestataire extends Model
         return $missionsScore + $qualityScore;
     }
 
-    public function getBadgeLevelAttribute()
-    {
-        $highestBadge = $this->badges()->orderByDesc('threshold')->first();
-        return $highestBadge ? $highestBadge->name : 'Débutant';
-    }
-
     public function getIsCertifiedAttribute()
     {
-        return $this->certified_at !== null || $this->completed_missions_count >= 10;
+        return $this->certified_at !== null;
     }
 
     public function getPhotoUrlAttribute()

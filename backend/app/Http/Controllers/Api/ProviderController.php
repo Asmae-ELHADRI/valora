@@ -178,6 +178,7 @@ class ProviderController extends Controller
             'diplomas' => $request->diplomas,
             'category_id' => !empty($request->category_ids) ? $request->category_ids[0] : null,
             'is_completed' => $request->has('is_completed') ? $request->is_completed : $prestataire->is_completed,
+            'availabilities' => $request->availabilities,
         ]);
 
         if ($request->has('category_ids')) {

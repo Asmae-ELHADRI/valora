@@ -66,6 +66,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/certificate', [\App\Http\Controllers\Api\CertificateController::class, 'show']);
     });
 
+    // Provider browsing (accessible by all auth users)
+    Route::prefix('provider')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Api\ProviderController::class, 'index']);
+        Route::get('/{id}', [\App\Http\Controllers\Api\ProviderController::class, 'show']);
+    });
+
     // Client routes
     Route::middleware(['role:client'])->prefix('client')->group(function () {
         Route::post('/profile', [\App\Http\Controllers\Api\ClientController::class, 'updateProfile']);
@@ -81,31 +87,35 @@ Route::middleware('auth:sanctum')->group(function () {
     // Admin Specific Routes
     Route::middleware(['admin'])->prefix('admin')->group(function () {
         Route::get('/stats', [\App\Http\Controllers\Api\AdminController::class, 'stats']);
+        Route::get('/conversations', [\App\Http\Controllers\Api\AdminController::class, 'conversations']);
+        Route::get('/conversations/{user1}/{user2}', [\App\Http\Controllers\Api\AdminController::class, 'getMessagesBetweenUsers']);
+        Route::get('/messages/attachments/{id}', [\App\Http\Controllers\Api\AdminController::class, 'downloadAttachment']);
         Route::get('/users', [\App\Http\Controllers\Api\AdminController::class, 'index']);
         Route::post('/users', [\App\Http\Controllers\Api\AdminController::class, 'store']);
         Route::put('/users/{id}', [\App\Http\Controllers\Api\AdminController::class, 'update']);
         Route::post('/users/{id}/toggle-status', [\App\Http\Controllers\Api\AdminController::class, 'toggleStatus']);
         Route::delete('/users/{id}', [\App\Http\Controllers\Api\AdminController::class, 'destroy']);
         
-        Route::get('/complaints', [\App\Http\Controllers\Api\AdminController::class, 'complaints']);
-        Route::post('/complaints/{id}/status', [\App\Http\Controllers\Api\AdminController::class, 'updateComplaintStatus']);
-
-        Route::get('/roles', [\App\Http\Controllers\Api\AdminController::class, 'roles']);
-        Route::put('/roles/{id}/permissions', [\App\Http\Controllers\Api\AdminController::class, 'updateRolePermissions']);
-
-        // Service Categories Management
-        Route::get('/categories', [\App\Http\Controllers\Admin\ServiceCategoryController::class, 'index']);
-        Route::post('/categories', [\App\Http\Controllers\Admin\ServiceCategoryController::class, 'store']);
-        Route::put('/categories/{id}', [\App\Http\Controllers\Admin\ServiceCategoryController::class, 'update']);
-        Route::delete('/categories/{id}', [\App\Http\Controllers\Admin\ServiceCategoryController::class, 'destroy']);
-
-        // Moderation
+        // Moderation & Complaints
+        Route::get('/complaints', [\App\Http\Controllers\Admin\ComplaintController::class, 'index']);
+        Route::get('/complaints/{id}', [\App\Http\Controllers\Admin\ComplaintController::class, 'show']);
+        Route::post('/complaints/{id}/action', [\App\Http\Controllers\Admin\ComplaintController::class, 'action']);
         Route::post('/users/{id}/warn', [\App\Http\Controllers\Api\AdminController::class, 'warnUser']);
         Route::delete('/complaints/{id}/content', [\App\Http\Controllers\Api\AdminController::class, 'deleteReportedContent']);
 
         // Platform Governance
         Route::get('/settings', [\App\Http\Controllers\Api\AdminController::class, 'getSettings']);
         Route::put('/settings', [\App\Http\Controllers\Api\AdminController::class, 'updateSettings']);
+        
+        // Grades Management
+        Route::get('/grades', [\App\Http\Controllers\Admin\GradeController::class, 'index']);
+        Route::post('/grades', [\App\Http\Controllers\Admin\GradeController::class, 'store']);
+        Route::post('/grades/assign', [\App\Http\Controllers\Admin\GradeController::class, 'assign']); // Manual assign
+        Route::post('/grades/sync', [\App\Http\Controllers\Admin\GradeController::class, 'syncGrades']); // Auto sync
+        Route::post('/grades/revoke', [\App\Http\Controllers\Admin\GradeController::class, 'revoke']); // Revoke
+        Route::put('/grades/{id}', [\App\Http\Controllers\Admin\GradeController::class, 'update']);
+        Route::delete('/grades/{id}', [\App\Http\Controllers\Admin\GradeController::class, 'destroy']);
+        Route::get('/attributions', [\App\Http\Controllers\Admin\GradeController::class, 'attributions']);
 
         // Detailed Content Management
         Route::get('/offers-list', [\App\Http\Controllers\Api\AdminController::class, 'offersList']);
