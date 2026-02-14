@@ -642,18 +642,10 @@ class AdminController extends Controller
     }
 
     /**
-     * Get messages for a specific conversation between two users (Admin view).
+     * Get messages between two specific users for admin monitoring.
      */
-    public function conversationMessages(Request $request)
+    public function getMessagesBetweenUsers(Request $request, $user1Id, $user2Id)
     {
-        $request->validate([
-            'user1_id' => 'required|exists:users,id',
-            'user2_id' => 'required|exists:users,id',
-        ]);
-
-        $user1Id = $request->user1_id;
-        $user2Id = $request->user2_id;
-
         $messages = Message::where(function($q) use ($user1Id, $user2Id) {
             $q->where('sender_id', $user1Id)->where('receiver_id', $user2Id);
         })->orWhere(function($q) use ($user1Id, $user2Id) {

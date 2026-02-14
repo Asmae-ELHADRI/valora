@@ -28,6 +28,7 @@ class Prestataire extends Model
         'availabilities',
         'is_available',
         'is_visible',
+        'is_completed',
         'photo',
         'rating',
         'certified_at',
@@ -38,6 +39,7 @@ class Prestataire extends Model
         'availabilities' => 'array',
         'is_available' => 'boolean',
         'is_visible' => 'boolean',
+        'is_completed' => 'boolean',
     ];
 
     protected $appends = ['photo_url', 'current_grade', 'completed_missions_count', 'pro_score', 'is_certified'];

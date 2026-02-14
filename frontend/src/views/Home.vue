@@ -68,7 +68,6 @@ const fetchLatestOffers = async () => {
   try {
     const response = await api.get('/api/offers');
     if (response.data.data) {
-      // Use real offers if available, otherwise keep defaults
       offers.value = response.data.data.slice(0, 3).map(o => ({
         id: o.id,
         title: o.title,
@@ -82,6 +81,7 @@ const fetchLatestOffers = async () => {
   }
 };
 
+
 const handleApply = (offerId) => {
   if (!auth.isAuthenticated) {
     router.push('/login');
@@ -89,6 +89,15 @@ const handleApply = (offerId) => {
     // If logged in, go to search page with this offer selected or just search
     router.push({ name: 'Search', query: { id: offerId } });
   }
+};
+
+const getCategoryKey = (name) => {
+  if (!name) return 'service';
+  return name.toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // remove accents
+    .replace(/ & /g, '_')
+    .replace(/ /g, '_')
+    .replace(/[^a-z0-9_]/g, '');
 };
 
 onMounted(() => {
@@ -109,14 +118,6 @@ onMounted(() => {
         <div class="absolute bottom-[20%] right-[10%] w-[500px] h-[500px] bg-[#8B5E3C]/5 rounded-full blur-[120px]"></div>
       </div>
 
-      <!-- Navigation -->
-      <nav class="absolute top-0 left-0 w-full p-8 flex justify-between items-center z-30">
-        <div class="flex items-center space-x-2 bg-white/50 backdrop-blur-md px-4 py-2 rounded-full border border-white/50 shadow-sm">
-          <div class="w-2 h-2 bg-[#F4C430] rounded-full animate-pulse"></div>
-          <span class="text-[10px] font-black uppercase tracking-widest">{{ $t('home.hero_badge', 'LE TALENT À PORTÉE DE MAIN') }}</span>
-        </div>
-        <LanguageSwitcher />
-      </nav>
 
       <!-- Centerpiece Section -->
       <div class="relative z-10 flex flex-col items-center justify-center w-full max-w-4xl pt-20">
@@ -135,7 +136,11 @@ onMounted(() => {
 
         <!-- Slogan (Now Directly Below Logo) -->
         <div class="mt-4 text-center px-3 transition-all duration-1000 delay-500 transform" :class="isVisible ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'">
-          <h2 class="text-2xl md:text-5xl font-black text-[#1A2B4C] leading-tight whitespace-nowrap" v-html="$t('home.slogan')"></h2>
+          <h2 class="text-2xl md:text-5xl font-black text-[#1A2B4C] leading-tight">
+            "{{ $t('home.slogan_part1') }} 
+            <span class="text-[#8B5E3C] italic font-playfair lowercase">{{ $t('home.slogan_highlight') }}</span> 
+            {{ $t('home.slogan_part2') }}"
+          </h2>
         </div>
       </div>
 
@@ -182,7 +187,6 @@ onMounted(() => {
                     <span class="text-[10px] font-black uppercase tracking-widest text-slate-400 group-hover:text-white">{{ artisan.categoryDisplay }}</span>
                 </div>
             </div>
-
             <div class="relative z-10 mt-auto">
                 <h3 class="text-xl font-bold text-[#1A2B4C] group-hover:text-white transition-colors mb-1">{{ artisan.name }}</h3>
                 <div class="flex items-center gap-2 text-slate-400 group-hover:text-slate-300 text-xs font-medium mb-3">
@@ -259,7 +263,7 @@ onMounted(() => {
                   <Briefcase class="w-8 h-8 text-[#1A2B4C]" />
                 </div>
                 <div class="bg-[#FAF9F6] px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest text-slate-400 group-hover:bg-[#1A2B4C] group-hover:text-white transition-all">
-                  {{ $t('categories.' + offer.category) }}
+                  {{ $t('categories.' + getCategoryKey(offer.category)) }}
                 </div>
               </div>
               <div class="space-y-3">

@@ -4,7 +4,7 @@ import { useAuthStore } from '../store/auth';
 import api from '../services/api';
 import { 
   Search, Filter, MapPin, Briefcase, Calendar, 
-  ChevronRight, Euro, Clock, X, Loader2, Info, Check
+  ChevronRight, Euro, Clock, X, Loader2, Info, Check, ShieldAlert
 } from 'lucide-vue-next';
 
 const auth = useAuthStore();
@@ -26,6 +26,28 @@ const filters = ref({
 const applyMessage = ref('');
 const applying = ref(false);
 const applySuccess = ref(false);
+
+const showReportModal = ref(false);
+const reportReason = ref('');
+const reporting = ref(false);
+
+const submitReport = async () => {
+  if (!reportReason.value.trim()) return;
+  reporting.value = true;
+  try {
+    await api.post('/api/report', {
+      reported_id: selectedOffer.value.user?.id || selectedOffer.value.user_id,
+      reason: reportReason.value
+    });
+    alert('Signalement envoyé avec succès');
+    showReportModal.value = false;
+    reportReason.value = '';
+  } catch (err) {
+    alert(err.response?.data?.message || 'Erreur lors de l\'envois');
+  } finally {
+    reporting.value = false;
+  }
+};
 
 const submitApplication = async () => {
   if (!selectedOffer.value) return;
@@ -127,7 +149,7 @@ const formatDate = (date) => {
 
     <!-- Search & Filter Bar -->
     <div class="bg-white p-4 rounded-4xl border border-gray-100 shadow-xl shadow-slate-200/40 mb-12 space-y-4 md:space-y-0 md:flex md:items-center md:space-x-4">
-      <div class="relative flex-grow">
+      <div class="relative grow">
         <Search class="absolute left-6 top-4 w-5 h-5 text-slate-400" />
         <input 
           v-model="filters.keyword"
@@ -243,7 +265,7 @@ const formatDate = (date) => {
     </div>
 
     <!-- Offer Detail Modal -->
-    <div v-if="selectedOffer" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
+    <div v-if="selectedOffer" class="fixed inset-0 z-100 flex items-center justify-center p-4">
       <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-md transition-opacity" @click="closeOffer"></div>
       <div class="relative bg-white w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-[3rem] shadow-2xl animate-in fade-in zoom-in duration-300">
         <button @click="closeOffer" class="absolute top-8 right-8 p-3 rounded-full bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-slate-900 transition z-10">
@@ -341,13 +363,42 @@ const formatDate = (date) => {
               v-if="!applySuccess"
               @click="submitApplication"
               :disabled="applying"
-              class="flex-grow bg-slate-900 text-white py-5 rounded-2xl font-black hover:bg-slate-800 shadow-xl shadow-slate-200 transition disabled:opacity-50 flex items-center justify-center space-x-3 active:scale-[0.98]"
+              class="grow bg-slate-900 text-white py-5 rounded-2xl font-black hover:bg-slate-800 shadow-xl shadow-slate-200 transition disabled:opacity-50 flex items-center justify-center space-x-3 active:scale-[0.98]"
             >
               <Loader2 v-if="applying" class="w-5 h-5 animate-spin" />
               <span>{{ applying ? $t('search.sending') : $t('search.apply_btn') }}</span>
             </button>
+            <button @click="showReportModal = true" class="p-5 bg-red-50 text-red-600 rounded-2xl hover:bg-red-100 transition active:scale-[0.98]" title="Signaler cette offre">
+              <ShieldAlert class="w-6 h-6" />
+            </button>
             <button @click="closeOffer" class="px-10 py-5 bg-gray-100 text-slate-600 rounded-2xl font-bold hover:bg-gray-200 transition active:scale-[0.98]">
               {{ $t('search.close_btn') }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Report Modal -->
+    <div v-if="showReportModal" class="fixed inset-0 z-120 flex items-center justify-center p-4">
+      <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="showReportModal = false"></div>
+      <div class="relative bg-white w-full max-w-lg rounded-[3rem] shadow-2xl p-10 animate-in fade-in zoom-in duration-300">
+        <div class="text-center mb-8">
+          <div class="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4 text-red-600">
+            <ShieldAlert class="w-8 h-8" />
+          </div>
+          <h3 class="text-2xl font-black text-slate-900">Signaler cette offre</h3>
+          <p class="text-sm text-slate-500 mt-2">Expliquez-nous pourquoi vous signalez cette offre (arnaque, contenu inapproprié...).</p>
+        </div>
+        <div class="space-y-6">
+          <div>
+            <label class="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Raison du signalement</label>
+            <textarea v-model="reportReason" rows="4" placeholder="Ex: Cette offre semble être une arnaque..." class="w-full px-6 py-4 bg-slate-50 border-none rounded-2xl text-sm focus:ring-4 focus:ring-slate-100 outline-none font-medium text-slate-700 resize-none"></textarea>
+          </div>
+          <div class="flex gap-4">
+            <button @click="showReportModal = false" class="grow py-4 rounded-2xl font-bold border border-gray-200 text-gray-500 hover:bg-gray-50 transition">Annuler</button>
+            <button @click="submitReport" :disabled="reporting || !reportReason.trim()" class="grow py-4 rounded-2xl font-bold bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 transition flex items-center justify-center">
+               <Loader2 v-if="reporting" class="w-5 h-5 animate-spin mr-2" />
+               <span>Envoyer</span>
             </button>
           </div>
         </div>
@@ -360,6 +411,7 @@ const formatDate = (date) => {
 .line-clamp-2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }

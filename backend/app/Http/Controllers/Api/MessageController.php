@@ -147,6 +147,9 @@ class MessageController extends Controller
 
         broadcast(new MessageSent($message))->toOthers();
 
+        // Trigger Database Notification
+        $receiver->notify(new \App\Notifications\NewMessageNotification($message));
+
         return response()->json($message);
     }
 
@@ -193,5 +196,27 @@ class MessageController extends Controller
             ->count();
 
         return response()->json(['count' => $count]);
+    }
+
+    /**
+     * Delete a message.
+     */
+    public function destroy(Request $request, $id)
+    {
+        $message = Message::findOrFail($id);
+        
+        // Authorization: only the sender can delete their message
+        if ($message->sender_id !== $request->user()->id) {
+            return response()->json(['message' => 'Accès non autorisé.'], 403);
+        }
+
+        // Delete attachment if exists
+        if ($message->attachment_path) {
+            Storage::disk('local')->delete($message->attachment_path);
+        }
+
+        $message->delete();
+
+        return response()->json(['success' => true]);
     }
 }

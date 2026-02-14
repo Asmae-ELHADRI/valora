@@ -8,16 +8,22 @@
     "logout": "Logout",
     "settings": "Settings",
     "messages": "Messages",
-    "dashboard": "Dashboard"
+    "dashboard": "Dashboard",
+    "support": "Admin Support"
   },
   "common": {
     "welcome": "Welcome",
+    "support_title": "Support & Assistance",
+    "support_desc": "An issue? Need help with your profile or a mission?",
+    "contact_admin": "Contact Administrator",
     "success": "Success",
     "error": "Error",
     "loading": "Loading...",
     "footer_quote": "« It is in effort that the human reveals himself »",
     "save": "Save",
     "cancel": "Cancel",
+    "security": "Security",
+    "quality": "Quality",
     "delete": "Delete",
     "edit": "Edit",
     "close": "Close",
@@ -26,7 +32,9 @@
   "home": {
     "hero_subtitle": "Valuing human excellence through effort.",
     "hero_desc": "Valora is the alchemy of value and effort. It is here that the artisan's talent is celebrated and their work finds its true recognition. We believe that valuing humans begins with valuing their excellence.",
-    "slogan": "\"Value the <span class=\"text-[#8B5E3C] italic font-playfair lowercase\">effort</span> that reveals the human\"",
+    "slogan_part1": "Value the",
+    "slogan_highlight": "effort",
+    "slogan_part2": "that reveals the human",
     "cta_start": "Start Now",
     "cta_explore": "Explore Services",
     "hero_badge": "Talent at your fingertips",
@@ -127,7 +135,16 @@
     "nettoyage": "Cleaning",
     "maconnerie": "Masonry",
     "couture": "Tailoring",
-    "design_interieur": "Interior Design"
+    "design_interieur": "Interior Design",
+    "jardinage_paysagisme": "Gardening & Landscaping",
+    "menage_nettoyage": "Housekeeping & Cleaning",
+    "garde_enfants": "Childcare",
+    "aide_domicile": "Home Help",
+    "repassage": "Ironing",
+    "cuisine_domicile": "Home Cooking",
+    "construction_renovation": "Construction & Renovation",
+    "services_domicile": "Home Services",
+    "service": "Service"
   },
   "search": {
     "title": "Find a Mission",

@@ -152,6 +152,7 @@ class ProviderController extends Controller
             'birth_date' => 'nullable|date',
             'hourly_rate' => 'nullable|numeric|min:0',
             'city' => 'nullable|string|max:255',
+            'is_completed' => 'nullable|boolean',
         ]);
 
         $user->update([
@@ -176,6 +177,7 @@ class ProviderController extends Controller
             'experience' => $request->experience,
             'diplomas' => $request->diplomas,
             'category_id' => !empty($request->category_ids) ? $request->category_ids[0] : null,
+            'is_completed' => $request->has('is_completed') ? $request->is_completed : $prestataire->is_completed,
             'availabilities' => $request->availabilities,
         ]);
 

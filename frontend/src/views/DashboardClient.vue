@@ -5,7 +5,7 @@ import { useAuthStore } from '../store/auth';
 import { 
   Plus, Briefcase, Clock, CheckCircle, Edit, Trash2, 
   MapPin, Calendar, XCircle, DollarSign, User, Info, MessageSquare, Star, Trash, Loader2,
-  ShieldCheck, Award, Search
+  ShieldCheck, Award, Search, LifeBuoy, ArrowRight
 } from 'lucide-vue-next';
 import api from '../services/api';
 
@@ -269,6 +269,30 @@ onMounted(fetchDashboardData);
         </div>
         <!-- Decor -->
          <div class="absolute top-0 right-0 w-32 h-32 bg-slate-800 rounded-full blur-[60px] opacity-50"></div>
+    </div>
+
+    <!-- Support Card (Prominent) -->
+    <div class="bg-linear-to-br from-blue-600 to-indigo-700 rounded-4xl p-6 text-white shadow-xl relative overflow-hidden mb-8 group/support">
+        <div class="relative z-10 flex items-center justify-between">
+            <div class="space-y-3 max-w-[70%]">
+                <div class="flex items-center space-x-3">
+                    <div class="p-2 bg-white/20 rounded-xl">
+                        <LifeBuoy class="w-5 h-5" />
+                    </div>
+                    <h3 class="font-black text-lg">{{ $t('common.support_title') }}</h3>
+                </div>
+                <p class="text-blue-100 text-xs font-medium leading-relaxed">{{ $t('common.support_desc') }}</p>
+                <router-link to="/messages?userId=19" class="inline-flex items-center space-x-2 bg-white text-blue-600 px-6 py-3 rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-premium-yellow hover:text-slate-900 transition-all shadow-lg active:scale-95">
+                    <span>{{ $t('common.contact_admin') }}</span>
+                    <ArrowRight class="w-4 h-4" />
+                </router-link>
+            </div>
+            <div class="w-20 h-20 bg-white/10 rounded-full flex items-center justify-center backdrop-blur-md transform group-hover/support:rotate-12 transition-transform duration-700">
+                 <ShieldCheck class="w-10 h-10 opacity-50" />
+            </div>
+        </div>
+        <!-- Decor -->
+        <div class="absolute -right-10 -bottom-10 w-40 h-40 bg-white/10 rounded-full blur-3xl group-hover/support:scale-150 transition-transform duration-1000"></div>
     </div>
 
     <!-- Quick Stats -->

@@ -4,15 +4,74 @@ import { useRouter } from 'vue-router';
 import { useAuthStore } from './store/auth';
 import api from './services/api';
 import echo from './services/echo';
-import { LogOut, User as UserIcon, MessageSquare, Search, Settings, CheckCircle, X, Info } from 'lucide-vue-next';
+import { LogOut, User as UserIcon, MessageSquare, Search, Settings, CheckCircle, X, Info, Bell, Briefcase } from 'lucide-vue-next';
 import valoraLogo from './assets/v-logo.png';
 import BottomNav from './components/BottomNav.vue';
+import LanguageSwitcher from './components/LanguageSwitcher.vue';
 
 const auth = useAuthStore();
 const router = useRouter();
 const unreadCount = ref(0);
 const reqCount = ref(0);
 const isScrolled = ref(false);
+const notifications = ref([]);
+const unreadNotifCount = ref(0);
+const showNotifDropdown = ref(false);
+
+const fetchNotifications = async () => {
+  if (!auth.isAuthenticated) return;
+  try {
+    const response = await api.get('/notifications');
+    notifications.value = response.data.notifications.map(n => ({
+        id: n.id,
+        type: n.data.type || 'system',
+        title: n.data.title || 'Notification',
+        desc: n.data.desc || n.data.content || '',
+        time: n.created_at, // We will format this in template or via a helper
+        unread: !n.read_at,
+        original: n
+    }));
+    unreadNotifCount.value = response.data.unread_count;
+  } catch (error) {
+    console.error('Error fetching notifications:', error);
+  }
+};
+
+const markNotifRead = async (id) => {
+    try {
+        await api.post(`/notifications/${id}/read`);
+        const notif = notifications.value.find(n => n.id === id);
+        if (notif && notif.unread) {
+            notif.unread = false;
+            unreadNotifCount.value--;
+        }
+    } catch (error) {
+        console.error('Error marking notification as read:', error);
+    }
+};
+
+const markAllNotifsRead = async () => {
+    try {
+        await api.post('/notifications/read-all');
+        notifications.value.forEach(n => n.unread = false);
+        unreadNotifCount.value = 0;
+    } catch (error) {
+        console.error('Error marking all notifications as read:', error);
+    }
+};
+
+const formatRelativeTime = (date) => {
+    if (!date) return '';
+    const d = typeof date === 'string' ? new Date(date) : date;
+    const now = new Date();
+    const diff = Math.floor((now - d) / 1000); // seconds
+
+    if (diff < 60) return "À l'instant";
+    if (diff < 3600) return `Il y a ${Math.floor(diff / 60)} min`;
+    if (diff < 86400) return `Il y a ${Math.floor(diff / 3600)} h`;
+    return d.toLocaleDateString();
+};
+
 let countInterval = null;
 
 const handleScroll = () => {
@@ -63,22 +122,46 @@ const logout = async () => {
 };
 
 onMounted(() => {
-  fetchUnreadCount();
+  if (auth.isAuthenticated) {
+    fetchUnreadCount();
+    fetchNotifications();
+  }
   window.addEventListener('scroll', handleScroll);
 
   if (auth.user) {
     echo.private(`chat.${auth.user.id}`)
       .listen('MessageSent', (e) => {
-        // If not on messages page, show notification and increment count
-        if (router.currentRoute.value.path !== '/messages') {
-          unreadCount.value++;
-          showGlobalToast(`${e.message.sender?.name || 'Nouveau message'} : ${e.message.content || 'Fichier reçu'}`, 'info');
-        } else {
-            // Unread count is handled by Messages.vue when on that page, 
-            // but we might want to sync it here too if needed.
-        }
+        // ... message handling ...
+      });
+
+    // Listen for real-time notifications
+    echo.private(`App.Models.User.${auth.user.id}`)
+      .notification((notification) => {
+        // Add new notification to the top
+        notifications.value.unshift({
+            id: notification.id,
+            type: notification.type || 'system',
+            title: notification.title || 'Notification',
+            desc: notification.desc || notification.content || '',
+            time: 'À l\'instant',
+            unread: true,
+            original: notification
+        });
+        unreadNotifCount.value++;
+        
+        // Show a little toast too? Why not.
+        showGlobalToast(`🔔 ${notification.title || 'Nouvelle notification'}`, 'info');
       });
   }
+
+  // Handle click outside for notification dropdown
+  window.addEventListener('click', (e) => {
+    const btn = document.querySelector('.notif-btn-trigger');
+    const dropdown = document.querySelector('.notif-dropdown-menu');
+    if (showNotifDropdown.value && btn && !btn.contains(e.target) && dropdown && !dropdown.contains(e.target)) {
+        showNotifDropdown.value = false;
+    }
+  });
 });
 
 onUnmounted(() => {
@@ -90,11 +173,10 @@ onUnmounted(() => {
 <template>
   <div class="min-h-screen bg-gray-50 flex flex-col">
     <!-- Premium Navbar -->
-    <nav v-if="!['/login', '/register'].includes($route.path) && !$route.path.startsWith('/admin')" 
-         :class="[isScrolled ? 'navbar-transparent' : 'navbar-scrolled']"
+    <nav :class="[isScrolled ? 'navbar-transparent' : 'navbar-scrolled']"
          class="navbar-premium sticky top-0 z-50 transition-all duration-500">
       <!-- Gradient Background -->
-      <div class="navbar-gradient" :class="{ 'opacity-0': isScrolled, 'opacity-100': !isScrolled }"></div>
+      <div class="navbar-gradient" :class="{ 'opacity-100': !isScrolled, 'opacity-0': isScrolled }"></div>
       
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div class="flex justify-between h-20">
@@ -134,6 +216,7 @@ onUnmounted(() => {
               <router-link to="/login" class="nav-btn-secondary">
                 {{ $t('nav.login') }}
               </router-link>
+              <LanguageSwitcher />
             </template>
             <template v-else>
               <!-- Messages Icon -->
@@ -144,8 +227,52 @@ onUnmounted(() => {
                 </span>
               </router-link>
               
+              <!-- Notifications Icon -->
+              <div class="relative">
+                <button @click="showNotifDropdown = !showNotifDropdown" class="nav-icon-btn notif-btn-trigger">
+                    <Bell class="w-5 h-5" />
+                    <span v-if="unreadNotifCount > 0" class="notif-badge-new"></span>
+                </button>
+                
+                <!-- Notification Dropdown -->
+                <Transition name="dropdown">
+                    <div v-if="showNotifDropdown" class="absolute right-0 mt-4 w-80 bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden z-50 notif-dropdown-menu">
+                        <div class="p-5 border-b border-slate-50 flex items-center justify-between bg-slate-50/50">
+                            <h4 class="text-[10px] font-black uppercase tracking-widest text-slate-900">Notifications</h4>
+                            <button @click="markAllNotifsRead" class="text-[8px] font-bold text-slate-400 uppercase tracking-widest hover:text-premium-brown transition-colors">Tout marquer</button>
+                        </div>
+                        <div class="max-h-96 overflow-y-auto divide-y divide-slate-50 premium-scrollbar">
+                            <div v-for="notif in notifications" :key="notif.id" @click="markNotifRead(notif.id)" class="p-4 hover:bg-slate-50 transition-colors cursor-pointer group relative">
+                                <div class="flex space-x-3 relative z-10">
+                                    <div :class="notif.unread ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100 text-slate-400'" class="w-9 h-9 rounded-xl shrink-0 flex items-center justify-center transition-transform group-hover:scale-110">
+                                        <MessageSquare v-if="notif.type === 'message' || notif.type === 'App\\Notifications\\NewMessageNotification'" class="w-4 h-4" />
+                                        <Briefcase v-else-if="notif.type === 'mission' || notif.type === 'App\\Notifications\\ServiceRequestNotification'" class="w-4 h-4" />
+                                        <Bell v-else class="w-4 h-4" />
+                                    </div>
+                                    <div class="grow min-w-0">
+                                        <div class="flex justify-between items-start">
+                                            <p class="text-[11px] font-black text-slate-900 truncate tracking-tight">{{ notif.title }}</p>
+                                            <span class="text-[8px] font-bold text-slate-400 shrink-0 ml-2">{{ formatRelativeTime(notif.time) }}</span>
+                                        </div>
+                                        <p class="text-[10px] text-slate-500 line-clamp-2 mt-0.5 leading-relaxed font-medium">{{ notif.desc }}</p>
+                                    </div>
+                                </div>
+                                <div v-if="notif.unread" class="absolute left-1 top-1/2 -translate-y-1/2 w-1 h-8 bg-yellow-400 rounded-full opacity-50"></div>
+                            </div>
+                        </div>
+                        <div v-if="notifications.length === 0" class="p-10 text-center">
+                            <Bell class="w-8 h-8 text-slate-200 mx-auto mb-3" />
+                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Aucune notification</p>
+                        </div>
+                        <div class="p-4 bg-slate-50/50 text-center border-t border-slate-50">
+                             <button class="text-[9px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors">Voir l'historique complet</button>
+                        </div>
+                    </div>
+                </Transition>
+              </div>
+
               <!-- Dashboard Icon -->
-              <router-link :to="auth.isProvider ? '/dashboard-provider' : (auth.isClient ? '/dashboard-client' : (auth.isAdmin ? '/dashboard-admin' : '/dashboard'))" class="nav-icon-btn">
+              <router-link :to="auth.isProvider ? '/dashboard-provider' : (auth.isClient ? '/dashboard-client' : (auth.isAdmin ? '/admin/dashboard' : '/dashboard'))" class="nav-icon-btn">
                 <UserIcon class="w-5 h-5" />
                 <span v-if="reqCount > 0" class="notification-badge bg-gradient-to-br from-orange-500 to-orange-600">
                   {{ reqCount }}
@@ -161,6 +288,8 @@ onUnmounted(() => {
               <button @click="logout" class="nav-icon-btn logout-btn">
                 <LogOut class="w-5 h-5" />
               </button>
+
+              <LanguageSwitcher />
             </template>
           </div>
         </div>
@@ -479,6 +608,51 @@ onUnmounted(() => {
 .toast-leave-to {
   opacity: 0;
   transform: translateY(20px);
+}
+
+/* Dropdown Animations */
+.dropdown-enter-active,
+.dropdown-leave-active {
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.dropdown-enter-from {
+  opacity: 0;
+  transform: translateY(15px) scale(0.95);
+}
+
+.dropdown-leave-to {
+  opacity: 0;
+  transform: translateY(10px) scale(0.98);
+}
+
+.notif-badge-new {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 6px;
+    height: 6px;
+    background: #facc15;
+    border-radius: 50%;
+    box-shadow: 0 0 10px rgba(250, 204, 21, 0.8);
+    animation: pulse-yellow 2s infinite;
+}
+
+@keyframes pulse-yellow {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.5); opacity: 0.5; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+.premium-scrollbar::-webkit-scrollbar {
+    width: 4px;
+}
+.premium-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+}
+.premium-scrollbar::-webkit-scrollbar-thumb {
+    background: #e2e8f0;
+    border-radius: 10px;
 }
 
 /* Responsive Adjustments */

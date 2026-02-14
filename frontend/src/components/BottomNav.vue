@@ -27,8 +27,8 @@ const isActive = (path) => route.path === path;
       <MessageSquare class="w-6 h-6" :class="{'fill-current': isActive('/messages')}" />
     </router-link>
 
-    <router-link to="/profile" class="p-2 transition-colors" :class="isActive('/profile') ? 'text-slate-900' : 'text-slate-300 hover:text-slate-500'">
-      <User class="w-6 h-6" :class="{'fill-current': isActive('/profile')}" />
+    <router-link to="/dashboard-provider" class="p-2 transition-colors" :class="isActive('/dashboard-provider') ? 'text-slate-900' : 'text-slate-300 hover:text-slate-500'">
+      <User class="w-6 h-6" :class="{'fill-current': isActive('/dashboard-provider')}" />
     </router-link>
   </div>
 </template>

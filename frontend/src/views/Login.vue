@@ -102,6 +102,14 @@ const getErrorMessage = (err, defaultMsg) => {
     return err.response?.data?.message || defaultMsg;
 };
 
+const isProfileIncomplete = (user) => {
+    if (user.role !== 'provider') return false;
+    const p = user.prestataire;
+    if (!p) return true;
+    // Check for essential fields
+    return !p.city || !p.birth_date || !p.category_id;
+};
+
 const handleLogin = async () => {
     loading.value = true;
     error.value = '';
@@ -111,8 +119,11 @@ const handleLogin = async () => {
             password: loginForm.value.password 
         });
         
+        // Redirect based on role
         if (auth.isAdmin) {
             router.push('/admin/dashboard');
+        } else if (auth.user?.role === 'provider') {
+            router.push('/dashboard-provider');
         } else {
             router.push('/dashboard');
         }
@@ -162,7 +173,8 @@ const handleProviderRegister = async () => {
             role: 'provider'
         });
         registrationSuccess.value = true;
-        setTimeout(() => router.push('/dashboard'), 1200);
+        // Redirect new providers directly to their dashboard
+        setTimeout(() => router.push('/dashboard-provider'), 1200);
     } catch (err) {
         error.value = getErrorMessage(err, 'auth.register_error');
     } finally {
@@ -185,32 +197,37 @@ const handleProviderRegister = async () => {
     </div>
 
     <div class="relative z-10 w-full max-w-6xl">
-      <div class="grid lg:grid-cols-2 gap-12 items-center">
+      <div class="grid lg:grid-cols-2 gap-12 items-start">
         
         <!-- Left Side: Branding & Artisan Values -->
-        <div class="hidden lg:flex flex-col space-y-10 animate-fade-in px-8">
-           <div class="flex items-center space-x-12 relative">
-              <!-- Shared Logo Structure scaled up for Login -->
-              <div class="logo-container scale-[2.2] origin-left ml-4">
-                 <LanguageSwitcher class="absolute -top-6 -left-6 z-50 scale-50" />
-                 
-                 <img :src="valoraLogo" alt="VALORA Logo" class="logo-image" />
-                 <span class="text-3xl font-black tracking-tight logo-text logo-text-brown">
-                   VALORA
-                 </span>
+        <div class="hidden lg:flex flex-col items-start space-y-10 animate-fade-in px-8">
 
-                 <!-- Orbiting Icons attached to the shared container -->
-                 <div>
-                 </div>
-              </div>
-           </div>
+            <div class="space-y-12 w-full flex flex-col items-start">
+               <!-- Shared Logo Structure scaled up for Login -->
+               <div class="logo-container flex items-start scale-[2.5] origin-left mb-15 mt-10 gap-3">
+              
+                  <!-- Logo Icon Wrapper: Premium Animations & Transparent Border -->
+                  <div class="logo-image-wrapper w-[50px] h-[50px] rounded-full overflow-hidden flex items-center justify-center bg-white shrink-0 shadow-xl border-2 border-transparent animate-float shimmer-sweep group/logo">
+                    <img :src="valoraLogo" alt="VALORA Logo" class="w-full h-full object-cover scale-[1.4] transition-all duration-700 group-hover/logo:scale-[1.6]" />
+                  </div>
 
-            <div class="space-y-8">
+                  <span class="text-3xl font-black tracking-tight logo-text logo-text-brown">
+                    VALORA
+                  </span>
+
+                  <!-- Orbiting Icons placeholder -->
+                  <div></div>
+               </div>
+
                <div class="inline-flex items-center space-x-3 px-6 py-3 bg-premium-yellow/10 border border-premium-yellow/20 text-premium-yellow rounded-full backdrop-blur-sm">
                   <span class="text-[10px] font-black uppercase tracking-[0.3em]">{{ $t('auth.vision_badge') }}</span>
                </div>
                
-                <h2 class="text-7xl font-black text-white tracking-tighter leading-[0.85]" v-html="$t('home.slogan')"></h2>
+                <h2 class="text-7xl font-black text-white tracking-tighter leading-[0.85]">
+                  {{ $t('home.slogan_part1') }}
+                  <span class="text-premium-yellow">{{ $t('home.slogan_highlight') }}</span>
+                  {{ $t('home.slogan_part2') }}
+                </h2>
 
                <div class="space-y-6 max-w-lg">
       
@@ -355,7 +372,6 @@ const handleProviderRegister = async () => {
                                      <input v-model="clientForm.email" type="email" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl py-5 pl-14 pr-6 outline-none focus:ring-4 focus:ring-premium-blue/5 transition-all font-bold text-slate-700" :placeholder="$t('auth.email')">
                                      <Mail class="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-premium-blue transition-all" />
                                   </div>
-
                                   <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                      <div class="relative group">
                                         <input v-model="clientForm.password" :type="showPassword ? 'text' : 'password'" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl py-5 pl-14 pr-12 outline-none focus:ring-4 focus:ring-premium-blue/5 transition-all font-bold text-slate-700" :placeholder="$t('auth.password')">
@@ -397,7 +413,6 @@ const handleProviderRegister = async () => {
                                         <input v-model="providerForm.email" type="email" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl py-5 pl-14 pr-6 outline-none focus:ring-4 focus:ring-premium-blue/5 transition-all font-bold text-slate-700" :placeholder="$t('auth.email')">
                                         <Mail class="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-premium-blue transition-all" />
                                     </div>
-
                                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div class="relative group">
                                             <input v-model="providerForm.password" :type="showPassword ? 'text' : 'password'" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl py-5 pl-14 pr-12 outline-none focus:ring-4 focus:ring-premium-blue/5 transition-all font-bold text-slate-700" :placeholder="$t('auth.password')">
@@ -568,6 +583,43 @@ const handleProviderRegister = async () => {
 }
 .animate-yellow-shine {
   animation: yellow-shine 4s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-150%) skewX(-20deg); }
+  50% { transform: translateX(150%) skewX(-20deg); }
+  100% { transform: translateX(150%) skewX(-20deg); }
+}
+
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+.shimmer-sweep {
+  position: relative;
+  overflow: hidden;
+}
+
+.shimmer-sweep::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    to right,
+    transparent,
+    rgba(255, 255, 255, 0.4),
+    transparent
+  );
+  transform: translateX(-150%) skewX(-20deg);
+  animation: shimmer 4s infinite;
 }
 
 .bg-premium-blue { background-color: #0f172a; }
