@@ -650,22 +650,8 @@ class AdminController extends Controller
             $q->where('sender_id', $user1Id)->where('receiver_id', $user2Id);
         })->orWhere(function($q) use ($user1Id, $user2Id) {
             $q->where('sender_id', $user2Id)->where('receiver_id', $user1Id);
-        })->orderBy('created_at', 'desc')->paginate(50);
+        })->orderBy('created_at', 'asc')->get();
 
         return response()->json($messages);
-    }
-
-    /**
-     * Download attachment for admin.
-     */
-    public function downloadAttachment($id)
-    {
-        $message = Message::findOrFail($id);
-        
-        if (!$message->attachment_path || !\Illuminate\Support\Facades\Storage::disk('local')->exists($message->attachment_path)) {
-            return response()->json(['message' => 'Fichier introuvable.'], 404);
-        }
-
-        return \Illuminate\Support\Facades\Storage::disk('local')->download($message->attachment_path);
     }
 }

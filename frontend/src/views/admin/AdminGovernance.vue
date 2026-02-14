@@ -117,6 +117,10 @@ const openModal = (grade = null) => {
     showCreateModal.value = true;
 };
 
+const showAttributionModal = ref(false);
+const selectedAttribution = ref(null);
+const newGradeId = ref(null);
+
 const saveGrade = async () => {
     try {
         form.value.slug = form.value.name.toLowerCase().replace(/\s+/g, '-');
@@ -139,6 +143,36 @@ const deleteGrade = async (id) => {
         fetchData();
     } catch (error) {
         console.error('Error deleting:', error);
+    }
+};
+
+const revokeAttribution = async (id) => {
+    if(!confirm('Êtes-vous sûr de vouloir révoquer ce grade ? L\'utilisateur perdra ce statut.')) return;
+    try {
+        await api.post('/api/admin/grades/revoke', { attribution_id: id });
+        fetchData();
+    } catch (error) {
+        console.error('Error revoking attribution:', error);
+    }
+};
+
+const openEditAttribution = (attr) => {
+    selectedAttribution.value = attr;
+    newGradeId.value = attr.grade_id;
+    showAttributionModal.value = true;
+};
+
+const saveAttribution = async () => {
+    if (!selectedAttribution.value || !newGradeId.value) return;
+    try {
+        await api.post('/api/admin/grades/assign', {
+            user_id: selectedAttribution.value.user_id,
+            grade_id: newGradeId.value
+        });
+        showAttributionModal.value = false;
+        fetchData();
+    } catch (error) {
+        console.error('Error assigning grade:', error);
     }
 };
 
@@ -255,7 +289,7 @@ onMounted(() => {
         </section>
 
 
-        <!-- Attributions Feed (Premium List) -->
+    <!-- Attributions Feed (Premium List) -->
         <section class="max-w-5xl mx-auto">
             <div class="flex items-center justify-between mb-8">
                 <h2 class="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-3">
@@ -316,12 +350,20 @@ onMounted(() => {
                             
                             <div class="h-10 w-px bg-slate-100 dark:bg-white/5 mx-2 hidden sm:block"></div>
 
-                            <button class="px-5 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold text-xs uppercase tracking-wider rounded-xl hover:bg-slate-800 dark:hover:bg-slate-200 transition-colors shadow-lg shadow-white/5">
-                                Inspecter
+                            <button 
+                                @click="openEditAttribution(attr)"
+                                class="px-5 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold text-xs uppercase tracking-wider rounded-xl hover:bg-slate-800 dark:hover:bg-slate-200 transition-colors shadow-lg shadow-white/5 flex items-center gap-2"
+                            >
+                                <Edit3 class="w-3.5 h-3.5" />
+                                Modifier
                             </button>
                             
-                            <button class="p-2.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl transition-colors">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path></svg>
+                            <button 
+                                @click="revokeAttribution(attr.id)"
+                                class="p-2.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl transition-colors"
+                                title="Révoquer l'attribution"
+                            >
+                                <Trash2 class="w-5 h-5" />
                             </button>
                         </div>
                     </div>
@@ -329,7 +371,7 @@ onMounted(() => {
             </div>
         </section>
 
-        <!-- Edit/Create Modal (Standardized Glass) -->
+        <!-- Edit/Create Grade Modal (Standardized Glass) -->
         <div v-if="showCreateModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-slate-900/40 dark:bg-[#000000]/80 backdrop-blur-md transition-opacity" @click="showCreateModal = false"></div>
             <div class="relative bg-white dark:bg-[#0F172A] w-full max-w-lg rounded-[40px] shadow-2xl overflow-hidden border border-slate-200 dark:border-white/10">
@@ -389,5 +431,42 @@ onMounted(() => {
             </div>
         </div>
 
+        <!-- Edit Attribution Modal -->
+        <div v-if="showAttributionModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <div class="absolute inset-0 bg-slate-900/40 dark:bg-[#000000]/80 backdrop-blur-md transition-opacity" @click="showAttributionModal = false"></div>
+            <div class="relative bg-white dark:bg-[#0F172A] w-full max-w-md rounded-[32px] shadow-2xl overflow-hidden border border-slate-200 dark:border-white/10">
+                
+                <div class="px-8 py-8 border-b border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-white/5">
+                    <h3 class="text-xl font-black text-slate-900 dark:text-white">Modifier l'Attribution</h3>
+                    <p class="text-slate-500 dark:text-slate-400 text-sm mt-1">Changez le grade de {{ selectedAttribution?.user }}</p>
+                </div>
+                
+                <div class="p-8 space-y-4">
+                    <div class="space-y-2">
+                        <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500">Nouveau Grade</label>
+                        <div class="grid grid-cols-1 gap-2">
+                            <button 
+                                v-for="grade in grades" 
+                                :key="grade.id"
+                                @click="newGradeId = grade.id"
+                                class="flex items-center gap-3 p-3 rounded-xl border transition-all"
+                                :class="newGradeId === grade.id ? 'bg-amber-50 border-amber-500 ring-1 ring-amber-500' : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 hover:border-slate-300'"
+                            >
+                                <component :is="getGradeVisuals(grade.name).icon" class="w-5 h-5" :class="getGradeVisuals(grade.name).text" />
+                                <span class="font-bold text-sm" :class="newGradeId === grade.id ? 'text-slate-900' : 'text-slate-600 dark:text-slate-400'">{{ grade.name }}</span>
+                                <CheckCircle2 v-if="newGradeId === grade.id" class="ml-auto w-4 h-4 text-amber-500" />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="px-8 pb-8 flex gap-4">
+                    <button @click="showAttributionModal = false" class="flex-1 py-4 rounded-xl font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors">Annuler</button>
+                    <button @click="saveAttribution" class="flex-1 py-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-black uppercase tracking-wider shadow-lg transition-transform active:scale-95">
+                        Confirmer
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 </template>

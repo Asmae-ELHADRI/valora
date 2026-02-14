@@ -63,8 +63,11 @@ class GradeController extends Controller
                 return [
                     'id' => $attr->id,
                     'user' => $attr->prestataire->user->name ?? 'Utilisateur Inconnu',
+                    'user_id' => $attr->prestataire->user->id ?? null,
+                    'prestataire_id' => $attr->prestataire_id,
                     'user_photo' => $attr->prestataire->user->photo,
                     'grade' => $attr->grade->name,
+                    'grade_id' => $attr->grade_id,
                     'grade_color' => $attr->grade->color,
                     'date' => $attr->created_at->diffForHumans(),
                     'type' => $attr->type === 'automatic' ? 'Automatique' : 'Manuel',

@@ -203,6 +203,8 @@ onMounted(fetchConversations);
                                     </div>
                                 </div>
                             </div>
+                            
+                            <div class="h-8 w-px bg-slate-200 dark:bg-white/10"></div>
 
                             <div class="flex-1 min-w-0">
                                 <div class="flex justify-between items-start mb-0.5">
