@@ -6,7 +6,8 @@ import { X, AlertTriangle, CheckCircle, Loader2 } from 'lucide-vue-next';
 const props = defineProps({
     isOpen: Boolean,
     userId: Number,
-    userName: String
+    userName: String,
+    userRole: String  // Add role to check if user is admin
 });
 
 const emit = defineEmits(['close', 'success']);
@@ -98,9 +99,21 @@ const close = () => {
                     </div>
 
                     <div v-else class="space-y-6">
-                        <p class="text-sm text-slate-500 font-medium">
-                            Vous signalez l'utilisateur <strong class="text-slate-900">{{ userName }}</strong>. Ce signalement restera anonyme.
-                        </p>
+                        <!-- Admin Warning -->
+                        <div v-if="props.userRole === 'admin'" class="p-6 rounded-2xl bg-amber-50 border-2 border-amber-200 text-amber-900">
+                            <div class="flex items-start gap-3">
+                                <AlertTriangle class="w-6 h-6 shrink-0 mt-1" />
+                                <div>
+                                    <h4 class="font-black mb-1">Impossible de signaler un administrateur</h4>
+                                    <p class="text-sm font-medium">Les comptes administrateurs ne peuvent pas être signalés. Si vous avez un problème, veuillez contacter le support.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div v-else>
+                            <p class="text-sm text-slate-500 font-medium">
+                                Vous signalez l'utilisat eur <strong class="text-slate-900">{{ userName }}</strong>. Ce signalement restera anonyme.
+                            </p>
 
                         <div class="space-y-3">
                             <label class="block text-xs font-black uppercase tracking-widest text-slate-400">Raison</label>
@@ -132,7 +145,9 @@ const close = () => {
                             {{ error }}
                         </div>
 
-                        <div class="flex gap-4 pt-2">
+                        </div>
+
+                        <div class="flex gap-4 pt-2" v-if="props.userRole !== 'admin'">
                             <button @click="close" class="w-full py-4 rounded-xl border border-slate-200 text-slate-600 font-black text-[11px] uppercase tracking-widest hover:bg-slate-50 transition-colors">
                                 Annuler
                             </button>
@@ -145,6 +160,9 @@ const close = () => {
                                 <span>{{ loading ? 'Envoi...' : 'Signaler' }}</span>
                             </button>
                         </div>
+                        <button v-else @click="close" class="w-full py-4 rounded-xl border border-slate-200 text-slate-600 font-black text-[11px] uppercase tracking-widest hover:bg-slate-50 transition-colors">
+                            Fermer
+                        </button>
                     </div>
                 </div>
             </div>

@@ -182,7 +182,7 @@ onUnmounted(() => {
 <template>
   <div class="min-h-screen bg-gray-50 flex flex-col">
     <!-- Premium Navbar -->
-    <nav v-if="!route.path.startsWith('/admin')"
+    <nav v-if="!['/login', '/register'].includes(route.path) && !route.path.startsWith('/admin')"
          :class="[isScrolled ? 'navbar-glacier' : 'navbar-top']"
          class="navbar-premium sticky top-0 z-50 transition-all duration-700">
       <!-- Top Gradient Overlay (Only at top) -->

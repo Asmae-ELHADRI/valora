@@ -18,6 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => \App\Http\Middleware\CheckRole::class,
             'admin' => \App\Http\Middleware\CheckAdminRole::class,
             'permission' => \App\Http\Middleware\CheckPermission::class,
+            'prevent.admin.report' => \App\Http\Middleware\PreventAdminReport::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

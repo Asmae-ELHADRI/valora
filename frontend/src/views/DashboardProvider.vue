@@ -9,7 +9,7 @@ import {
   Briefcase, Calendar, Camera, AlertCircle, Edit3, Save, X, Fingerprint, Coins, ChevronDown, 
   LifeBuoy, Zap, Trophy, Users, ExternalLink, Download, UploadCloud, FileCheck, Trash2, Smartphone, 
   ChevronLeft, ChevronRight, Globe, Linkedin, Facebook, Instagram,
-  PenTool, ArrowLeft
+  PenTool, ArrowLeft, Eye
 } from 'lucide-vue-next';
 import PhotoUploader from '../components/PhotoUploader.vue';
 import AvailabilityScheduler from '../components/AvailabilityScheduler.vue';
@@ -18,6 +18,7 @@ import html2pdf from 'html2pdf.js'; // Direct import for PDF generation
 const auth = useAuthStore();
 const router = useRouter();
 const applications = ref([]);
+const publishedMissions = ref([]);
 const reviewsData = ref({ reviews: [], average_rating: 0, total_reviews: 0 });
 const categories = ref([]);
 const loading = ref(true);
@@ -328,6 +329,15 @@ const fetchReviews = async () => {
   }
 };
 
+const fetchPublishedMissions = async () => {
+  try {
+    const response = await api.get('/api/offers');
+    publishedMissions.value = response.data.data;
+  } catch (err) {
+    console.error('Erreur chargement missions publiques:', err);
+  }
+};
+
 const fetchCategories = async () => {
   try {
     const response = await api.get('/api/offers/categories');
@@ -413,7 +423,7 @@ const removeFormation = (index) => {
 };
 
 onMounted(async () => {
-  await Promise.all([fetchApplications(), fetchReviews(), fetchCategories()]);
+  await Promise.all([fetchApplications(), fetchReviews(), fetchCategories(), fetchPublishedMissions()]);
   // Ensure we have the latest user data including provider details
   if (auth.token) {
       await auth.fetchUser();
@@ -1044,11 +1054,11 @@ const orderedDays = computed(() => {
                 <!-- Active Missions -->
                 <div class="space-y-6">
                     <div class="flex items-center justify-between px-4">
-                        <h3 class="text-xl font-black text-slate-900 tracking-tight">Missions Actives</h3>
+                        <h3 class="text-xl font-black text-slate-900 tracking-tight">Missions Disponibles</h3>
                         <router-link to="/search" class="text-[10px] font-black text-premium-brown uppercase tracking-widest hover:text-slate-900 transition-colors">Explorer plus <ArrowRight class="inline w-3 h-3 ml-1" /></router-link>
                     </div>
 
-                    <div v-if="activeMissions.length === 0" class="bg-white rounded-[3rem] p-16 text-center border-2 border-dashed border-slate-100 group hover:border-premium-yellow transition-colors cursor-pointer" @click="$router.push('/search')">
+                    <div v-if="publishedMissions.length === 0" class="bg-white rounded-[3rem] p-16 text-center border-2 border-dashed border-slate-100 group hover:border-premium-yellow transition-colors cursor-pointer" @click="$router.push('/search')">
                         <div class="max-w-xs mx-auto space-y-6">
                             <div class="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto transition-transform group-hover:scale-110 group-hover:bg-premium-yellow/10">
                                 <Search class="w-8 h-8 text-slate-300 group-hover:text-premium-yellow" />
@@ -1059,40 +1069,38 @@ const orderedDays = computed(() => {
                     </div>
 
                     <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div v-for="mission in activeMissions" :key="mission.id" class="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 group">
+                        <div v-for="mission in publishedMissions" :key="mission.id" class="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 group">
                             <div class="space-y-6">
                                 <div class="flex justify-between items-start">
                                     <div class="flex items-center space-x-4">
                                         <div class="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center group-hover:bg-premium-yellow/20 transition-colors">
-                                            <Briefcase class="w-6 h-6 text-blue-600 group-hover:text-slate-900" />
+                                            <component :is="PenTool" class="w-6 h-6 text-blue-600 group-hover:text-slate-900" />
                                         </div>
                                         <div>
-                                            <h4 class="font-black text-slate-900 text-sm leading-tight group-hover:text-premium-brown transition-colors">{{ mission.service_offer?.title }}</h4>
-                                            <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{{ mission.service_offer?.user?.name }}</p>
+                                            <h4 class="font-black text-slate-900 text-sm leading-tight group-hover:text-premium-brown transition-colors">{{ mission.title }}</h4>
+                                            <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{{ mission.user?.name }} • {{ mission.category?.name }}</p>
                                         </div>
                                     </div>
-                                    <div class="bg-emerald-50 text-emerald-600 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest">Active</div>
+                                    <div class="bg-premium-yellow/10 text-premium-brown px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border border-premium-yellow/20">Nouveau</div>
                                 </div>
                                 
-                                <div class="bg-slate-50 p-4 rounded-2xl space-y-3">
-                                    <div class="flex justify-between items-center text-[10px] font-bold text-slate-500">
-                                        <span>Progression</span>
-                                        <span class="text-slate-900">En cours</span>
-                                    </div>
-                                    <div class="h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                                        <div class="h-full bg-linear-to-r from-blue-500 to-blue-400 rounded-full w-2/3 shadow-sm"></div>
-                                    </div>
+                                <div class="text-[11px] text-slate-500 line-clamp-2 font-medium leading-relaxed">
+                                    {{ mission.description }}
                                 </div>
 
                                 <div class="flex items-center justify-between">
                                     <div class="flex items-center space-x-1.5 bg-slate-50 px-3 py-1.5 rounded-xl text-[10px] font-black text-slate-500">
                                         <MapPin class="w-3 h-3" />
-                                        <span>{{ mission.service_offer?.city || 'Maroc' }}</span>
+                                        <span>{{ mission.city || mission.location || 'Maroc' }}</span>
                                     </div>
-                                    <button @click="switchTab('missions')" class="bg-slate-900 text-white px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-premium-yellow hover:text-slate-900 transition-all shadow-lg active:scale-95">
-                                        Détails
-                                    </button>
+                                    <div class="text-[10px] font-black text-slate-900 bg-slate-50 px-3 py-1.5 rounded-xl">
+                                        {{ mission.budget }} DH
+                                    </div>
                                 </div>
+
+                                <router-link :to="`/search`" class="block w-full text-center bg-slate-900 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-premium-yellow hover:text-slate-900 transition-all shadow-lg active:scale-95">
+                                    Voir les détails
+                                </router-link>
                             </div>
                         </div>
                     </div>

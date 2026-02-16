@@ -16,9 +16,7 @@ class ProviderController extends Controller
             ->whereHas('prestataire', function ($q) {
                 $q->where('is_visible', true);
             })
-            ->with(['prestataire.categories', 'prestataire.badges' => function ($q) {
-                $q->orderBy('threshold', 'desc');
-            }]);
+            ->with(['prestataire.categories']);
 
         // Filter by keyword (name, description, skills)
         if ($request->has('keyword')) {

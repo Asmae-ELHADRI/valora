@@ -16,6 +16,13 @@ class Report extends Model
         'description',
         'status',
         'priority',
+        'admin_action',
+        'admin_action_at',
+        'admin_notes',
+    ];
+
+    protected $casts = [
+        'admin_action_at' => 'datetime',
     ];
 
     public function reporter()

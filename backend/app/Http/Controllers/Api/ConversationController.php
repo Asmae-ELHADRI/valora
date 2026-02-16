@@ -23,25 +23,26 @@ class ConversationController extends Controller
             $query->where('sender_id', $userId)
                   ->orWhere('receiver_id', $userId);
         })
-        ->with(['sender:id,name,role,avatar', 'receiver:id,name,role,avatar', 'messages' => function ($query) {
-            $query->latest()->limit(1);
-        }])
-        ->orderByDesc(function ($query) {
-            $query->select('created_at')
-                ->from('messages')
-                ->whereColumn('conversation_id', 'conversations.id')
-                ->latest()
-                ->limit(1)
-                ->union(
-                    DB::table('conversations')
-                        ->select('created_at')
-                        ->whereColumn('id', 'conversations.id')
-                );
-        })
+        ->with([
+            'sender:id,name,role,email', 
+            'receiver:id,name,role,email', 
+            'messages' => function ($query) {
+                $query->latest()->limit(1);
+            }
+        ])
         ->get()
+        ->sortByDesc(function ($conversation) {
+            $lastMessage = $conversation->messages->first();
+            return $lastMessage ? $lastMessage->created_at : $conversation->created_at;
+        })
         ->map(function ($conversation) use ($userId) {
             $otherUser = $conversation->sender_id === $userId ? $conversation->receiver : $conversation->sender;
             $lastMessage = $conversation->messages->first();
+            
+            // Load prestataire if user is a provider
+            if ($otherUser->role === 'provider') {
+                $otherUser->load('prestataire:user_id,photo');
+            }
             
             return [
                 'id' => $conversation->id,
@@ -51,8 +52,10 @@ class ConversationController extends Controller
                 'unread_count' => $conversation->messages()->where('receiver_id', $userId)->whereNull('read_at')->count(),
                 'related_type' => $conversation->related_type,
                 'related_id' => $conversation->related_id,
+                'is_blocked' => $conversation->is_blocked,
             ];
-        });
+        })
+        ->values();
 
         return response()->json(['data' => $conversations]);
     }
@@ -63,11 +66,22 @@ class ConversationController extends Controller
     public function show($id)
     {
         $userId = Auth::id();
-        $conversation = Conversation::with(['sender', 'receiver'])->findOrFail($id);
+        $conversation = Conversation::with([
+            'sender:id,name,role,email', 
+            'receiver:id,name,role,email'
+        ])->findOrFail($id);
 
         // Security check: User must be a participant
         if ($conversation->sender_id !== $userId && $conversation->receiver_id !== $userId) {
             return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        // Load prestataire for provider users
+        if ($conversation->sender->role === 'provider') {
+            $conversation->sender->load('prestataire:user_id,photo');
+        }
+        if ($conversation->receiver->role === 'provider') {
+            $conversation->receiver->load('prestataire:user_id,photo');
         }
 
         // Mark messages as read
@@ -77,9 +91,16 @@ class ConversationController extends Controller
             ->update(['read_at' => now()]);
 
         $messages = $conversation->messages()
-            ->with('sender:id,name,avatar')
+            ->with(['sender:id,name,role'])
             ->orderBy('created_at', 'asc')
-            ->get();
+            ->get()
+            ->map(function ($message) {
+                // Load prestataire for provider senders
+                if ($message->sender->role === 'provider') {
+                    $message->sender->load('prestataire:user_id,photo');
+                }
+                return $message;
+            });
 
         return response()->json(['data' => $messages, 'conversation' => $conversation]);
     }

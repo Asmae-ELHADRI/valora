@@ -66,6 +66,8 @@ const categoryGroups = computed(() => {
     };
 
     const result = [];
+    const usedIds = new Set();
+
     for (const [groupName, categoryNames] of Object.entries(groups)) {
         const groupCategories = categories.value.filter(cat => 
             categoryNames.includes(cat.name)
@@ -75,8 +77,19 @@ const categoryGroups = computed(() => {
                 name: groupName,
                 categories: groupCategories
             });
+            groupCategories.forEach(cat => usedIds.add(cat.id));
         }
     }
+
+    // Ajouter les catégories non classées dans "Autres"
+    const otherCategories = categories.value.filter(cat => !usedIds.has(cat.id));
+    if (otherCategories.length > 0) {
+        result.push({
+            name: 'Autres',
+            categories: otherCategories
+        });
+    }
+
     return result;
 });
 

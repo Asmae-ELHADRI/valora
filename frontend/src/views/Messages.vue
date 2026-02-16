@@ -634,7 +634,8 @@ onMounted(() => {
                           </div>
                      </div>
                     
-                    <div class="relative">
+                    
+                    <div class="relative" v-if="activeConversation.other_user.role !== 'admin'">
                         <button @click="showMenu = !showMenu" class="p-2 rounded-xl text-slate-300 hover:text-slate-600 hover:bg-slate-50 transition-all">
                             <MoreVertical class="w-5 h-5" />
                         </button>

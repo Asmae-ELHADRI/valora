@@ -46,7 +46,7 @@ import { Facebook, Instagram, Linkedin, Twitter, Mail, Phone, MapPin, ArrowRight
           <ul class="space-y-3">
             <li><router-link to="/" class="hover:text-[#facc15] transition-colors flex items-center gap-2 group"><ArrowRight class="w-3 h-3 text-[#facc15] opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all" /> Accueil</router-link></li>
             <li><router-link to="/about" class="hover:text-[#facc15] transition-colors flex items-center gap-2 group"><ArrowRight class="w-3 h-3 text-[#facc15] opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all" /> À propos</router-link></li>
-            <li><router-link to="/services" class="hover:text-[#facc15] transition-colors flex items-center gap-2 group"><ArrowRight class="w-3 h-3 text-[#facc15] opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all" /> Services</router-link></li>
+            <li><router-link to="/providers" class="hover:text-[#facc15] transition-colors flex items-center gap-2 group"><ArrowRight class="w-3 h-3 text-[#facc15] opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all" /> Services</router-link></li>
             <li><router-link to="/contact" class="hover:text-[#facc15] transition-colors flex items-center gap-2 group"><ArrowRight class="w-3 h-3 text-[#facc15] opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all" /> Contact</router-link></li>
           </ul>
         </div>

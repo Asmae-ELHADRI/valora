@@ -14,8 +14,11 @@ const router = useRouter();
 const offers = ref([]);
 const categories = ref([]);
 const loading = ref(false);
+const loadingMore = ref(false);
 const selectedOffer = ref(null);
 const showFilters = ref(false);
+const currentPage = ref(1);
+const lastPage = ref(1);
 
 const filters = ref({
   keyword: '',
@@ -63,21 +66,42 @@ const contactClient = () => {
     });
 };
 
-const fetchOffers = async () => {
-  loading.value = true;
+const fetchOffers = async (loadMore = false) => {
+  if (loadMore) {
+    loadingMore.value = true;
+  } else {
+    loading.value = true;
+    currentPage.value = 1; // Reset to page 1 on new filter/search
+  }
+
   try {
-    const params = {};
+    const params = { page: currentPage.value };
     Object.keys(filters.value).forEach(key => {
       if (filters.value[key]) params[key] = filters.value[key];
     });
     
     const response = await api.get('/api/offers', { params });
-    offers.value = response.data.data;
+    
+    if (loadMore) {
+      offers.value = [...offers.value, ...response.data.data];
+    } else {
+      offers.value = response.data.data;
+    }
+    
+    lastPage.value = response.data.last_page;
   } catch (err) {
     console.error('Erreur lors du chargement des offres:', err);
   } finally {
     loading.value = false;
+    loadingMore.value = false;
   }
+};
+
+const loadMoreOffers = () => {
+    if (currentPage.value < lastPage.value) {
+        currentPage.value++;
+        fetchOffers(true);
+    }
 };
 
 const fetchCategories = async () => {
@@ -232,7 +256,7 @@ const formatDate = (date) => {
              <Briefcase v-else class="w-6 h-6" />
           </div>
           <span class="px-4 py-2 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-slate-200 group-hover:bg-slate-800 transition-colors">
-            {{ offer.budget }} €
+            {{ offer.budget }} DH
           </span>
         </div>
         
@@ -244,19 +268,31 @@ const formatDate = (date) => {
             <div class="flex items-center justify-between text-xs font-bold text-slate-400 uppercase tracking-wider">
                 <div class="flex items-center">
                     <MapPin class="w-4 h-4 mr-2" />
-                    {{ offer.location }}
+                    {{ offer.location || 'Maroc' }}
                 </div>
                 <div class="flex items-center">
                     <Calendar class="w-4 h-4 mr-2" />
-                    {{ formatDate(offer.desired_date) }}
+                    {{ formatDate(offer.created_at) }}
                 </div>
             </div>
             <div class="flex items-center text-xs font-bold text-slate-500 bg-slate-50 p-3 rounded-xl">
                 <Clock class="w-4 h-4 mr-2 text-slate-400" />
-                {{ $t('search.published_by') }} <span class="text-slate-900 ml-1">{{ offer.user.name }}</span>
+                {{ $t('search.published_by') || 'Publié par' }} <span class="text-slate-900 ml-1">{{ offer.user?.name }}</span>
             </div>
         </div>
       </div>
+    </div>
+
+    <!-- Load More Button -->
+    <div v-if="offers.length > 0 && currentPage < lastPage" class="mt-12 text-center">
+        <button 
+            @click="loadMoreOffers" 
+            :disabled="loadingMore"
+            class="px-8 py-4 bg-white border border-slate-200 text-slate-900 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm active:scale-95 disabled:opacity-50 flex items-center justify-center mx-auto gap-2"
+        >
+            <Loader2 v-if="loadingMore" class="w-4 h-4 animate-spin" />
+            <span>{{ loadingMore ? 'Chargement...' : 'Voir plus d\'offres' }}</span>
+        </button>
     </div>
 
     <!-- Offer Detail Modal -->
@@ -281,7 +317,7 @@ const formatDate = (date) => {
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
             <div class="bg-gray-50 p-6 rounded-3xl border border-gray-100">
               <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{{ $t('search.proposed_budget') }}</p>
-              <p class="text-2xl font-black text-slate-900">{{ selectedOffer.budget }} €</p>
+              <p class="text-2xl font-black text-slate-900">{{ selectedOffer.budget }} DH</p>
             </div>
             <div class="bg-gray-50 p-6 rounded-3xl border border-gray-100">
               <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{{ $t('search.desired_date') }}</p>

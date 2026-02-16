@@ -142,10 +142,19 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/badges', [\App\Http\Controllers\Api\AdminController::class, 'badgesList']);
         Route::put('/badges/{id}', [\App\Http\Controllers\Api\AdminController::class, 'updateBadge']);
 
+        
         // Moderation & Complaints (New)
         Route::get('/complaints', [\App\Http\Controllers\Admin\ComplaintController::class, 'index']);
         Route::get('/complaints/{id}', [\App\Http\Controllers\Admin\ComplaintController::class, 'show']);
         Route::post('/complaints/{id}/action', [\App\Http\Controllers\Admin\ComplaintController::class, 'action']);
+
+        // Reports Moderation (New)
+        Route::get('/reports', [\App\Http\Controllers\Admin\ModerationController::class, 'index']);
+        Route::get('/reports/{id}', [\App\Http\Controllers\Admin\ModerationController::class, 'show']);
+        Route::post('/reports/{id}/ignore', [\App\Http\Controllers\Admin\ModerationController::class, 'ignore']);
+        Route::post('/reports/{id}/warn', [\App\Http\Controllers\Admin\ModerationController::class, 'warn']);
+        Route::post('/reports/{id}/suspend', [\App\Http\Controllers\Admin\ModerationController::class, 'suspend']);
+        Route::post('/reports/{id}/delete-account', [\App\Http\Controllers\Admin\ModerationController::class, 'deleteAccount']);
         
         // Admin Conversations Overview
         Route::get('/conversations', [\App\Http\Controllers\Admin\ConversationController::class, 'index']);

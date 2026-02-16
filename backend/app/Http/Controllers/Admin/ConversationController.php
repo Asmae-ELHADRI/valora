@@ -11,21 +11,39 @@ class ConversationController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Conversation::with(['sender:id,name,photo', 'receiver:id,name,photo'])
-            ->latest();
+        $query = Conversation::with([
+            'sender:id,name,email,role', 
+            'receiver:id,name,email,role'
+        ])
+        ->withCount('messages')
+        ->latest();
 
         if ($request->has('search') && $request->search) {
             $search = $request->search;
             $query->where(function($q) use ($search) {
                 $q->whereHas('sender', function($q) use ($search) {
-                    $q->where('name', 'like', "%{$search}%");
+                    $q->where('name', 'like', "%{$search}%")
+                      ->orWhere('email', 'like', "%{$search}%");
                 })->orWhereHas('receiver', function($q) use ($search) {
-                    $q->where('name', 'like', "%{$search}%");
+                    $q->where('name', 'like', "%{$search}%")
+                      ->orWhere('email', 'like', "%{$search}%");
                 });
             });
         }
 
         $conversations = $query->paginate(15);
+        
+        // Load prestataire for providers
+        $conversations->getCollection()->transform(function ($conversation) {
+            if ($conversation->sender && $conversation->sender->role === 'provider') {
+                $conversation->sender->load('prestataire:user_id,photo');
+            }
+            if ($conversation->receiver && $conversation->receiver->role === 'provider') {
+                $conversation->receiver->load('prestataire:user_id,photo');
+            }
+            return $conversation;
+        });
+        
         return response()->json($conversations);
     }
 

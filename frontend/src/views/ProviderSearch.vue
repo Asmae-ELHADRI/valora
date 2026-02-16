@@ -4,12 +4,13 @@ import { useAuthStore } from '../store/auth';
 import api from '../services/api';
 import { 
   Search, Filter, MapPin, Star, Briefcase, 
-  ChevronRight, X, Loader2, Info, User,
+  ChevronRight, X, Loader2, Info, User, Clock,
   MessageSquare, GraduationCap, Award, Send, CheckCircle, AlertCircle,
-  ShieldAlert, Ban, ShieldCheck,
+  ShieldAlert, Ban, ShieldCheck, FileText,
   PenTool, Hammer, Paintbrush, Zap, Scissors, Sprout, Wrench, Utensils, Camera
 } from 'lucide-vue-next';
 import { useRouter } from 'vue-router';
+import ProviderCV from '../components/ProviderCV.vue';
 
 const orbitIcons = [
   PenTool, Hammer, Paintbrush, Zap, Scissors, Sprout, Wrench, Utensils, Camera
@@ -114,7 +115,7 @@ const resetFilters = () => {
 };
 
 const startConversation = (providerId) => {
-  router.push(`/messages?userId=${providerId}`);
+  router.push(`/messages?userId=${providerId}&related_type=profile`);
 };
 
 const fetchClientOffers = async () => {
@@ -359,6 +360,16 @@ const getBadgeClass = (level) => {
             >
               <MessageSquare class="w-5 h-5" />
             </button>
+            <a 
+              v-if="provider.prestataire?.cv_url"
+              :href="provider.prestataire.cv_url"
+              target="_blank"
+              @click.stop
+              class="p-2.5 bg-purple-50 text-purple-600 rounded-xl hover:bg-purple-600 hover:text-white transition shadow-sm"
+              title="Voir le CV"
+            >
+              <FileText class="w-5 h-5" />
+            </a>
           </div>
         </div>
       </div>
@@ -372,160 +383,37 @@ const getBadgeClass = (level) => {
           <X class="w-6 h-6" />
         </button>
         
-        <div class="overflow-y-auto p-10">
-          <div class="flex flex-col md:flex-row items-center md:items-start gap-8 mb-10">
-            <!-- Avatar with Premium Orbit Border -->
-            <div class="relative w-40 h-40 shrink-0 flex items-center justify-center">
-              <div class="absolute inset-0 border-4 border-dashed border-premium-yellow/30 rounded-full animate-spin-slow"></div>
-              
-              <!-- Orbiting Tools -->
-              <div 
-                v-for="(Icon, index) in orbitIcons" 
-                :key="index"
-                class="orbit-item absolute w-8 h-8 flex items-center justify-center bg-white/80 backdrop-blur-md rounded-lg border border-slate-100 shadow-sm transition-all duration-1000 z-10"
-                :style="{
-                  'animation': `orbit ${15 + index * 2}s linear infinite`,
-                  '--delay': `${(360 / orbitIcons.length) * index}deg`,
-                  '--orbit-radius': '95px'
-                }"
-              >
-                <Icon class="w-4 h-4 text-slate-600" />
-              </div>
-
-              <div class="relative z-20 w-full h-full bg-white rounded-full p-2 shadow-2xl border-8 border-gray-50 flex items-center justify-center overflow-hidden transition-transform duration-700 hover:rotate-6">
-                <img v-if="selectedProvider.prestataire?.photo" :src="`http://localhost:8000/storage/${selectedProvider.prestataire.photo}`" class="w-full h-full object-cover rounded-full">
-                <div v-else class="w-full h-full flex items-center justify-center text-gray-300">
-                  <User class="w-16 h-16" />
-                </div>
-              </div>
-            </div>
-            
-            <div class="grow text-center md:text-left space-y-4">
-              <div>
-                <h2 class="text-4xl font-black text-gray-900 leading-tight">{{ selectedProvider.name }}</h2>
-                <div class="flex flex-wrap justify-center md:justify-start gap-2 mt-2">
-                  <div class="flex flex-wrap justify-center md:justify-start gap-2">
-                    <span 
-                        v-if="selectedProvider.prestataire?.badge_level" 
-                        :class="getBadgeClass(selectedProvider.prestataire.badge_level)"
-                        class="px-4 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 shadow-lg"
-                    >
-                        <ShieldCheck v-if="selectedProvider.prestataire?.badge_level === 'Certifié Valora'" class="w-4 h-4" />
-                        {{ selectedProvider.prestataire.badge_level }}
-                    </span>
-                    <span 
-                      v-for="cat in selectedProvider.prestataire?.categories" 
-                      :key="cat.id"
-                      class="px-4 py-1.5 bg-blue-600 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest shadow-lg shadow-blue-200"
-                    >
-                      {{ cat.name }}
-                    </span>
-                  </div>
-                  <div v-if="selectedProvider.prestataire?.rating > 0" class="flex items-center bg-yellow-50 text-yellow-700 px-3 py-1.5 rounded-xl text-xs font-bold ring-1 ring-yellow-200">
-                    <Star class="w-4 h-4 fill-current mr-1.5 text-yellow-400" />
-                    {{ parseFloat(selectedProvider.prestataire.rating).toFixed(1) }} / 5
-                  </div>
-                </div>
-              </div>
-              
-              <div class="flex flex-wrap justify-center md:justify-start gap-6 text-sm text-gray-500 font-medium">
-                <div class="flex items-center">
-                  <MapPin class="w-5 h-5 mr-2 text-blue-600" />
-                  {{ selectedProvider.address || 'Localisation non précisée' }}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-10">
-            <div class="space-y-8">
-              <div>
-                <h4 class="text-xs font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center">
-                  <Info class="w-4 h-4 mr-2 text-blue-600" />
-                  A propos
-                </h4>
-                <p class="text-gray-600 leading-relaxed">{{ selectedProvider.prestataire?.description || 'Aucune description.' }}</p>
-              </div>
-
-              <div>
-                <h4 class="text-xs font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center">
-                  <Award class="w-4 h-4 mr-2 text-blue-600" />
-                  Compétences
-                </h4>
-                <div class="flex flex-wrap gap-2">
-                  <span v-for="skill in (selectedProvider.prestataire?.skills || '').split(',')" :key="skill" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl text-xs font-bold hover:bg-gray-200 transition">
-                    {{ skill.trim() }}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div class="space-y-8">
-              <div>
-                <h4 class="text-xs font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center">
-                  <GraduationCap class="w-4 h-4 mr-2 text-blue-600" />
-                  Expériences & Diplômes
-                </h4>
-                <div class="space-y-4">
-                  <div class="bg-blue-50/50 p-4 rounded-2xl border border-blue-100">
-                    <p class="text-xs font-bold text-blue-600 uppercase mb-1">Expérience</p>
-                    <p class="text-sm text-gray-700 whitespace-pre-wrap">{{ selectedProvider.prestataire?.experience || 'Non renseigné' }}</p>
-                  </div>
-                  <div class="bg-purple-50/50 p-4 rounded-2xl border border-purple-100">
-                    <p class="text-xs font-bold text-purple-600 uppercase mb-1">Diplômes</p>
-                    <p class="text-sm text-gray-700 whitespace-pre-wrap">{{ selectedProvider.prestataire?.diplomas || 'Non renseigné' }}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <h4 class="text-xs font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center">
-                  <Clock class="w-4 h-4 mr-2 text-blue-600" />
-                  Disponibilités
-                </h4>
-                <div class="grid grid-cols-2 gap-2">
-                   <div v-for="(day, key) in { monday: 'Lun', tuesday: 'Mar', wednesday: 'Mer', thursday: 'Jeu', friday: 'Ven', saturday: 'Sam', sunday: 'Dim' }" :key="key" 
-                        class="p-2 rounded-xl text-[10px] font-bold border flex flex-col items-center"
-                        :class="selectedProvider.prestataire?.availabilities?.[key]?.active ? 'bg-green-50 border-green-100 text-green-700' : 'bg-gray-50 border-gray-100 text-gray-400 opacity-50'">
-                        <span>{{ day }}</span>
-                        <span v-if="selectedProvider.prestataire?.availabilities?.[key]?.active" class="mt-1 text-[9px]">
-                            {{ selectedProvider.prestataire?.availabilities[key].start }} - {{ selectedProvider.prestataire?.availabilities[key].end }}
-                        </span>
-                        <span v-else class="mt-1">Off</span>
-                   </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Reviews Section -->
-          <div class="mt-12 pt-12 border-t border-gray-100">
-            <h4 class="text-xs font-black text-gray-400 uppercase tracking-widest mb-8 flex items-center">
+        <div class="overflow-y-auto bg-slate-50">
+          <ProviderCV :provider="selectedProvider" />
+          
+          <!-- Reviews Section (Separate from CV but within modal) -->
+          <div class="p-10 border-t border-slate-200">
+            <h4 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-8 flex items-center">
               <Star class="w-4 h-4 mr-2 text-yellow-400" />
               Avis des clients ({{ selectedProvider.received_reviews?.length || 0 }})
             </h4>
             
             <div v-if="selectedProvider.received_reviews?.length > 0" class="space-y-6">
-              <div v-for="review in selectedProvider.received_reviews" :key="review.id" class="p-6 bg-gray-50 rounded-3xl border border-gray-100">
+              <div v-for="review in selectedProvider.received_reviews" :key="review.id" class="p-6 bg-white rounded-3xl border border-slate-100 shadow-sm transition-all hover:shadow-md">
                 <div class="flex justify-between items-start mb-4">
                   <div class="flex items-center space-x-3">
-                    <div class="w-10 h-10 rounded-xl bg-white flex items-center justify-center font-bold text-blue-600 border border-gray-100">
-                      {{ review.reviewer?.name?.charAt(0) }}
+                    <div class="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center font-black text-xs shadow-lg">
+                      {{ review.reviewer?.name?.substring(0,2).toUpperCase() }}
                     </div>
                     <div>
-                      <p class="font-bold text-gray-900">{{ review.reviewer?.name }}</p>
-                      <p class="text-[10px] text-gray-400">{{ new Date(review.created_at).toLocaleDateString() }}</p>
+                      <p class="font-black text-slate-900 leading-none">{{ review.reviewer?.name }}</p>
+                      <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">{{ new Date(review.created_at).toLocaleDateString() }}</p>
                     </div>
                   </div>
                   <div class="flex text-yellow-400">
-                    <Star v-for="i in 5" :key="i" :class="i <= review.rating ? 'fill-current' : 'text-gray-200'" class="w-3 h-3" />
+                    <Star v-for="i in 5" :key="i" :class="i <= review.rating ? 'fill-current' : 'text-slate-200'" class="w-3 h-3" />
                   </div>
                 </div>
-                <p class="text-sm text-gray-600 leading-relaxed italic">"{{ review.comment }}"</p>
+                <p class="text-sm text-slate-600 leading-relaxed italic font-medium">"{{ review.comment }}"</p>
               </div>
             </div>
-            <div v-else class="text-center py-10 text-gray-400 text-sm">
-              Aucun avis pour le moment.
+            <div v-else class="text-center py-10 bg-white rounded-3xl border-2 border-dashed border-slate-100">
+              <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Aucun avis pour le moment</p>
             </div>
           </div>
         </div>
@@ -563,6 +451,16 @@ const getBadgeClass = (level) => {
             >
               <Ban class="w-6 h-6" />
             </button>
+            <a 
+              v-if="selectedProvider.prestataire?.cv_url"
+              :href="selectedProvider.prestataire.cv_url"
+              target="_blank"
+              class="p-5 bg-purple-600 text-white rounded-3xl hover:bg-purple-700 transition shadow-xl shadow-purple-100 flex items-center justify-center space-x-2"
+              title="Visualiser le CV"
+            >
+              <FileText class="w-6 h-6" />
+              <span class="font-bold">Mon CV</span>
+            </a>
           </div>
           
           <button @click="closeProvider" class="px-10 py-5 bg-white text-gray-700 border border-gray-200 rounded-3xl font-bold hover:bg-gray-100 transition">
