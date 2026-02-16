@@ -37,52 +37,91 @@ const chartData = ref({
   datasets: []
 });
 
+const chartOptions = computed(() => ({
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: {
+      display: false,
+    },
+    tooltip: {
+      mode: 'index',
+      intersect: false,
+      backgroundColor: '#1E293B',
+      titleFont: { size: 14, weight: 'bold' },
+      bodyFont: { size: 13 },
+      padding: 12,
+      cornerRadius: 12,
+    }
+  },
+  scales: {
+    x: {
+      grid: {
+        display: false,
+      },
+      ticks: {
+        font: { size: 11, weight: 'bold' },
+        color: '#94A3B8'
+      }
+    },
+    y: {
+      beginAtZero: true,
+      grid: {
+        color: 'rgba(148, 163, 184, 0.1)',
+        drawBorder: false
+      },
+      ticks: {
+        font: { size: 11, weight: 'bold' },
+        color: '#94A3B8',
+        padding: 10
+      }
+    }
+  }
+}));
+
+
+
 const loading = ref(true);
-
-// ... chart code ...
-
-
 
 const fetchData = async () => {
     loading.value = true;
     try {
-        // ... (stats fetch) ...
         const statsRes = await api.get('/api/admin/stats?period=month');
         const data = statsRes.data;
         
         stats.value = {
-            users_count: data.users_count,
+            users_count: data.users_count || 0,
             users_growth: 12, 
-            revenue: data.missions_count * 50, 
+            revenue: (data.missions_count || 0) * 50, 
             revenue_growth: 15,
-            new_users: data.chart_data.datasets[0].data.reduce((a, b) => a + b, 0),
+            new_users: data.chart_data?.datasets?.[0]?.data?.reduce((a, b) => a + b, 0) || 0,
             new_users_growth: 24,
-            reports_count: data.reports_count,
-            missions_count: data.missions_count
+            reports_count: data.reports_count || 0,
+            missions_count: data.missions_count || 0
         };
 
-        // ... (chart fetch) ...
-        chartData.value = {
-            labels: data.chart_data.labels,
-            datasets: [{
-                label: 'Nouveaux inscrits',
-                data: data.chart_data.datasets[0].data,
-                borderColor: '#3b82f6',
-                backgroundColor: (context) => {
-                    const ctx = context.chart.ctx;
-                    const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-                    gradient.addColorStop(0, 'rgba(59, 130, 246, 0.5)');
-                    gradient.addColorStop(1, 'rgba(59, 130, 246, 0)');
-                    return gradient;
-                },
-                fill: true,
-                tension: 0.4,
-                pointRadius: 0
-            }]
-        };
-
-
-
+        if (data.chart_data) {
+            chartData.value = {
+                labels: data.chart_data.labels,
+                datasets: [{
+                    label: 'Nouveaux inscrits',
+                    data: data.chart_data.datasets[0].data,
+                    borderColor: '#3b82f6',
+                    backgroundColor: (context) => {
+                        const chart = context.chart;
+                        const {ctx, chartArea} = chart;
+                        if (!chartArea) return null;
+                        const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+                        gradient.addColorStop(0, 'rgba(59, 130, 246, 0)');
+                        gradient.addColorStop(1, 'rgba(59, 130, 246, 0.5)');
+                        return gradient;
+                    },
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 0
+                }]
+            };
+        }
     } catch (err) {
         console.error('Failed to fetch dashboard data:', err);
     } finally {

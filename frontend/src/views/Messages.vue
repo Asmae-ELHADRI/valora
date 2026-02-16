@@ -5,6 +5,7 @@ import api from '../services/api';
 import echo from '../services/echo';
 import { useRoute } from 'vue-router';
 import { Send, User, MessageCircle, MessageSquare, MoreVertical, Search, CheckCheck, ChevronLeft, CheckCircle, Paperclip, X, FileText, Loader2, Play, Mic, Ban, Trash2, StopCircle, Pause, Flag, ShieldAlert } from 'lucide-vue-next';
+import ReportModal from '../components/ReportModal.vue'; // Import ReportModal
 
 const auth = useAuthStore();
 const route = useRoute();
@@ -38,8 +39,8 @@ const currentTime = ref(Date.now());
 
 // Reporting State
 const showReportModal = ref(false);
-const reportReason = ref('');
-const isReporting = ref(false);
+const showMenu = ref(false);
+const reportTarget = ref(null);
 
 const isOnline = (userId) => {
     return onlineUsers.value.some(u => u.id === userId);
@@ -70,40 +71,6 @@ const showSuccessToast = (message) => {
     }, 3000);
 };
 
-const reportForm = ref({
-    reason: 'Comportement inapproprié',
-    description: ''
-});
-const reportLoading = ref(false);
-const showMenu = ref(false);
-
-const openReportModal = () => {
-    showMenu.value = false;
-    showReportModal.value = true;
-};
-
-const submitReport = async () => {
-    if (!activeConversation.value) return;
-    reportLoading.value = true;
-    try {
-        await api.post('/api/report', {
-            reported_id: activeConversation.value.user.id,
-            reason: reportForm.value.reason,
-            description: reportForm.value.description
-        });
-        showSuccessToast('Utilisateur signalé et bloqué.');
-        showReportModal.value = false;
-        reportForm.value.description = '';
-        if (activeConversation.value) {
-            activeConversation.value.user.has_blocked = true;
-        }
-    } catch (err) {
-        showErrorToast(err.response?.data?.message || 'Erreur lors du signalement.');
-    } finally {
-        reportLoading.value = false;
-    }
-};
-
 const showErrorToast = (message) => {
     toastType.value = 'error';
     toastMessage.value = message;
@@ -122,34 +89,56 @@ const showInfoToast = (message) => {
     }, 5000);
 };
 
+const openReportModal = () => {
+    if (!activeConversation.value) return;
+    reportTarget.value = activeConversation.value.other_user;
+    showMenu.value = false;
+    showReportModal.value = true;
+};
+
+const onReportSuccess = () => {
+    showSuccessToast('Signalement envoyé avec succès.');
+};
+
 const fetchConversations = async () => {
     try {
-        const response = await api.get('/api/messages');
-        conversations.value = response.data.map(c => ({
+        const response = await api.get('/api/conversations');
+        conversations.value = response.data.data.map(c => ({
             ...c,
-            last_message_date: c.last_message ? new Date(c.last_message.created_at) : new Date(0)
+            last_message_date: c.last_message_time ? new Date(c.last_message_time) : new Date(0)
         }));
 
+        // Handle URL params for starting new chat
         if (route.query.user || route.query.userId) {
             const userId = parseInt(route.query.user || route.query.userId);
-            const existingConv = conversations.value.find(c => c.user.id === userId);
+            const existingConv = conversations.value.find(c => c.other_user.id === userId);
+            
             if (existingConv) {
                 selectConversation(existingConv);
             } else {
-                // Fetch basic info and start new conversation
+                // Determine context from query params
+                const relatedType = route.query.related_type || null;
+                const relatedId = route.query.related_id || null;
+
                 try {
-                    const userRes = await api.get(`/api/users/${userId}/basic`);
-                    const newUser = userRes.data;
-                    const newConv = {
-                        user: newUser,
-                        last_message: null,
-                        unread_count: 0
-                    };
-                    activeConversation.value = newConv;
-                    if (window.innerWidth < 768) showSidebar.value = false;
-                    messages.value = []; // Empty chat
+                    // Try to start/find conversation via API
+                    const res = await api.post('/api/conversations', {
+                        receiver_id: userId,
+                        related_type: relatedType,
+                        related_id: relatedId
+                    });
+                    
+                    const newConvData = res.data.data;
+                    // Re-fetch to get full structure users
+                    await fetchConversations();
+                    
+                    const foundConv = conversations.value.find(c => c.id === newConvData.id);
+                    if (foundConv) {
+                         selectConversation(foundConv);
+                    }
                 } catch (e) {
-                    console.error('Error fetching user for new chat', e);
+                    console.error('Error starting chat', e);
+                    showErrorToast('Impossible de démarrer la conversation');
                 }
             }
         }
@@ -160,10 +149,11 @@ const fetchConversations = async () => {
     }
 };
 
-const fetchMessages = async (userId) => {
+const fetchMessages = async (conversationId) => {
     try {
-        const response = await api.get(`/api/messages/${userId}`);
-        messages.value = response.data.data.reverse();
+        const response = await api.get(`/api/conversations/${conversationId}`);
+        // Response structure: { data: messages, conversation: ... }
+        messages.value = response.data.data; 
         messages.value.forEach(msg => {
             if (msg.attachment_path) fetchSecureUrl(msg);
         });
@@ -173,30 +163,12 @@ const fetchMessages = async (userId) => {
     }
 };
 
-const getBadgeClass = (level) => {
-    switch (level) {
-        case 'Expert': return 'bg-purple-600 text-white shadow-lg shadow-purple-200';
-        case 'Confirmé': return 'bg-blue-600 text-white shadow-lg shadow-blue-200';
-        default: return 'bg-gray-500 text-white shadow-lg shadow-gray-200';
-    }
-};
-
 const deleteMessage = async (msgId) => {
+    // ... (Keep existing delete logic if needed, or remove if not in new requirement)
     if (!confirm('Voulez-vous supprimer ce message ?')) return;
     try {
         await api.delete(`/api/messages/${msgId}`);
         messages.value = messages.value.filter(m => m.id !== msgId);
-        
-        // Sync conversation preview if it was the last message
-        if (activeConversation.value?.last_message?.id === msgId) {
-            const nextLast = messages.value[messages.value.length - 1] || null;
-            activeConversation.value.last_message = nextLast;
-            const conv = conversations.value.find(c => c.user.id === activeConversation.value.user.id);
-            if (conv) {
-                conv.last_message = nextLast;
-                if (nextLast) conv.last_message_date = new Date(nextLast.created_at);
-            }
-        }
     } catch (err) {
         showErrorToast('Erreur lors de la suppression');
     }
@@ -206,7 +178,7 @@ const selectConversation = async (conv) => {
     activeConversation.value = conv;
     conv.unread_count = 0; 
     if (window.innerWidth < 768) showSidebar.value = false;
-    await fetchMessages(conv.user.id);
+    await fetchMessages(conv.id);
 };
 
 const handleFileSelect = (event) => {
@@ -376,7 +348,7 @@ const sendMessage = async () => {
         id: 'temp-' + Date.now(),
         content: newMessage.value,
         sender_id: auth.user.id,
-        receiver_id: activeConversation.value.user.id,
+        receiver_id: activeConversation.value.other_user.id,
         created_at: new Date().toISOString(),
         pending: true,
         attachment_path: previewUrl.value || audioPreviewUrl.value, // Local preview
@@ -387,7 +359,6 @@ const sendMessage = async () => {
     scrollToBottom();
 
     const formData = new FormData();
-    formData.append('receiver_id', activeConversation.value.user.id);
     formData.append('content', newMessage.value);
     if (selectedFile.value) {
         formData.append('image', selectedFile.value);
@@ -400,8 +371,6 @@ const sendMessage = async () => {
     const sentFile = selectedFile.value;
     
     newMessage.value = '';
-    
-    // Clear attachments but keep temp ref if needed (though we just reset)
     clearFile();
     
     // Reset Audio
@@ -412,7 +381,7 @@ const sendMessage = async () => {
     isSending.value = true;
 
     try {
-        const response = await api.post('/api/messages', formData, {
+        const response = await api.post(`/api/conversations/${activeConversation.value.id}/messages`, formData, {
             headers: {
                 'Content-Type': 'multipart/form-data'
             }
@@ -420,11 +389,12 @@ const sendMessage = async () => {
         
         const index = messages.value.findIndex(m => m.id === tempMsg.id);
         if (index !== -1) {
-            messages.value[index] = response.data;
+            messages.value[index] = response.data.data;
         }
         
-        activeConversation.value.last_message = response.data;
-        activeConversation.value.last_message_date = new Date(response.data.created_at);
+        // Update last message in conversation list
+        activeConversation.value.last_message = response.data.data.content; // API returns string in last_message
+        activeConversation.value.last_message_date = new Date(response.data.data.created_at);
         conversations.value.sort((a, b) => b.last_message_date - a.last_message_date);
         
         showSuccessToast('Message envoyé !');
@@ -492,7 +462,7 @@ const groupedMessages = computed(() => {
 
 const isBlocked = computed(() => {
     if (!activeConversation.value) return false;
-    return activeConversation.value.user.has_blocked || activeConversation.value.user.is_blocked_by;
+    return activeConversation.value.is_blocked; // Simplified based on conversation state
 });
 
 const formatDateHeader = (dateStr) => {
@@ -520,6 +490,7 @@ onMounted(() => {
         clearInterval(timer);
     });
     
+    
     if (auth.user) {
         echo.join('online')
             .here((users) => {
@@ -540,13 +511,12 @@ onMounted(() => {
                 const newMsg = e.message;
                 
                 if (newMsg.sender_id !== auth.user.id) {
-                    showInfoToast(`${newMsg.sender?.name || 'Contact'} : ${newMsg.content || 'Nouveau fichier reçu'}`);
+                    showInfoToast(`Nouveau message de ${newMsg.sender?.name || 'Contact'}`);
                 }
 
                 // If it's for the active conversation
                 if (activeConversation.value && (
-                    newMsg.sender_id === activeConversation.value.user.id || 
-                    (newMsg.sender_id === auth.user.id && newMsg.receiver_id === activeConversation.value.user.id)
+                    newMsg.conversation_id === activeConversation.value.id
                 )) {
                     // Avoid duplicates (already added by sender's AJAX response)
                     const exists = messages.value.some(m => m.id === newMsg.id || (m.id.toString().startsWith('temp') && m.content === newMsg.content));
@@ -556,19 +526,18 @@ onMounted(() => {
                         scrollToBottom();
                         
                         // Mark as read immediately if it's the active conversation
-                        if (newMsg.sender_id === activeConversation.value.user.id) {
-                            api.post(`/api/messages/${newMsg.sender_id}/read`).catch(e => console.error('Error marking as read', e));
+                        if (newMsg.sender_id !== auth.user.id) {
+                            api.post(`/api/conversations/${activeConversation.value.id}/read`);
                         }
                     }
                 }
 
                 // Update conversations list summary
-                const otherUserId = newMsg.sender_id === auth.user.id ? newMsg.receiver_id : newMsg.sender_id;
-                const conv = conversations.value.find(c => c.user.id === otherUserId);
+                const conv = conversations.value.find(c => c.id === newMsg.conversation_id);
                 if (conv) {
-                    conv.last_message = newMsg;
+                    conv.last_message = newMsg.content;
                     conv.last_message_date = new Date(newMsg.created_at);
-                    if (newMsg.sender_id !== auth.user.id && (!activeConversation.value || activeConversation.value.user.id !== newMsg.sender_id)) {
+                    if (newMsg.sender_id !== auth.user.id && (!activeConversation.value || activeConversation.value.id !== newMsg.conversation_id)) {
                          conv.unread_count = (conv.unread_count || 0) + 1;
                     }
                     conversations.value.sort((a, b) => b.last_message_date - a.last_message_date);
@@ -586,7 +555,6 @@ onMounted(() => {
         
         <!-- Sidebar - Left Pane -->
         <div 
-            v-show="showSidebar"
             class="w-full md:w-[380px] bg-white rounded-[32px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col overflow-hidden transition-all duration-300 border border-slate-100"
             :class="{ 'hidden md:flex': !showSidebar }"
         >
@@ -607,27 +575,26 @@ onMounted(() => {
                 <div v-else class="space-y-1 mt-4">
                     <div 
                         v-for="conv in conversations" 
-                        :key="conv.user.id"
+                        :key="conv.id"
                         @click="selectConversation(conv)"
-                        :class="activeConversation?.user.id === conv.user.id 
+                        :class="activeConversation?.id === conv.id 
                             ? 'bg-white border-l-[3px] border-blue-600 shadow-[0_4px_20px_rgba(37,99,235,0.08)]' 
                             : 'hover:bg-slate-50 border-l-[3px] border-transparent'"
                         class="p-5 cursor-pointer transition-all duration-200 relative group rounded-r-2xl"
                     >
                         <div class="flex justify-between items-start mb-1">
-                            <h3 class="font-bold text-[15px] text-slate-900 truncate pr-2">{{ conv.user.name }}</h3>
+                            <h3 class="font-bold text-[15px] text-slate-900 truncate pr-2">{{ conv.other_user.name }}</h3>
                             <span class="text-[11px] font-bold text-slate-400 whitespace-nowrap min-w-fit" v-if="conv.last_message">
-                                {{ formatTime(conv.last_message.created_at) }}
+                                {{ formatTime(conv.last_message_date) }}
                             </span>
                         </div>
                         <div class="flex justify-between items-center gap-2">
                             <p class="text-[13px] text-slate-400 truncate grow font-medium">
-                                <span v-if="conv.last_message?.sender_id === auth.user?.id" class="text-slate-300">Vous: </span>
-                                {{ conv.last_message?.content || (conv.last_message?.attachment_type ? '[Fichier]' : 'Début de conversation') }}
+                                {{ conv.last_message || 'Démarrer la conversation' }}
                             </p>
                             <div class="flex items-center gap-1.5 shrink-0">
                                 <span v-if="conv.unread_count > 0" class="w-2 h-2 bg-blue-500 rounded-full"></span>
-                                <span v-if="isOnline(conv.user.id)" class="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
+                                <span v-if="isOnline(conv.other_user.id)" class="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
                             </div>
                         </div>
                     </div>
@@ -648,21 +615,21 @@ onMounted(() => {
                               <ChevronLeft class="w-5 h-5" />
                           </button>
                           <div class="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center overflow-hidden border border-slate-200/50">
-                              <img v-if="activeConversation.user.role === 'provider' && activeConversation.user.prestataire?.photo" :src="`http://localhost:8000/storage/${activeConversation.user.prestataire.photo}`" class="w-full h-full object-cover">
+                              <img v-if="activeConversation.other_user.role === 'provider' && activeConversation.other_user.prestataire?.photo" :src="`http://localhost:8000/storage/${activeConversation.other_user.prestataire.photo}`" class="w-full h-full object-cover">
                               <div v-else class="w-full h-full flex items-center justify-center text-slate-300 bg-slate-50"><User class="w-6 h-6" /></div>
                           </div>
                           <div>
                               <div class="flex items-center gap-2">
-                                  <h3 class="font-bold text-slate-900 text-[17px] leading-tight">{{ activeConversation.user.name }}</h3>
-                                  <span v-if="activeConversation.user.role === 'provider' && activeConversation.user.prestataire?.badge_level" 
-                                        :class="getBadgeClass(activeConversation.user.prestataire.badge_level)"
+                                  <h3 class="font-bold text-slate-900 text-[17px] leading-tight">{{ activeConversation.other_user.name }}</h3>
+                                  <span v-if="activeConversation.other_user.role === 'provider' && activeConversation.other_user.prestataire?.badge_level" 
+                                        :class="getBadgeClass(activeConversation.other_user.prestataire.badge_level)"
                                         class="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider"
                                   >
-                                      {{ activeConversation.user.prestataire.badge_level }}
+                                      {{ activeConversation.other_user.prestataire.badge_level }}
                                   </span>
                               </div>
                               <p class="text-[10px] font-black text-slate-400 mt-1 uppercase tracking-[0.1em]">
-                                 {{ isOnline(activeConversation.user.id) ? 'EN LIGNE' : formatLastSeen(activeConversation.user.last_seen_at) }}
+                                 {{ isOnline(activeConversation.other_user.id) ? 'EN LIGNE' : formatLastSeen(activeConversation.other_user.last_seen_at) }}
                               </p>
                           </div>
                      </div>
@@ -865,38 +832,14 @@ onMounted(() => {
     </div>
 
     <!-- Modals & Toasts stay mostly same but with visual polish -->
-    <Transition name="fade">
-        <div v-if="showReportModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px]" @click="showReportModal = false"></div>
-            <div class="relative bg-white w-full max-w-md rounded-[40px] shadow-2xl p-10 border border-slate-100 animate-in zoom-in-95 duration-200">
-                <h3 class="text-2xl font-black text-slate-900 mb-8 flex items-center">
-                    <Ban class="w-7 h-7 mr-4 text-red-500" />
-                    Signaler
-                </h3>
-                <div class="space-y-6">
-                    <div>
-                        <label class="block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-[0.2em]">Motif</label>
-                        <select v-model="reportForm.reason" class="w-full px-5 py-4 bg-slate-50 rounded-2xl border border-slate-100 focus:bg-white focus:ring-2 focus:ring-red-500/10 outline-none font-bold text-sm appearance-none">
-                            <option>Comportement inapproprié</option>
-                            <option>Spam ou fraude</option>
-                            <option>Harcèlement</option>
-                            <option>Autre problème</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-[0.2em]">Détails</label>
-                        <textarea v-model="reportForm.description" rows="4" class="w-full px-5 py-4 bg-slate-50 rounded-2xl border border-slate-100 focus:bg-white focus:ring-2 focus:ring-red-500/10 outline-none font-medium text-sm resize-none"></textarea>
-                    </div>
-                </div>
-                <div class="flex gap-4 mt-10">
-                    <button @click="showReportModal = false" class="flex-1 py-4 font-black text-[12px] uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors">Fermer</button>
-                    <button @click="submitReport" :disabled="reportLoading" class="flex-1 py-4 bg-red-500 text-white font-black text-[12px] uppercase tracking-widest rounded-2xl shadow-lg shadow-red-500/20 hover:bg-red-600 transition-all">
-                        {{ reportLoading ? '...' : 'Signaler' }}
-                    </button>
-                </div>
-            </div>
-        </div>
-    </Transition>
+    <!-- Report Modal -->
+    <ReportModal 
+        :isOpen="showReportModal"
+        :userId="activeConversation?.other_user?.id"
+        :userName="activeConversation?.other_user?.name"
+        @close="showReportModal = false"
+        @success="onReportSuccess"
+    />
 
     <!-- Toast Component -->
     <Transition name="toast">

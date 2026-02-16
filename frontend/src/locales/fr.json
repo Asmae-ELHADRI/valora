@@ -69,6 +69,29 @@
       "apply_btn": "Postuler",
       "all_categories": "Toutes les catégories",
       "register_apply": "S'inscrire / Postuler"
+    },
+    "how_it_works": {
+      "title": "Comment ça marche ?",
+      "subtitle": "Simplicité & Efficacité",
+      "step1_title": "Postez votre besoin",
+      "step1_desc": "Décrivez ce que vous cherchez. Notre IA vous connecte aux meilleurs talents locaux en quelques secondes.",
+      "step2_title": "Choisissez un expert",
+      "step2_desc": "Comparez les profils vérifiés, lisez les avis et sélectionnez celui qui correspond à vos attentes.",
+      "step3_title": "Payez en sécurité",
+      "step3_desc": "Votre paiement est conservé jusqu'à ce que le service soit réalisé et validé par vos soins."
+    },
+    "categories_section": {
+      "title": "Catégories populaires",
+      "subtitle": "Explorez nos univers",
+      "view_all": "Voir tout"
+    },
+    "testimonials": {
+      "title": "Ce qu'ils disent de nous",
+      "subtitle": "Témoignages",
+      "role1": "Artisane Passionnée",
+      "role2": "Plombier Expert",
+      "text1": "Grâce à Valora, j'ai trouvé un artisan passionné en moins d'une heure. Le système de paiement est d'une fiabilité remarquable.",
+      "text2": "En tant que professionnel, Valora est la seule plateforme qui valorise réellement mon savoir-faire au juste prix."
     }
   },
   "auth": {

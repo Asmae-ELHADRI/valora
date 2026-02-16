@@ -28,15 +28,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/invite', [\App\Http\Controllers\Api\ServiceRequestController::class, 'invite']);
     Route::post('/service-requests/{id}/status', [\App\Http\Controllers\Api\ServiceRequestController::class, 'updateStatus']);
 
-    // Messaging routes
-    Route::get('/messages', [\App\Http\Controllers\Api\MessageController::class, 'index']);
+    // Messaging routes (New System)
     Route::get('/messages/unread-count', [\App\Http\Controllers\Api\MessageController::class, 'unreadCount']);
-    Route::get('/messages/attachments/{messageId}', [\App\Http\Controllers\Api\MessageController::class, 'downloadAttachment']);
-    Route::get('/messages/{userId}', [\App\Http\Controllers\Api\MessageController::class, 'show']);
-    Route::post('/messages/{userId}/read', [\App\Http\Controllers\Api\MessageController::class, 'markAsRead']);
-    Route::post('/messages', [\App\Http\Controllers\Api\MessageController::class, 'store']);
-    Route::delete('/messages/{id}', [\App\Http\Controllers\Api\MessageController::class, 'destroy']);
-
+    Route::get('/conversations', [\App\Http\Controllers\Api\ConversationController::class, 'index']);
+    Route::post('/conversations', [\App\Http\Controllers\Api\ConversationController::class, 'store']); // Start/Get conversation
+    Route::get('/conversations/{id}', [\App\Http\Controllers\Api\ConversationController::class, 'show']);
+    Route::post('/conversations/{id}/messages', [\App\Http\Controllers\Api\ConversationController::class, 'sendMessage']);
+    Route::post('/conversations/{id}/read', [\App\Http\Controllers\Api\ConversationController::class, 'markAsRead']);
+    
+    // Legacy Message Routes (Deprecating or adapting)
+    // Route::get('/messages', [\App\Http\Controllers\Api\MessageController::class, 'index']);
+    
     // Review routes
     Route::get('/reviews/provider', [\App\Http\Controllers\Api\ReviewController::class, 'providerReviews']);
     Route::get('/reviews/client', [\App\Http\Controllers\Api\ReviewController::class, 'clientReviews']);
@@ -87,7 +89,17 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Admin Specific Routes
     Route::middleware(['admin'])->prefix('admin')->group(function () {
+        // ... (Existing admin routes)
         Route::get('/stats', [\App\Http\Controllers\Api\AdminController::class, 'stats']);
+        
+        // Roles & Permissions (RBAC)
+        Route::get('/roles', [\App\Http\Controllers\Api\AdminRoleController::class, 'index']);
+        Route::post('/roles', [\App\Http\Controllers\Api\AdminRoleController::class, 'store']);
+        Route::put('/roles/{id}', [\App\Http\Controllers\Api\AdminRoleController::class, 'update']);
+        Route::delete('/roles/{id}', [\App\Http\Controllers\Api\AdminRoleController::class, 'destroy']);
+        Route::get('/permissions', [\App\Http\Controllers\Api\AdminRoleController::class, 'getPermissions']);
+
+        // ... (Other existing routes)
         Route::get('/conversations', [\App\Http\Controllers\Api\AdminController::class, 'conversations']);
         Route::get('/conversations/{user1}/{user2}', [\App\Http\Controllers\Api\AdminController::class, 'getMessagesBetweenUsers']);
         Route::get('/messages/attachments/{id}', [\App\Http\Controllers\Api\AdminController::class, 'downloadAttachment']);
@@ -129,6 +141,15 @@ Route::middleware('auth:sanctum')->group(function () {
         // Badge Management
         Route::get('/badges', [\App\Http\Controllers\Api\AdminController::class, 'badgesList']);
         Route::put('/badges/{id}', [\App\Http\Controllers\Api\AdminController::class, 'updateBadge']);
+
+        // Moderation & Complaints (New)
+        Route::get('/complaints', [\App\Http\Controllers\Admin\ComplaintController::class, 'index']);
+        Route::get('/complaints/{id}', [\App\Http\Controllers\Admin\ComplaintController::class, 'show']);
+        Route::post('/complaints/{id}/action', [\App\Http\Controllers\Admin\ComplaintController::class, 'action']);
+        
+        // Admin Conversations Overview
+        Route::get('/conversations', [\App\Http\Controllers\Admin\ConversationController::class, 'index']);
+        Route::get('/conversations/{sender}/{receiver}', [\App\Http\Controllers\Admin\ConversationController::class, 'show']);
     });
 });
 

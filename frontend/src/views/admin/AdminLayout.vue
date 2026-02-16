@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '../../store/auth';
 import { 
   LayoutDashboard, 
+  Shield,
   ShieldAlert, 
   Award, 
   Users, 
@@ -34,6 +35,7 @@ const menuItems = computed(() => [
   { name: t('admin.users', 'Utilisateurs'), path: '/admin/users', icon: Users },
   { name: t('nav.conversations', 'Conversations'), path: '/admin/conversations', icon: MessageCircle, arrow: true },
   { name: t('admin.reports', 'Signalements'), path: '/admin/moderation', icon: ShieldAlert },
+  { name: t('admin.roles', 'Rôles & Permissions'), path: '/admin/roles', icon: Shield },
   { name: t('admin.grades', 'Grades'), path: '/admin/governance', icon: Award },
   { name: t('admin.settings', 'Paramètres'), path: '/admin/settings', icon: Settings },
 ]);

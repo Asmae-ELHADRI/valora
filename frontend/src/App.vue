@@ -1,11 +1,12 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from './store/auth';
 import api from './services/api';
 import echo from './services/echo';
 import { LogOut, User as UserIcon, MessageSquare, Search, Settings, CheckCircle, X, Info, Bell, Briefcase } from 'lucide-vue-next';
 import valoraLogo from './assets/v-logo.png';
+import Footer from './components/Footer.vue';
 import BottomNav from './components/BottomNav.vue';
 import LanguageSwitcher from './components/LanguageSwitcher.vue';
 
@@ -17,11 +18,12 @@ const isScrolled = ref(false);
 const notifications = ref([]);
 const unreadNotifCount = ref(0);
 const showNotifDropdown = ref(false);
+const route = useRoute();
 
 const fetchNotifications = async () => {
   if (!auth.isAuthenticated) return;
   try {
-    const response = await api.get('/notifications');
+    const response = await api.get('/api/notifications');
     notifications.value = response.data.notifications.map(n => ({
         id: n.id,
         type: n.data.type || 'system',
@@ -39,7 +41,7 @@ const fetchNotifications = async () => {
 
 const markNotifRead = async (id) => {
     try {
-        await api.post(`/notifications/${id}/read`);
+        await api.post(`/api/notifications/${id}/read`);
         const notif = notifications.value.find(n => n.id === id);
         if (notif && notif.unread) {
             notif.unread = false;
@@ -52,7 +54,7 @@ const markNotifRead = async (id) => {
 
 const markAllNotifsRead = async () => {
     try {
-        await api.post('/notifications/read-all');
+        await api.post('/api/notifications/read-all');
         notifications.value.forEach(n => n.unread = false);
         unreadNotifCount.value = 0;
     } catch (error) {
@@ -131,7 +133,14 @@ onMounted(() => {
   if (auth.user) {
     echo.private(`chat.${auth.user.id}`)
       .listen('MessageSent', (e) => {
-        // ... message handling ...
+        const msg = e.message;
+        if (msg.sender_id !== auth.user.id) {
+          // If we're not already on the messages page for this conversation
+          if (route.path !== '/messages') {
+              unreadCount.value++;
+              showGlobalToast(`Nouveau message de ${msg.sender?.name || 'Contact'}`, 'info');
+          }
+        }
       });
 
     // Listen for real-time notifications
@@ -173,10 +182,11 @@ onUnmounted(() => {
 <template>
   <div class="min-h-screen bg-gray-50 flex flex-col">
     <!-- Premium Navbar -->
-    <nav :class="[isScrolled ? 'navbar-transparent' : 'navbar-scrolled']"
-         class="navbar-premium sticky top-0 z-50 transition-all duration-500">
-      <!-- Gradient Background -->
-      <div class="navbar-gradient" :class="{ 'opacity-100': !isScrolled, 'opacity-0': isScrolled }"></div>
+    <nav v-if="!route.path.startsWith('/admin')"
+         :class="[isScrolled ? 'navbar-glacier' : 'navbar-top']"
+         class="navbar-premium sticky top-0 z-50 transition-all duration-700">
+      <!-- Top Gradient Overlay (Only at top) -->
+      <div class="navbar-gradient-top" :class="{ 'opacity-100': !isScrolled, 'opacity-0': isScrolled }"></div>
       
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div class="flex justify-between h-20">
@@ -303,11 +313,7 @@ onUnmounted(() => {
     </main>
 
     <!-- Footer -->
-    <footer v-if="!['/login', '/register'].includes($route.path) && !$route.path.startsWith('/admin')" class="bg-white border-t border-gray-200 py-8">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-gray-500 text-sm">
-        <p>© 2026 VALORA {{ $t('common.footer_quote') }}</p>
-      </div>
-    </footer>
+    <Footer v-if="!['/login', '/register'].includes($route.path) && !$route.path.startsWith('/admin')" />
 
     <!-- Global Toast Notification -->
     <Transition name="toast">
@@ -355,31 +361,71 @@ onUnmounted(() => {
   transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.navbar-transparent {
+.navbar-top {
   background: transparent;
   box-shadow: none;
 }
 
-.navbar-scrolled {
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.3);
+.navbar-top .nav-link, 
+.navbar-top .nav-btn-secondary, 
+.navbar-top .nav-icon-btn {
+  color: #ffffff;
 }
 
-/* Gradient Background with Deeper Premium Palette */
-.navbar-gradient {
+.navbar-glacier {
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 
+    0 4px 30px rgba(0, 0, 0, 0.03),
+    inset 0 0 20px rgba(255, 255, 255, 0.5);
+}
+
+.navbar-glacier .nav-link,
+.navbar-glacier .nav-btn-secondary,
+.navbar-glacier .nav-icon-btn {
+  color: #0f172a;
+}
+
+/* Shiny Glacier Effect Overlay */
+.navbar-glacier::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    110deg,
+    transparent 20%,
+    rgba(255, 255, 255, 0.4) 48%,
+    rgba(255, 255, 255, 0.5) 50%,
+    rgba(255, 255, 255, 0.4) 52%,
+    transparent 80%
+  );
+  background-size: 200% 100%;
+  animation: shine-glacier 8s infinite linear;
+  pointer-events: none;
+  z-index: -1;
+}
+
+@keyframes shine-glacier {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* Gradient Background for the Top State */
+.navbar-gradient-top {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(165deg, 
-    rgba(15, 23, 42, 0.9) 0%,     /* Premium Blue */
-    rgba(30, 41, 59, 0.8) 40%,    /* Slate 800 */
-    rgba(69, 26, 3, 0.9) 100%     /* Deeper Brown */
+  background: linear-gradient(180deg, 
+    rgba(15, 23, 42, 0.8) 0%,
+    rgba(15, 23, 42, 0.4) 50%,
+    transparent 100%
   );
-  z-index: 1;
-  transition: opacity 0.5s ease;
+  z-index: -1;
+  transition: opacity 0.7s ease;
 }
 
 /* Bottom Border Glow */
@@ -419,17 +465,9 @@ onUnmounted(() => {
   letter-spacing: 0.01em;
 }
 
-.navbar-transparent .nav-link {
-  color: #0f172a;
-}
-
-.navbar-scrolled .nav-link {
-  color: rgba(255, 255, 255, 0.9);
-}
-
 .nav-link:hover {
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.15);
+  color: #facc15;
+  background: rgba(255, 255, 255, 0.1);
   transform: translateY(-1px);
 }
 
@@ -502,21 +540,8 @@ onUnmounted(() => {
   letter-spacing: 0.01em;
 }
 
-.navbar-transparent .nav-btn-secondary {
-  color: #0f172a;
-  border: 1.5px solid rgba(15, 23, 42, 0.2);
-  background: rgba(15, 23, 42, 0.05);
-}
-
-.navbar-scrolled .nav-btn-secondary {
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.15);
-  border: 1.5px solid rgba(255, 255, 255, 0.3);
-}
-
 .nav-btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.25);
-  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.2);
   transform: translateY(-1px);
 }
 
@@ -534,16 +559,14 @@ onUnmounted(() => {
   cursor: pointer;
 }
 
-.navbar-transparent .nav-icon-btn {
-  color: #0f172a;
-  background: rgba(15, 23, 42, 0.05);
-  border: 1.5px solid rgba(15, 23, 42, 0.1);
-}
-
-.navbar-scrolled .nav-icon-btn {
-  color: rgba(255, 255, 255, 0.9);
+.navbar-top .nav-icon-btn {
   background: rgba(255, 255, 255, 0.1);
   border: 1.5px solid rgba(255, 255, 255, 0.2);
+}
+
+.navbar-glacier .nav-icon-btn {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1.5px solid rgba(255, 255, 255, 0.3);
 }
 
 .nav-icon-btn:hover {

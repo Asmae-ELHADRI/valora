@@ -2,12 +2,15 @@
 import { ref, onMounted, watch } from 'vue';
 import { useAuthStore } from '../store/auth';
 import api from '../services/api';
+import { useRouter } from 'vue-router';
 import { 
   Search, Filter, MapPin, Briefcase, Calendar, 
-  ChevronRight, Euro, Clock, X, Loader2, Info, Check, ShieldAlert
+  ChevronRight, Euro, Clock, X, Loader2, Info, Check, ShieldAlert, MessageCircle
 } from 'lucide-vue-next';
+import ReportModal from '../components/ReportModal.vue';
 
 const auth = useAuthStore();
+const router = useRouter();
 const offers = ref([]);
 const categories = ref([]);
 const loading = ref(false);
@@ -28,26 +31,6 @@ const applying = ref(false);
 const applySuccess = ref(false);
 
 const showReportModal = ref(false);
-const reportReason = ref('');
-const reporting = ref(false);
-
-const submitReport = async () => {
-  if (!reportReason.value.trim()) return;
-  reporting.value = true;
-  try {
-    await api.post('/api/report', {
-      reported_id: selectedOffer.value.user?.id || selectedOffer.value.user_id,
-      reason: reportReason.value
-    });
-    alert('Signalement envoyé avec succès');
-    showReportModal.value = false;
-    reportReason.value = '';
-  } catch (err) {
-    alert(err.response?.data?.message || 'Erreur lors de l\'envois');
-  } finally {
-    reporting.value = false;
-  }
-};
 
 const submitApplication = async () => {
   if (!selectedOffer.value) return;
@@ -66,6 +49,18 @@ const submitApplication = async () => {
   } finally {
     applying.value = false;
   }
+};
+
+const contactClient = () => {
+    if (!selectedOffer.value || !selectedOffer.value.user) return;
+    router.push({
+        path: '/messages',
+        query: {
+            user: selectedOffer.value.user.id,
+            related_type: 'service_request', // or 'offer'
+            related_id: selectedOffer.value.id
+        }
+    });
 };
 
 const fetchOffers = async () => {
@@ -358,52 +353,46 @@ const formatDate = (date) => {
             </div>
           </div>
 
-          <div class="mt-12 flex flex-col sm:flex-row gap-4">
-            <button 
-              v-if="!applySuccess"
-              @click="submitApplication"
-              :disabled="applying"
-              class="grow bg-slate-900 text-white py-5 rounded-2xl font-black hover:bg-slate-800 shadow-xl shadow-slate-200 transition disabled:opacity-50 flex items-center justify-center space-x-3 active:scale-[0.98]"
-            >
-              <Loader2 v-if="applying" class="w-5 h-5 animate-spin" />
-              <span>{{ applying ? $t('search.sending') : $t('search.apply_btn') }}</span>
-            </button>
-            <button @click="showReportModal = true" class="p-5 bg-red-50 text-red-600 rounded-2xl hover:bg-red-100 transition active:scale-[0.98]" title="Signaler cette offre">
-              <ShieldAlert class="w-6 h-6" />
-            </button>
-            <button @click="closeOffer" class="px-10 py-5 bg-gray-100 text-slate-600 rounded-2xl font-bold hover:bg-gray-200 transition active:scale-[0.98]">
-              {{ $t('search.close_btn') }}
-            </button>
-          </div>
+            <div v-if="!applySuccess" class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-12">
+               <button 
+                  @click="contactClient"
+                  class="py-5 rounded-2xl font-black bg-blue-50 text-blue-600 hover:bg-blue-100 shadow-xl shadow-blue-100 transition flex items-center justify-center space-x-3 active:scale-[0.98]"
+                >
+                  <MessageCircle class="w-5 h-5" />
+                  <span>Discuter</span>
+                </button>
+                <button 
+                  @click="submitApplication"
+                  :disabled="applying"
+                  class="bg-slate-900 text-white py-5 rounded-2xl font-black hover:bg-slate-800 shadow-xl shadow-slate-200 transition disabled:opacity-50 flex items-center justify-center space-x-3 active:scale-[0.98]"
+                >
+                  <Loader2 v-if="applying" class="w-5 h-5 animate-spin" />
+                  <span>{{ applying ? $t('search.sending') : $t('search.apply_btn') }}</span>
+                </button>
+            </div>
+            
+            <div class="flex gap-4 mt-6 justify-center">
+                 <button @click="showReportModal = true" class="text-xs font-black text-red-400 hover:text-red-500 uppercase tracking-widest flex items-center gap-2 transition">
+                   <ShieldAlert class="w-4 h-4" />
+                   Signaler l'offre
+                 </button>
+                 <button @click="closeOffer" class="text-xs font-black text-slate-400 hover:text-slate-600 uppercase tracking-widest transition">
+                   Fermer
+                 </button>
+            </div>
+
         </div>
       </div>
     </div>
+
     <!-- Report Modal -->
-    <div v-if="showReportModal" class="fixed inset-0 z-120 flex items-center justify-center p-4">
-      <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="showReportModal = false"></div>
-      <div class="relative bg-white w-full max-w-lg rounded-[3rem] shadow-2xl p-10 animate-in fade-in zoom-in duration-300">
-        <div class="text-center mb-8">
-          <div class="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4 text-red-600">
-            <ShieldAlert class="w-8 h-8" />
-          </div>
-          <h3 class="text-2xl font-black text-slate-900">Signaler cette offre</h3>
-          <p class="text-sm text-slate-500 mt-2">Expliquez-nous pourquoi vous signalez cette offre (arnaque, contenu inapproprié...).</p>
-        </div>
-        <div class="space-y-6">
-          <div>
-            <label class="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Raison du signalement</label>
-            <textarea v-model="reportReason" rows="4" placeholder="Ex: Cette offre semble être une arnaque..." class="w-full px-6 py-4 bg-slate-50 border-none rounded-2xl text-sm focus:ring-4 focus:ring-slate-100 outline-none font-medium text-slate-700 resize-none"></textarea>
-          </div>
-          <div class="flex gap-4">
-            <button @click="showReportModal = false" class="grow py-4 rounded-2xl font-bold border border-gray-200 text-gray-500 hover:bg-gray-50 transition">Annuler</button>
-            <button @click="submitReport" :disabled="reporting || !reportReason.trim()" class="grow py-4 rounded-2xl font-bold bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 transition flex items-center justify-center">
-               <Loader2 v-if="reporting" class="w-5 h-5 animate-spin mr-2" />
-               <span>Envoyer</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <ReportModal 
+        :isOpen="showReportModal"
+        :userId="selectedOffer?.user?.id"
+        :userName="selectedOffer?.user?.name"
+        @close="showReportModal = false"
+        @success="showReportModal = false"
+    />
   </div>
 </template>
 

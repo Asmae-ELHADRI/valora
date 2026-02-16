@@ -146,6 +146,7 @@ class ProviderController extends Controller
             'description' => 'nullable|string',
             'achievements' => 'nullable|array', // Added
             'achievements.*' => 'string',       // Added
+            'languages' => 'nullable|array',    // Added
             'experience' => 'nullable|string',
             'diplomas' => 'nullable|string',
             'category_ids' => 'nullable|array',
@@ -177,6 +178,7 @@ class ProviderController extends Controller
             'skills' => $request->skills,
             'description' => $request->description,
             'achievements' => $request->achievements, // Added
+            'languages' => $request->languages,       // Added
             'experience' => $request->experience,
             'diplomas' => $request->diplomas,
             'category_id' => !empty($request->category_ids) ? $request->category_ids[0] : null,

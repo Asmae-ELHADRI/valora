@@ -13,6 +13,21 @@ const routes = [
         component: () => import('../views/Login.vue')
     },
     {
+        path: '/about',
+        name: 'About',
+        component: () => import('../views/About.vue')
+    },
+    {
+        path: '/contact',
+        name: 'Contact',
+        component: () => import('../views/Contact.vue')
+    },
+    {
+        path: '/services/:slug',
+        name: 'ServiceDetail',
+        component: () => import('../views/ServiceDetail.vue')
+    },
+    {
         path: '/register',
         name: 'Register',
         component: () => import('../views/Login.vue')
@@ -34,7 +49,7 @@ const routes = [
         path: '/dashboard-provider',
         name: 'DashboardProvider',
         component: () => import('../views/DashboardProvider.vue'),
-        meta: { requiresAuth: true, role: 'provider' }
+        meta: { requiresAuth: true, role: ['provider', 'prestataire'] }
     },
     {
         path: '/dashboard-prestataire',
@@ -106,7 +121,7 @@ const routes = [
         path: '/certificate',
         name: 'Certificate',
         component: () => import('../views/Certificate.vue'),
-        meta: { requiresAuth: true, role: 'provider' }
+        meta: { requiresAuth: true, role: ['provider', 'prestataire'] }
     },
     {
         path: '/admin',
@@ -134,6 +149,11 @@ const routes = [
                 component: () => import('../views/admin/AdminConversations.vue')
             },
             {
+                path: 'roles',
+                name: 'AdminRoles',
+                component: () => import('../views/admin/AdminRoles.vue')
+            },
+            {
                 path: 'users',
                 name: 'AdminUsers',
                 component: () => import('../views/admin/AdminUsers.vue')
@@ -142,8 +162,19 @@ const routes = [
                 path: 'settings',
                 name: 'AdminSettings',
                 component: () => import('../views/admin/AdminSettings.vue')
+            },
+            {
+                path: 'moderation',
+                name: 'AdminModeration',
+                component: () => import('../views/admin/AdminModeration.vue')
             }
         ]
+    },
+    {
+        path: '/provider/certificate',
+        name: 'ProviderCertificate',
+        component: () => import('../views/provider/Certificate.vue'),
+        meta: { requiresAuth: true, role: 'provider' }
     }
 ]
 

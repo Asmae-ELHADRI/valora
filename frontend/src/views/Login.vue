@@ -54,6 +54,17 @@ watch(() => route.path, (newPath) => {
     } else if (newPath === '/login') {
         isLoginMode.value = true;
     }
+    error.value = '';
+    registrationSuccess.value = false;
+});
+
+// Clear errors on local mode/role changes
+watch(isLoginMode, () => {
+    error.value = '';
+    registrationSuccess.value = false;
+});
+watch(activeRole, () => {
+    error.value = '';
 });
 
 // Error Handling

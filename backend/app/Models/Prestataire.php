@@ -22,6 +22,7 @@ class Prestataire extends Model
         'skills',
         'description',
         'achievements', // Added
+        'languages',    // Added
         'experience',
         'diplomas',
         'availabilities',
@@ -37,6 +38,7 @@ class Prestataire extends Model
         'birth_date' => 'date',
         'availabilities' => 'array',
         'achievements' => 'array', // Added
+        'languages' => 'array',    // Added
         'is_available' => 'boolean',
         'is_visible' => 'boolean',
         'is_completed' => 'boolean',
