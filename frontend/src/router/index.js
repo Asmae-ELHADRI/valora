@@ -159,6 +159,11 @@ const routes = [
                 component: () => import('../views/admin/AdminUsers.vue')
             },
             {
+                path: 'messages',
+                name: 'AdminMessages',
+                component: () => import('../views/admin/AdminMessages.vue')
+            },
+            {
                 path: 'settings',
                 name: 'AdminSettings',
                 component: () => import('../views/admin/AdminSettings.vue')

@@ -16,17 +16,20 @@ import {
   Sun, 
   Moon,
   MessageCircle,
+  MessageSquare,
   ChevronRight,
   Menu
 } from 'lucide-vue-next';
 import LanguageSwitcher from '../../components/LanguageSwitcher.vue';
 import { useThemeStore } from '../../store/theme';
+import api from '../../services/api';
 
 const { t, locale } = useI18n();
 const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
 const themeStore = useThemeStore();
+const unreadCount = ref(0);
 
 const isActive = (path) => route.path === path;
 
@@ -34,6 +37,7 @@ const menuItems = computed(() => [
   { name: t('admin.dashboard', 'Tableau de bord'), path: '/admin/dashboard', icon: LayoutDashboard },
   { name: t('admin.users', 'Utilisateurs'), path: '/admin/users', icon: Users },
   { name: t('nav.conversations', 'Conversations'), path: '/admin/conversations', icon: MessageCircle, arrow: true },
+  { name: 'Mes Messages', path: '/admin/messages', icon: MessageSquare, badge: unreadCount.value, section: 'messaging' },
   { name: t('admin.reports', 'Signalements'), path: '/admin/moderation', icon: ShieldAlert },
   { name: t('admin.roles', 'Rôles & Permissions'), path: '/admin/roles', icon: Shield },
   { name: t('admin.grades', 'Grades'), path: '/admin/governance', icon: Award },
@@ -45,11 +49,27 @@ const logout = async () => {
     router.push('/login');
 };
 
+// Fetch unread count
+const fetchUnreadCount = async () => {
+  try {
+    const response = await api.get('/api/admin/my-conversations/unread-count');
+    unreadCount.value = response.data.count || 0;
+  } catch (error) {
+    console.error('Error fetching unread count:', error);
+  }
+};
+
 // RTL Support
 const isRTL = computed(() => locale.value === 'ar');
 watch(isRTL, (newVal) => {
   document.documentElement.dir = newVal ? 'rtl' : 'ltr';
 }, { immediate: true });
+
+onMounted(() => {
+  fetchUnreadCount();
+  // Refresh every 30 seconds
+  setInterval(fetchUnreadCount, 30000);
+});
 
 </script>
 
@@ -103,6 +123,14 @@ watch(isRTL, (newVal) => {
             <span class="font-bold text-[14px] tracking-wide">{{ item.name }}</span>
           </div>
           
+          <!-- Badge for unread messages -->
+          <span 
+            v-if="item.badge && item.badge > 0" 
+            class="absolute top-2 right-2 min-w-[20px] h-5 px-1.5 flex items-center justify-center bg-red-500 text-white text-xs font-bold rounded-full shadow-lg"
+          >
+            {{ item.badge > 99 ? '99+' : item.badge }}
+          </span>
+          
           <ChevronRight 
             v-if="item.arrow && !isActive(item.path)" 
             class="w-4 h-4 text-slate-300 dark:text-slate-600 opacity-0 group-hover:opacity-100 transition-all duration-300 -translate-x-2 group-hover:translate-x-0" 
@@ -110,47 +138,63 @@ watch(isRTL, (newVal) => {
           />
         </router-link>
       </nav>
-
-      <!-- Bottom Tools & Profile -->
-      <div class="p-5 border-t border-slate-100 dark:border-white/5 bg-slate-50/80 dark:bg-[#0F172A]/80 backdrop-blur-md">
-        
-        <!-- Tools Row -->
-        <div class="flex items-center justify-between mb-6 px-1">
-             <LanguageSwitcher 
-               class="origin-left scale-95" 
-               :class="{ 'origin-right': isRTL }"
-             />
-             <button 
-                @click="themeStore.toggleTheme" 
-                class="w-10 h-10 flex items-center justify-center rounded-xl bg-white dark:bg-white/5 border border-slate-100 dark:border-white/5 text-slate-400 hover:text-amber-500 hover:border-amber-500/30 transition-all shadow-sm"
-             >
-                <Sun v-if="themeStore.theme === 'light'" class="w-5 h-5 transition-transform duration-500 hover:rotate-90" />
-                <Moon v-else class="w-5 h-5 transition-transform duration-500 hover:-rotate-12" />
-             </button>
-        </div>
-
-        <!-- User Profile Card -->
-        <div class="flex items-center gap-4 p-4 rounded-[24px] bg-white dark:bg-[#1E293B] border border-slate-100 dark:border-white/5 shadow-lg shadow-slate-200/50 dark:shadow-none bg-gradient-to-br from-white to-slate-50 dark:from-[#1E293B] dark:to-[#0F172A] relative overflow-hidden group">
-            <div class="absolute inset-0 bg-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-            
-            <div class="w-11 h-11 rounded-full bg-slate-100 dark:bg-[#0F172A] flex items-center justify-center overflow-hidden border-2 border-slate-200 dark:border-white/10 flex-shrink-0 shadow-sm relative z-10">
-                <img v-if="auth.user?.photo" :src="auth.user.photo" class="w-full h-full object-cover">
-                <span v-else class="font-black text-slate-500 dark:text-slate-400 text-sm">{{ auth.user?.name?.charAt(0) || 'A' }}</span>
-            </div>
-            
-            <div class="flex-1 min-w-0 relative z-10">
-                <p class="text-[13px] font-black text-slate-900 dark:text-white truncate tracking-tight">{{ auth.user?.name || 'Admin' }}</p>
-                <button @click="logout" class="text-[11px] font-bold text-red-500 hover:text-red-600 transition-colors text-left flex items-center gap-1.5 mt-0.5 group/logout">
-                    <LogOut class="w-3 h-3 group-hover/logout:-translate-x-0.5 transition-transform" />
-                    <span>Se déconnecter</span>
-                </button>
-            </div>
-        </div>
-      </div>
     </aside>
 
     <!-- Main Content Area -->
     <main class="flex-1 h-full overflow-y-auto relative scroll-smooth no-scrollbar bg-[#F8FAFC] dark:bg-[#0F172A]">
+        <!-- Top Navbar -->
+        <div class="sticky top-0 z-40 bg-white/80 dark:bg-[#1E293B]/80 backdrop-blur-md border-b border-slate-200/60 dark:border-white/5 px-8 py-4">
+          <div class="max-w-[1600px] mx-auto flex items-center justify-end gap-4">
+            
+            <!-- Messages Button -->
+            <router-link 
+              to="/admin/messages" 
+              class="relative w-10 h-10 flex items-center justify-center rounded-xl bg-white dark:bg-white/5 border border-slate-100 dark:border-white/5 text-slate-600 dark:text-slate-400 hover:text-blue-600 hover:border-blue-500/30 transition-all shadow-sm"
+              :class="{ 'text-blue-600 border-blue-500/30': route.path === '/admin/messages' }"
+            >
+              <MessageSquare class="w-5 h-5" />
+              <!-- Badge -->
+              <span 
+                v-if="unreadCount > 0" 
+                class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full shadow-lg"
+              >
+                {{ unreadCount > 99 ? '99+' : unreadCount }}
+              </span>
+            </router-link>
+            
+            <!-- Language Switcher -->
+            <LanguageSwitcher 
+              class="origin-right" 
+              :class="{ 'origin-left': isRTL }"
+            />
+            
+            <!-- Dark Mode Toggle -->
+            <button 
+              @click="themeStore.toggleTheme" 
+              class="w-10 h-10 flex items-center justify-center rounded-xl bg-white dark:bg-white/5 border border-slate-100 dark:border-white/5 text-slate-400 hover:text-amber-500 hover:border-amber-500/30 transition-all shadow-sm"
+            >
+              <Sun v-if="themeStore.theme === 'light'" class="w-5 h-5 transition-transform duration-500 hover:rotate-90" />
+              <Moon v-else class="w-5 h-5 transition-transform duration-500 hover:-rotate-12" />
+            </button>
+            
+            <!-- User Profile Dropdown -->
+            <div class="flex items-center gap-3 px-4 py-2 rounded-2xl bg-white dark:bg-[#1E293B] border border-slate-100 dark:border-white/5 shadow-sm hover:shadow-md transition-all">
+              <div class="w-9 h-9 rounded-full bg-slate-100 dark:bg-[#0F172A] flex items-center justify-center overflow-hidden border-2 border-slate-200 dark:border-white/10 flex-shrink-0">
+                <img v-if="auth.user?.photo" :src="auth.user.photo" class="w-full h-full object-cover">
+                <span v-else class="font-black text-slate-500 dark:text-slate-400 text-xs">{{ auth.user?.name?.charAt(0) || 'A' }}</span>
+              </div>
+              
+              <div class="flex flex-col min-w-0">
+                <p class="text-xs font-black text-slate-900 dark:text-white truncate">{{ auth.user?.name || 'Admin' }}</p>
+                <button @click="logout" class="text-[10px] font-bold text-red-500 hover:text-red-600 transition-colors text-left flex items-center gap-1 group/logout">
+                  <LogOut class="w-3 h-3 group-hover/logout:-translate-x-0.5 transition-transform" />
+                  <span>Déconnexion</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        
         <!-- Content Container -->
         <div class="max-w-[1600px] mx-auto p-8 lg:p-12 pb-32">
              <router-view v-slot="{ Component }">

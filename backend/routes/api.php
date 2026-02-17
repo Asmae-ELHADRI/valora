@@ -156,9 +156,19 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/reports/{id}/suspend', [\App\Http\Controllers\Admin\ModerationController::class, 'suspend']);
         Route::post('/reports/{id}/delete-account', [\App\Http\Controllers\Admin\ModerationController::class, 'deleteAccount']);
         
-        // Admin Conversations Overview
+        // Admin Conversations Overview (Moderation - Read Only)
         Route::get('/conversations', [\App\Http\Controllers\Admin\ConversationController::class, 'index']);
         Route::get('/conversations/{sender}/{receiver}', [\App\Http\Controllers\Admin\ConversationController::class, 'show']);
+        
+        // Admin Direct Messages (Participation)
+        Route::prefix('my-conversations')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Admin\AdminMessageController::class, 'index']);
+            Route::get('/unread-count', [\App\Http\Controllers\Admin\AdminMessageController::class, 'unreadCount']);
+            Route::get('/{id}', [\App\Http\Controllers\Admin\AdminMessageController::class, 'show']);
+            Route::post('/{id}/messages', [\App\Http\Controllers\Admin\AdminMessageController::class, 'sendMessage']);
+            Route::post('/{id}/read', [\App\Http\Controllers\Admin\AdminMessageController::class, 'markAsRead']);
+            Route::post('/start', [\App\Http\Controllers\Admin\AdminMessageController::class, 'startConversation']);
+        });
     });
 });
 
